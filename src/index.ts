@@ -108,7 +108,7 @@ export default {
         });
 
         // Only process ticket creation events
-        if (data.type === 'zen:event-type:ticket.created' && data.detail) {
+        if ((data.type === 'zen:event-type:ticket.created' || data.type === 'ticket.created') && data.detail) {
           try {
             // Validate required environment variables
             if (!env.CLICKUP_TOKEN || !env.CLICKUP_LIST_ID) {
