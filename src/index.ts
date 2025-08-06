@@ -4,6 +4,7 @@ interface Env {
   ZENDESK_TOKEN: string;
   CLICKUP_TOKEN: string;
   CLICKUP_LIST_ID: string;
+  WEBHOOK_SECRET: string;
   TASK_MAPPING?: KVNamespace;
 }
 
@@ -88,6 +89,7 @@ export default {
             zendesk_token: env.ZENDESK_TOKEN ? '✅ configured' : '❌ missing',
             clickup_token: env.CLICKUP_TOKEN ? '✅ configured' : '❌ missing',
             clickup_list_id: env.CLICKUP_LIST_ID ? '✅ configured' : '❌ missing',
+            webhook_secret: env.WEBHOOK_SECRET ? '✅ configured' : '❌ missing',
             kv_storage: env.TASK_MAPPING ? '✅ available' : '❌ missing'
           },
           timestamp: new Date().toISOString()
@@ -99,6 +101,21 @@ export default {
 
       // Route: Zendesk webhook - Create ClickUp task when ticket is created
       if (url.pathname === '/zendesk-webhook' && method === 'POST') {
+        // Validate webhook secret for security
+        const authHeader = request.headers.get('Authorization');
+        const expectedSecret = `Bearer ${env.WEBHOOK_SECRET}`;
+        
+        if (!authHeader || authHeader !== expectedSecret) {
+          return new Response(JSON.stringify({
+            status: 'error',
+            message: 'Unauthorized - Invalid webhook secret',
+            timestamp: new Date().toISOString()
+          }), {
+            status: 401,
+            headers: corsHeaders
+          });
+        }
+        
         const data: ZendeskWebhook = await request.json();
         
         console.log('📧 Zendesk webhook received:', {
