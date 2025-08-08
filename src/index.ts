@@ -1,9 +1,42 @@
-import { Env, ZendeskWebhook, ClickUpWebhook, SlackEvent } from './types/index.js';
+import { Env, ZendeskWebhook, ClickUpWebhook, SlackEvent, ZendeskTicket } from './types/index.js';
 import { SlackService } from './services/slack.js';
 import { ZendeskService } from './services/zendesk.js';
 import { ClickUpService } from './services/clickup.js';
 import { AIService } from './services/ai.js';
 import { getCorsHeaders, formatErrorResponse, formatSuccessResponse } from './utils/index.js';
+
+// Helper functions to normalize webhook data
+function mapPriority(priority: string): 'low' | 'normal' | 'high' | 'urgent' {
+  const mapping: Record<string, 'low' | 'normal' | 'high' | 'urgent'> = {
+    'low': 'low',
+    'normal': 'normal', 
+    'high': 'high',
+    'urgent': 'urgent',
+    // Handle Zendesk v2 webhook formats
+    'LOW': 'low',
+    'NORMAL': 'normal',
+    'HIGH': 'high', 
+    'URGENT': 'urgent'
+  };
+  return mapping[priority] || 'normal';
+}
+
+function mapStatus(status: string): 'new' | 'open' | 'pending' | 'solved' | 'closed' {
+  const mapping: Record<string, 'new' | 'open' | 'pending' | 'solved' | 'closed'> = {
+    'new': 'new',
+    'open': 'open',
+    'pending': 'pending', 
+    'solved': 'solved',
+    'closed': 'closed',
+    // Handle Zendesk v2 webhook formats
+    'NEW': 'new',
+    'OPEN': 'open',
+    'PENDING': 'pending',
+    'SOLVED': 'solved',
+    'CLOSED': 'closed'
+  };
+  return mapping[status] || 'new';
+}
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -13,11 +46,35 @@ export default {
     // CORS headers for all responses
     const corsHeaders = getCorsHeaders();
     
-    // Initialize services
-    const slackService = new SlackService(env);
-    const zendeskService = new ZendeskService(env);
-    const clickupService = new ClickUpService(env);
-    const aiService = new AIService(env);
+    // Initialize services with error handling
+    let slackService: SlackService | null = null;
+    let zendeskService: ZendeskService | null = null;
+    let clickupService: ClickUpService | null = null;
+    let aiService: AIService | null = null;
+
+    try {
+      slackService = new SlackService(env);
+    } catch (error) {
+      console.warn('Slack service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
+
+    try {
+      zendeskService = new ZendeskService(env);
+    } catch (error) {
+      console.warn('Zendesk service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
+
+    try {
+      clickupService = new ClickUpService(env);
+    } catch (error) {
+      console.warn('ClickUp service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
+
+    try {
+      aiService = new AIService(env);
+    } catch (error) {
+      console.warn('AI service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
 
     // Handle CORS preflight
     if (method === 'OPTIONS') {
@@ -49,7 +106,9 @@ export default {
             'POST /clickup-webhook - ClickUp webhook endpoint',
             'POST /slack/events - Slack events endpoint',
             'POST /slack/commands - Slack commands endpoint',
-            'POST /test-ai - Test AI summarization'
+            'POST /test-ai - Test AI summarization',
+            'POST /test-clickup - Test ClickUp integration',
+            'POST /test-slack - Test Slack integration'
           ]
         }), {
           status: 200,
@@ -62,6 +121,12 @@ export default {
         return new Response(JSON.stringify({
           status: 'ok',
           message: 'TaskGenie Environment Test',
+          services: {
+            slack: slackService ? '✅ available' : '❌ unavailable',
+            zendesk: zendeskService ? '✅ available' : '❌ unavailable',
+            clickup: clickupService ? '✅ available' : '❌ unavailable',
+            ai: aiService ? '✅ available' : '❌ unavailable'
+          },
           environment: {
             // Zendesk Configuration
             zendesk_domain: env.ZENDESK_DOMAIN ? '✅ configured' : '❌ missing',
@@ -78,7 +143,7 @@ export default {
             
             // AI Configuration
             ai_provider: env.AI_PROVIDER || '❌ not set',
-            ai_configured: aiService.isConfigured() ? '✅ ready' : '❌ missing keys',
+            ai_configured: aiService?.isConfigured() ? '✅ ready' : '❌ missing keys',
             
             // Storage & Security
             webhook_secret: env.WEBHOOK_SECRET ? '✅ configured' : '❌ missing',
@@ -94,6 +159,14 @@ export default {
       // Route: Zendesk webhook - Create ClickUp task and notify Slack
       if (url.pathname === '/zendesk-webhook' && method === 'POST') {
         try {
+          // Check if required services are available
+          if (!clickupService) {
+            return new Response(JSON.stringify(formatErrorResponse('ClickUp service not available - check environment configuration')), {
+              status: 503,
+              headers: corsHeaders
+            });
+          }
+
           // Validate webhook secret for security
           const authHeader = request.headers.get('Authorization');
           const expectedSecret = `Bearer ${env.WEBHOOK_SECRET}`;
@@ -107,28 +180,54 @@ export default {
           
           const data: ZendeskWebhook = await request.json();
           
+          // Handle both old and new Zendesk webhook formats
+          const rawTicket = data.ticket || data.detail;
+          
+          // Normalize the ticket data to match expected format
+          const ticket = rawTicket ? {
+            ...rawTicket,
+            id: typeof rawTicket.id === 'string' ? parseInt(rawTicket.id) : rawTicket.id,
+            priority: mapPriority(rawTicket.priority || 'normal'),
+            status: mapStatus(rawTicket.status || 'new'),
+            tags: rawTicket.tags || []
+          } as ZendeskTicket : null;
+          
           console.log('📧 Zendesk webhook received:', {
             type: data.type,
-            ticket_id: data.ticket?.id,
-            subject: data.ticket?.subject
+            ticket_id: ticket?.id,
+            subject: ticket?.subject,
+            format: data.ticket ? 'legacy' : 'v2'
           });
 
           // Only process ticket creation events
-          if ((data.type === 'zen:event-type:ticket.created' || data.type === 'ticket.created') && data.ticket) {
+          if ((data.type === 'zen:event-type:ticket.created' || data.type === 'ticket.created') && ticket) {
+            console.log('📋 Processing ticket creation event for ticket:', ticket.id);
+            
             // Create ClickUp task using the service
-            const clickupTask = await clickupService.createTaskFromTicket(data.ticket);
+            let clickupTask;
+            try {
+              clickupTask = await clickupService.createTaskFromTicket(ticket);
+            } catch (clickupError) {
+              console.error('💥 ClickUp task creation failed:', clickupError);
+              throw new Error(`ClickUp task creation failed: ${clickupError instanceof Error ? clickupError.message : 'Unknown error'}`);
+            }
             
             if (!clickupTask) {
-              throw new Error('Failed to create ClickUp task');
+              console.error('❌ ClickUp task creation returned null');
+              throw new Error('Failed to create ClickUp task - service returned null');
             }
 
-            console.log('✅ ClickUp task created:', clickupTask.id);
+            console.log('🎉 ClickUp task created successfully:', {
+              id: clickupTask.id,
+              name: clickupTask.name,
+              url: clickupTask.url
+            });
 
             // Store mapping in KV if available
             if (env.TASK_MAPPING) {
-              const mappingKey = `zendesk_${data.ticket.id}`;
+              const mappingKey = `zendesk_${ticket.id}`;
               const mappingValue = {
-                zendesk_ticket_id: data.ticket.id,
+                zendesk_ticket_id: ticket.id,
                 clickup_task_id: clickupTask.id,
                 created_at: new Date().toISOString(),
                 status: 'active'
@@ -139,17 +238,17 @@ export default {
 
             // Send Slack notification if configured
             let slackThreadTs: string | undefined;
-            if (env.SLACK_BOT_TOKEN && env.SLACK_SIGNING_SECRET) {
+            if (slackService && env.SLACK_BOT_TOKEN && env.SLACK_SIGNING_SECRET) {
               try {
                 // For demo purposes, we'll use a default channel
                 // In production, this should be configurable
                 const defaultChannel = '#taskgenie'; // or get from env
-                const zendeskUrl = zendeskService.getTicketUrl(data.ticket.id);
+                const zendeskUrl = zendeskService?.getTicketUrl(ticket.id) || `https://${env.ZENDESK_DOMAIN}/agent/tickets/${ticket.id}`;
                 const clickupUrl = clickupService.getTaskUrl(clickupTask.id);
                 
                 const slackMessage = await slackService.sendTaskCreationMessage(
                   defaultChannel,
-                  data.ticket.id.toString(),
+                  ticket.id.toString(),
                   zendeskUrl,
                   clickupUrl,
                   'Steve' // In production, get from ticket requester
@@ -164,8 +263,8 @@ export default {
             }
 
             return new Response(JSON.stringify(formatSuccessResponse({
-              zendesk_ticket_id: data.ticket.id,
-              zendesk_subject: data.ticket.subject,
+              zendesk_ticket_id: ticket.id,
+              zendesk_subject: ticket.subject,
               clickup_task_id: clickupTask.id,
               clickup_task_url: clickupService.getTaskUrl(clickupTask.id),
               slack_thread_ts: slackThreadTs,
@@ -197,6 +296,13 @@ export default {
       // Route: Slack Events API
       if (url.pathname === '/slack/events' && method === 'POST') {
         try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse('Slack service not available - check environment configuration')), {
+              status: 503,
+              headers: corsHeaders
+            });
+          }
+
           const body = await request.text();
           const timestamp = request.headers.get('X-Slack-Request-Timestamp') || '';
           const signature = request.headers.get('X-Slack-Signature') || '';
@@ -310,6 +416,17 @@ export default {
       // Route: Test AI functionality
       if (url.pathname === '/test-ai' && method === 'POST') {
         try {
+          if (!aiService) {
+            return new Response(JSON.stringify({
+              error: 'AI Service Not Available',
+              message: 'AI service is not configured. Please check your environment variables.',
+              timestamp: new Date().toISOString()
+            }), {
+              status: 503,
+              headers: corsHeaders
+            });
+          }
+
           const data = await request.json() as { text?: string };
           const text = data.text;
           
@@ -435,7 +552,132 @@ export default {
         }
       }
 
-      // Route: Test Slack Integration
+      // Route: Test ClickUp Integration
+      if (url.pathname === '/test-clickup' && method === 'POST') {
+        try {
+          if (!clickupService) {
+            return new Response(JSON.stringify({
+              error: 'ClickUp Service Not Available',
+              message: 'ClickUp service is not configured. Please check your environment variables.',
+              timestamp: new Date().toISOString()
+            }), {
+              status: 503,
+              headers: corsHeaders
+            });
+          }
+
+          const body = await request.json() as { 
+            action: 'test_auth' | 'create_test_task' | 'list_spaces';
+            test_ticket_id?: string;
+          };
+          
+          const results: any = {
+            action: body.action,
+            timestamp: new Date().toISOString()
+          };
+          
+          switch (body.action) {
+            case 'test_auth':
+              // Test ClickUp API authentication
+              const connectionTest = await clickupService.testConnection();
+              results.connection_test = connectionTest;
+              break;
+              
+            case 'create_test_task':
+              // Create a test task to verify the integration
+              const testTicket = {
+                id: parseInt(body.test_ticket_id || '12345'),
+                subject: 'Test Ticket from TaskGenie',
+                description: 'This is a test ticket created to verify the ClickUp integration.',
+                status: 'new',
+                priority: 'normal',
+                created_at: new Date().toISOString(),
+                requester_id: 123456,
+                tags: ['test', 'automation']
+              } as ZendeskTicket;
+              
+              try {
+                const testTask = await clickupService.createTaskFromTicket(testTicket);
+                results.test_task_creation = {
+                  success: !!testTask,
+                  task_id: testTask?.id,
+                  task_url: testTask ? clickupService.getTaskUrl(testTask.id) : null
+                };
+              } catch (error) {
+                results.test_task_creation = {
+                  success: false,
+                  error: error instanceof Error ? error.message : 'Unknown error'
+                };
+              }
+              break;
+              
+            case 'list_spaces':
+              // List ClickUp spaces to help debug list configuration
+              try {
+                const spacesResponse = await fetch('https://api.clickup.com/api/v2/team', {
+                  headers: {
+                    'Authorization': env.CLICKUP_TOKEN,
+                    'Content-Type': 'application/json'
+                  }
+                });
+                
+                if (spacesResponse.ok) {
+                  const spacesData = await spacesResponse.json();
+                  results.spaces = spacesData;
+                } else {
+                  const errorText = await spacesResponse.text();
+                  results.spaces_error = {
+                    status: spacesResponse.status,
+                    statusText: spacesResponse.statusText,
+                    body: errorText
+                  };
+                }
+              } catch (error) {
+                results.spaces_error = {
+                  message: error instanceof Error ? error.message : 'Unknown error'
+                };
+              }
+              break;
+              
+            default:
+              return new Response(JSON.stringify({
+                error: 'Invalid Action',
+                message: 'action must be one of: test_auth, create_test_task, list_spaces',
+                available_actions: ['test_auth', 'create_test_task', 'list_spaces'],
+                timestamp: new Date().toISOString()
+              }), {
+                status: 400,
+                headers: corsHeaders
+              });
+          }
+          
+          // Check environment configuration
+          results.environment_check = {
+            clickup_token: !!env.CLICKUP_TOKEN,
+            clickup_list_id: !!env.CLICKUP_LIST_ID,
+            clickup_list_id_value: env.CLICKUP_LIST_ID || 'not set'
+          };
+          
+          return new Response(JSON.stringify({
+            status: 'success',
+            clickup_test_results: results
+          }), {
+            status: 200,
+            headers: corsHeaders
+          });
+          
+        } catch (error) {
+          console.error('❌ ClickUp test error:', error);
+          return new Response(JSON.stringify({
+            error: 'ClickUp Test Failed',
+            message: error instanceof Error ? error.message : 'Unknown ClickUp test error',
+            timestamp: new Date().toISOString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
       if (url.pathname === '/test-slack' && method === 'POST') {
         try {
           const body = await request.json() as { 
@@ -445,7 +687,6 @@ export default {
             test_signature?: boolean;
           };
           
-          const slackService = new SlackService(env);
           const results: any = {
             action: body.action,
             timestamp: new Date().toISOString()
@@ -566,6 +807,7 @@ export default {
           'POST /slack/commands - Slack slash commands',
           'POST /test-ai - Test AI summarization',
           'POST /test-zendesk-ai - Test Zendesk + AI integration',
+          'POST /test-clickup - Test ClickUp integration',
           'POST /test-slack - Test Slack integration'
         ]
       }), {

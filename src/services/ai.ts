@@ -26,12 +26,17 @@ export class GoogleGeminiProvider implements AIProvider {
 }
 
 export class AIService {
-  private provider: AIProvider;
+  private provider: AIProvider | null = null;
   private env: Env;
 
   constructor(env: Env) {
     this.env = env;
-    this.provider = this.createProvider();
+    try {
+      this.provider = this.createProvider();
+    } catch (error) {
+      console.warn('AI provider not configured:', error instanceof Error ? error.message : 'Unknown error');
+      this.provider = null;
+    }
   }
 
   private createProvider(): AIProvider {
@@ -56,6 +61,10 @@ export class AIService {
   }
 
   async summarizeTicket(ticketContent: string): Promise<AIResponse> {
+    if (!this.provider) {
+      throw new Error('AI provider is not configured');
+    }
+
     try {
       const summary = await this.provider.summarize(ticketContent);
       
@@ -72,15 +81,10 @@ export class AIService {
   }
 
   isConfigured(): boolean {
-    try {
-      this.createProvider();
-      return true;
-    } catch {
-      return false;
-    }
+    return this.provider !== null;
   }
 
   getProviderName(): string {
-    return this.provider.name;
+    return this.provider?.name || 'none';
   }
 }

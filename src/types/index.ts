@@ -58,6 +58,7 @@ export interface ZendeskTicket {
 export interface ZendeskWebhook {
   type: string;
   ticket?: ZendeskTicket;
+  detail?: ZendeskTicket; // New webhook format uses 'detail' instead of 'ticket'
   current_user?: ZendeskUser;
   account?: {
     subdomain: string;

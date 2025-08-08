@@ -8,6 +8,18 @@ export class ZendeskService {
 
   constructor(env: Env) {
     this.env = env;
+    
+    // Validate required environment variables
+    if (!env.ZENDESK_DOMAIN) {
+      throw new Error('ZENDESK_DOMAIN environment variable is required');
+    }
+    if (!env.ZENDESK_EMAIL) {
+      throw new Error('ZENDESK_EMAIL environment variable is required');
+    }
+    if (!env.ZENDESK_TOKEN) {
+      throw new Error('ZENDESK_TOKEN environment variable is required');
+    }
+    
     // Ensure the domain includes .zendesk.com if not already present
     const domain = env.ZENDESK_DOMAIN.includes('.zendesk.com') 
       ? env.ZENDESK_DOMAIN 
