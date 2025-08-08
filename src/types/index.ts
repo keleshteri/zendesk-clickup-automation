@@ -10,11 +10,24 @@ export interface Env {
   CLICKUP_TEAM_ID?: string;
   CLICKUP_SPACE_ID?: string;
   
+  // Slack Configuration
+  SLACK_BOT_TOKEN: string;
+  SLACK_SIGNING_SECRET: string;
+  SLACK_APP_TOKEN?: string;
+  
+  // AI Provider Configuration
+  AI_PROVIDER: 'googlegemini' | 'openai' | 'openrouter';
+  GOOGLE_GEMINI_API_KEY?: string;
+  OPENAI_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
+  OPENROUTER_MODEL?: string;
+  
   // KV Storage
   TASK_MAPPING?: KVNamespace;
   
   // Optional
   ENVIRONMENT?: string;
+  WEBHOOK_SECRET?: string;
 }
 
 // Zendesk Types
@@ -40,6 +53,15 @@ export interface ZendeskTicket {
   created_at: string;
   updated_at: string;
   external_id?: string;
+}
+
+export interface ZendeskWebhook {
+  type: string;
+  ticket?: ZendeskTicket;
+  current_user?: ZendeskUser;
+  account?: {
+    subdomain: string;
+  };
 }
 
 export interface ZendeskWebhookPayload {
@@ -128,6 +150,24 @@ export interface ClickUpTask {
   url: string;
 }
 
+export interface ClickUpWebhook {
+  event: string;
+  task_id: string;
+  webhook_id: string;
+  history_items?: Array<{
+    id: string;
+    type: number;
+    date: string;
+    field: string;
+    parent_id: string;
+    data: any;
+    source: string;
+    user: ClickUpUser;
+    before?: any;
+    after?: any;
+  }>;
+}
+
 export interface ClickUpWebhookPayload {
   event: string;
   task_id: string;
@@ -200,10 +240,65 @@ export interface IntegrationConfig {
     team_id?: string;
     space_id?: string;
   };
+  slack: {
+    bot_token: string;
+    signing_secret: string;
+    app_token?: string;
+  };
+  ai: {
+    provider: 'googlegemini' | 'openai' | 'openrouter';
+    api_key: string;
+    model?: string;
+  };
   features: {
     auto_create_tasks: boolean;
     sync_status: boolean;
     sync_comments: boolean;
     sync_priority: boolean;
+    ai_summarization: boolean;
   };
+}
+
+// Slack Types
+export interface SlackEvent {
+  type: string;
+  channel: string;
+  user: string;
+  text: string;
+  ts: string;
+  thread_ts?: string;
+}
+
+export interface SlackMessage {
+  channel: string;
+  text: string;
+  thread_ts?: string;
+  blocks?: any[];
+  user: string;
+  ts: string;
+}
+
+export interface TaskGenieContext {
+  ticketId?: string;
+  zendesk_ticket_id?: number;
+  clickup_task_id?: string;
+  slack_thread_ts?: string;
+  channel: string;
+  threadTs: string;
+  user_id?: string;
+  channel_id?: string;
+  awaiting_summarization?: boolean;
+}
+
+// AI Provider Types
+export interface AIProvider {
+  name: 'googlegemini' | 'openai' | 'openrouter';
+  summarize(text: string): Promise<string>;
+}
+
+export interface AIResponse {
+  summary: string;
+  provider: string;
+  model?: string;
+  timestamp: string;
 }
