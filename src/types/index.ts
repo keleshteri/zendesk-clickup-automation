@@ -5,10 +5,15 @@ export interface Env {
   ZENDESK_TOKEN: string;
   
   // ClickUp Configuration  
-  CLICKUP_TOKEN: string;
+  CLICKUP_TOKEN?: string; // Optional - for direct API token usage
   CLICKUP_LIST_ID: string;
   CLICKUP_TEAM_ID?: string;
   CLICKUP_SPACE_ID?: string;
+  
+  // ClickUp OAuth Configuration
+  CLICKUP_CLIENT_ID: string;
+  CLICKUP_CLIENT_SECRET: string;
+  CLICKUP_REDIRECT_URI: string;
   
   // Slack Configuration
   SLACK_BOT_TOKEN: string;
@@ -302,4 +307,29 @@ export interface AIResponse {
   provider: string;
   model?: string;
   timestamp: string;
+}
+
+// OAuth Types
+export interface OAuthTokens {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+  token_type: string;
+  scope?: string;
+  expires_at?: number; // calculated expiration timestamp
+}
+
+export interface ClickUpOAuthResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface UserOAuthData {
+  user_id: string;
+  team_id?: string;
+  access_token: string;
+  refresh_token?: string;
+  expires_at?: number;
+  authorized_at: string;
+  scopes?: string[];
 }

@@ -1,22 +1,62 @@
-import { ClickUpTask, Env, ZendeskTicket } from '../types/index.js';
+import { ClickUpTask, Env, ZendeskTicket, UserOAuthData } from '../types/index.js';
 import { mapZendeskToClickUpPriority, mapZendeskToClickUpStatus } from '../utils/index.js';
 
 export class ClickUpService {
   private env: Env;
   private baseUrl: string = 'https://api.clickup.com/api/v2';
+  private userOAuthData: UserOAuthData | null = null;
 
-  constructor(env: Env) {
+  constructor(env: Env, userOAuthData?: UserOAuthData | null) {
     this.env = env;
+    this.userOAuthData = userOAuthData || null;
+  }
+
+  /**
+   * Set OAuth data for this service instance
+   */
+  setOAuthData(oauthData: UserOAuthData | null): void {
+    this.userOAuthData = oauthData;
+    console.log(`🔧 ClickUp service OAuth data ${oauthData ? 'set' : 'cleared'}`);
+  }
+
+  /**
+   * Get the appropriate authorization header (OAuth or API token)
+   */
+  private getAuthHeader(): string {
+    if (this.userOAuthData?.access_token) {
+      console.log('🔐 Using OAuth token for ClickUp API');
+      return `Bearer ${this.userOAuthData.access_token}`;
+    } else if (this.env.CLICKUP_TOKEN) {
+      console.log('🔐 Using API token for ClickUp API');
+      return this.env.CLICKUP_TOKEN;
+    } else {
+      throw new Error('No ClickUp authentication available - neither OAuth token nor API token configured');
+    }
+  }
+
+  /**
+   * Check if service has valid authentication
+   */
+  hasValidAuth(): boolean {
+    const hasOAuth = !!(this.userOAuthData?.access_token);
+    const hasApiToken = !!this.env.CLICKUP_TOKEN;
+    
+    console.log('🔍 ClickUp auth check:', {
+      oauth: hasOAuth ? '✅' : '❌',
+      api_token: hasApiToken ? '✅' : '❌'
+    });
+    
+    return hasOAuth || hasApiToken;
   }
 
   async createTaskFromTicket(ticket: ZendeskTicket): Promise<ClickUpTask | null> {
     console.log('🚀 Starting ClickUp task creation for ticket:', ticket.id);
     
     try {
-      // Validate required environment variables
-      if (!this.env.CLICKUP_TOKEN) {
-        console.error('❌ CLICKUP_TOKEN is not configured');
-        throw new Error('ClickUp token is not configured');
+      // Validate authentication and required configuration
+      if (!this.hasValidAuth()) {
+        console.error('❌ No ClickUp authentication available');
+        throw new Error('ClickUp authentication is not configured');
       }
       
       if (!this.env.CLICKUP_LIST_ID) {
@@ -24,7 +64,7 @@ export class ClickUpService {
         throw new Error('ClickUp list ID is not configured');
       }
 
-      console.log('✅ Environment variables validated');
+      console.log('✅ Authentication and environment validated');
       console.log('📋 Target ClickUp List ID:', this.env.CLICKUP_LIST_ID);
 
       const taskData = {
@@ -53,7 +93,7 @@ export class ClickUpService {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': this.env.CLICKUP_TOKEN,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(taskData)
@@ -112,7 +152,7 @@ export class ClickUpService {
       
       const response = await fetch(`${this.baseUrl}/task/${taskId}`, {
         headers: {
-          'Authorization': this.env.CLICKUP_TOKEN,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json'
         }
       });
@@ -144,7 +184,7 @@ export class ClickUpService {
       const response = await fetch(`${this.baseUrl}/task/${taskId}`, {
         method: 'PUT',
         headers: {
-          'Authorization': this.env.CLICKUP_TOKEN,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(updates)
@@ -174,7 +214,7 @@ export class ClickUpService {
       const response = await fetch(`${this.baseUrl}/task/${taskId}/comment`, {
         method: 'POST',
         headers: {
-          'Authorization': this.env.CLICKUP_TOKEN,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -229,13 +269,13 @@ ${ticket.assignee_id ? `- Assignee ID: ${ticket.assignee_id}` : ''}
     try {
       console.log('🔧 Testing ClickUp API connection...');
       
-      if (!this.env.CLICKUP_TOKEN) {
-        return { success: false, error: 'ClickUp token not configured' };
+      if (!this.hasValidAuth()) {
+        return { success: false, error: 'ClickUp authentication not configured' };
       }
 
       const response = await fetch(`${this.baseUrl}/team`, {
         headers: {
-          'Authorization': this.env.CLICKUP_TOKEN,
+          'Authorization': this.getAuthHeader(),
           'Content-Type': 'application/json'
         }
       });

@@ -1,8 +1,9 @@
-import { Env, ZendeskWebhook, ClickUpWebhook, SlackEvent, ZendeskTicket } from './types/index.js';
+import { Env, ZendeskWebhook, ClickUpWebhook, SlackEvent, ZendeskTicket, UserOAuthData } from './types/index.js';
 import { SlackService } from './services/slack.js';
 import { ZendeskService } from './services/zendesk.js';
 import { ClickUpService } from './services/clickup.js';
 import { AIService } from './services/ai.js';
+import { OAuthService } from './services/oauth.js';
 import { getCorsHeaders, formatErrorResponse, formatSuccessResponse } from './utils/index.js';
 
 // Helper functions to normalize webhook data
@@ -51,6 +52,7 @@ export default {
     let zendeskService: ZendeskService | null = null;
     let clickupService: ClickUpService | null = null;
     let aiService: AIService | null = null;
+    let oauthService: OAuthService | null = null;
 
     try {
       slackService = new SlackService(env);
@@ -74,6 +76,12 @@ export default {
       aiService = new AIService(env);
     } catch (error) {
       console.warn('AI service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
+
+    try {
+      oauthService = new OAuthService(env);
+    } catch (error) {
+      console.warn('OAuth service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
     }
 
     // Handle CORS preflight
@@ -106,6 +114,9 @@ export default {
             'POST /clickup-webhook - ClickUp webhook endpoint',
             'POST /slack/events - Slack events endpoint',
             'POST /slack/commands - Slack commands endpoint',
+            'GET  /auth/clickup - Start ClickUp OAuth flow',
+            'GET  /auth/clickup/callback - ClickUp OAuth callback',
+            'GET  /auth/status - Check OAuth authorization status',
             'POST /test-ai - Test AI summarization',
             'POST /test-clickup - Test ClickUp integration',
             'POST /test-slack - Test Slack integration'
@@ -125,7 +136,8 @@ export default {
             slack: slackService ? '✅ available' : '❌ unavailable',
             zendesk: zendeskService ? '✅ available' : '❌ unavailable',
             clickup: clickupService ? '✅ available' : '❌ unavailable',
-            ai: aiService ? '✅ available' : '❌ unavailable'
+            ai: aiService ? '✅ available' : '❌ unavailable',
+            oauth: oauthService ? '✅ available' : '❌ unavailable'
           },
           environment: {
             // Zendesk Configuration
@@ -134,8 +146,13 @@ export default {
             zendesk_token: env.ZENDESK_TOKEN ? '✅ configured' : '❌ missing',
             
             // ClickUp Configuration
-            clickup_token: env.CLICKUP_TOKEN ? '✅ configured' : '❌ missing',
+            clickup_token: env.CLICKUP_TOKEN ? '✅ configured' : '❌ missing (OAuth recommended)',
             clickup_list_id: env.CLICKUP_LIST_ID ? '✅ configured' : '❌ missing',
+            
+            // ClickUp OAuth Configuration  
+            clickup_client_id: env.CLICKUP_CLIENT_ID ? '✅ configured' : '❌ missing',
+            clickup_client_secret: env.CLICKUP_CLIENT_SECRET ? '✅ configured' : '❌ missing',
+            clickup_redirect_uri: env.CLICKUP_REDIRECT_URI ? '✅ configured' : '❌ missing',
             
             // Slack Configuration
             slack_bot_token: env.SLACK_BOT_TOKEN ? '✅ configured' : '❌ missing',
@@ -203,10 +220,29 @@ export default {
           if ((data.type === 'zen:event-type:ticket.created' || data.type === 'ticket.created') && ticket) {
             console.log('📋 Processing ticket creation event for ticket:', ticket.id);
             
-            // Create ClickUp task using the service
+            // Try to get OAuth data for enhanced permissions
+            let oauthClickUpService = clickupService;
+            if (oauthService && env.TASK_MAPPING) {
+              try {
+                // For demo, use 'default' user - in production, this should come from the webhook or be configurable
+                const defaultUserId = 'default'; 
+                const oauthData = await oauthService.getUserOAuth(defaultUserId);
+                
+                if (oauthData && oauthService.isTokenValid(oauthData)) {
+                  console.log('✅ Using OAuth tokens for ClickUp API');
+                  oauthClickUpService = new ClickUpService(env, oauthData);
+                } else {
+                  console.log('⚠️ OAuth data not found or invalid, falling back to API token');
+                }
+              } catch (oauthError) {
+                console.warn('⚠️ Error retrieving OAuth data, falling back to API token:', oauthError);
+              }
+            }
+            
+            // Create ClickUp task using the service (OAuth or API token)
             let clickupTask;
             try {
-              clickupTask = await clickupService.createTaskFromTicket(ticket);
+              clickupTask = await oauthClickUpService.createTaskFromTicket(ticket);
             } catch (clickupError) {
               console.error('💥 ClickUp task creation failed:', clickupError);
               throw new Error(`ClickUp task creation failed: ${clickupError instanceof Error ? clickupError.message : 'Unknown error'}`);
@@ -244,7 +280,7 @@ export default {
                 // In production, this should be configurable
                 const defaultChannel = '#taskgenie'; // or get from env
                 const zendeskUrl = zendeskService?.getTicketUrl(ticket.id) || `https://${env.ZENDESK_DOMAIN}/agent/tickets/${ticket.id}`;
-                const clickupUrl = clickupService.getTaskUrl(clickupTask.id);
+                const clickupUrl = oauthClickUpService.getTaskUrl(clickupTask.id);
                 
                 const slackMessage = await slackService.sendTaskCreationMessage(
                   defaultChannel,
@@ -266,7 +302,7 @@ export default {
               zendesk_ticket_id: ticket.id,
               zendesk_subject: ticket.subject,
               clickup_task_id: clickupTask.id,
-              clickup_task_url: clickupService.getTaskUrl(clickupTask.id),
+              clickup_task_url: oauthClickUpService.getTaskUrl(clickupTask.id),
               slack_thread_ts: slackThreadTs,
               event_type: data.type
             }, 'Zendesk ticket successfully converted to ClickUp task and Slack notified')), {
@@ -794,6 +830,284 @@ export default {
         }
       }
 
+      // Route: Start ClickUp OAuth Flow
+      if (url.pathname === '/auth/clickup' && method === 'GET') {
+        try {
+          if (!oauthService) {
+            return new Response(JSON.stringify({
+              error: 'OAuth Service Not Available',
+              message: 'OAuth service is not configured. Please check your ClickUp OAuth environment variables.',
+              timestamp: new Date().toISOString()
+            }), {
+              status: 503,
+              headers: corsHeaders
+            });
+          }
+
+          // Generate state for security
+          const state = oauthService.generateState();
+          
+          // Generate OAuth URL
+          const authUrl = oauthService.generateAuthUrl(state);
+          
+          // Store state in KV for validation (if available)
+          if (env.TASK_MAPPING) {
+            await env.TASK_MAPPING.put(`oauth_state_${state}`, JSON.stringify({
+              state,
+              created_at: new Date().toISOString(),
+              expires_at: Date.now() + (10 * 60 * 1000) // 10 minutes
+            }));
+          }
+
+          return new Response(JSON.stringify({
+            status: 'success',
+            message: 'ClickUp OAuth authorization URL generated',
+            auth_url: authUrl,
+            state: state,
+            instructions: [
+              '1. Visit the auth_url to authorize TaskGenie',
+              '2. You will be redirected back to the callback URL',
+              '3. TaskGenie will then have access to your ClickUp workspace'
+            ],
+            timestamp: new Date().toISOString()
+          }), {
+            status: 200,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error('❌ OAuth start error:', error);
+          return new Response(JSON.stringify({
+            error: 'OAuth Start Failed',
+            message: error instanceof Error ? error.message : 'Unknown OAuth error',
+            timestamp: new Date().toISOString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: ClickUp OAuth Callback
+      if (url.pathname === '/auth/clickup/callback' && method === 'GET') {
+        try {
+          if (!oauthService) {
+            return new Response(JSON.stringify({
+              error: 'OAuth Service Not Available',
+              message: 'OAuth service is not configured.',
+              timestamp: new Date().toISOString()
+            }), {
+              status: 503,
+              headers: corsHeaders
+            });
+          }
+
+          const code = url.searchParams.get('code');
+          const state = url.searchParams.get('state');
+          const error = url.searchParams.get('error');
+
+          // Handle OAuth errors
+          if (error) {
+            console.error('❌ OAuth callback error:', error);
+            return new Response(JSON.stringify({
+              error: 'OAuth Authorization Failed',
+              message: `ClickUp OAuth error: ${error}`,
+              timestamp: new Date().toISOString()
+            }), {
+              status: 400,
+              headers: corsHeaders
+            });
+          }
+
+          if (!code) {
+            return new Response(JSON.stringify({
+              error: 'Missing Authorization Code',
+              message: 'No authorization code provided by ClickUp',
+              timestamp: new Date().toISOString()
+            }), {
+              status: 400,
+              headers: corsHeaders
+            });
+          }
+
+          // Validate state if KV storage is available
+          if (state && env.TASK_MAPPING) {
+            const storedStateData = await env.TASK_MAPPING.get(`oauth_state_${state}`);
+            if (!storedStateData) {
+              return new Response(JSON.stringify({
+                error: 'Invalid State Parameter',
+                message: 'OAuth state parameter is invalid or expired',
+                timestamp: new Date().toISOString()
+              }), {
+                status: 400,
+                headers: corsHeaders
+              });
+            }
+            // Clean up state after validation
+            await env.TASK_MAPPING.delete(`oauth_state_${state}`);
+          }
+
+          // Exchange code for tokens
+          const tokens = await oauthService.exchangeCodeForToken(code);
+          
+          // Get user info
+          const userInfo = await oauthService.getUserInfo(tokens.access_token);
+          const userTeams = await oauthService.getUserTeams(tokens.access_token);
+
+          // Create user OAuth data
+          const userId = userInfo.user?.id || 'unknown';
+          const oauthData: UserOAuthData = {
+            user_id: userId,
+            team_id: userTeams.length > 0 ? userTeams[0].id : undefined,
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token,
+            expires_at: tokens.expires_at,
+            authorized_at: new Date().toISOString(),
+            scopes: []
+          };
+
+          // Store OAuth data with both actual user ID and 'default' key
+          await oauthService.storeUserOAuth(userId, oauthData);
+          // Also store with 'default' key for application compatibility
+          await oauthService.storeUserOAuth('default', oauthData);
+
+          return new Response(JSON.stringify({
+            status: 'success',
+            message: 'ClickUp OAuth authorization successful!',
+            user: {
+              id: userInfo.user?.id,
+              username: userInfo.user?.username,
+              email: userInfo.user?.email
+            },
+            teams: userTeams.map((team: any) => ({
+              id: team.id,
+              name: team.name
+            })),
+            access_granted: true,
+            timestamp: new Date().toISOString()
+          }), {
+            status: 200,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error('❌ OAuth callback error:', error);
+          return new Response(JSON.stringify({
+            error: 'OAuth Callback Failed',
+            message: error instanceof Error ? error.message : 'Unknown OAuth callback error',
+            timestamp: new Date().toISOString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Check OAuth Status
+      if (url.pathname === '/auth/status' && method === 'GET') {
+        try {
+          const userId = url.searchParams.get('user_id') || 'default';
+
+          if (!oauthService) {
+            return new Response(JSON.stringify({
+              status: 'oauth_unavailable',
+              message: 'OAuth service is not configured',
+              timestamp: new Date().toISOString()
+            }), {
+              status: 503,
+              headers: corsHeaders
+            });
+          }
+
+          console.log(`🔍 Checking OAuth status for user: ${userId}`);
+          const oauthData = await oauthService.getUserOAuth(userId);
+
+          if (!oauthData) {
+            console.log(`❌ No OAuth data found for user: ${userId}`);
+            return new Response(JSON.stringify({
+              status: 'not_authorized',
+              message: 'User has not authorized ClickUp access',
+              oauth_url: `/auth/clickup`,
+              checked_user_id: userId,
+              timestamp: new Date().toISOString()
+            }), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+
+          const isValid = oauthService.isTokenValid(oauthData);
+          
+          return new Response(JSON.stringify({
+            status: isValid ? 'authorized' : 'token_expired',
+            message: isValid ? 'ClickUp access is authorized and valid' : 'ClickUp access token has expired',
+            user_id: oauthData.user_id,
+            team_id: oauthData.team_id,
+            authorized_at: oauthData.authorized_at,
+            expires_at: oauthData.expires_at,
+            needs_reauth: !isValid,
+            oauth_url: !isValid ? `/auth/clickup` : undefined,
+            timestamp: new Date().toISOString()
+          }), {
+            status: 200,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error('❌ OAuth status check error:', error);
+          return new Response(JSON.stringify({
+            error: 'OAuth Status Check Failed',
+            message: error instanceof Error ? error.message : 'Unknown status check error',
+            timestamp: new Date().toISOString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Debug OAuth Storage (for troubleshooting)
+      if (url.pathname === '/auth/debug' && method === 'GET') {
+        try {
+          if (!oauthService || !env.TASK_MAPPING) {
+            return new Response(JSON.stringify({
+              error: 'OAuth service or KV storage not available',
+              timestamp: new Date().toISOString()
+            }), {
+              status: 503,
+              headers: corsHeaders
+            });
+          }
+
+          // Check for both 'default' and any specific user ID
+          const defaultData = await oauthService.getUserOAuth('default');
+
+          return new Response(JSON.stringify({
+            status: 'debug_info',
+            oauth_service_available: !!oauthService,
+            kv_storage_available: !!env.TASK_MAPPING,
+            default_user_data: defaultData ? {
+              user_id: defaultData.user_id,
+              team_id: defaultData.team_id,
+              has_access_token: !!defaultData.access_token,
+              authorized_at: defaultData.authorized_at,
+              expires_at: defaultData.expires_at
+            } : null,
+            timestamp: new Date().toISOString()
+          }), {
+            status: 200,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error('❌ OAuth debug error:', error);
+          return new Response(JSON.stringify({
+            error: 'OAuth Debug Failed',
+            message: error instanceof Error ? error.message : 'Unknown debug error',
+            timestamp: new Date().toISOString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
       // Route: Not found
       return new Response(JSON.stringify({
         error: 'Not Found',
@@ -805,6 +1119,9 @@ export default {
           'POST /clickup-webhook - ClickUp webhook endpoint',
           'POST /slack/events - Slack events endpoint',
           'POST /slack/commands - Slack slash commands',
+          'GET  /auth/clickup - Start ClickUp OAuth flow',
+          'GET  /auth/clickup/callback - ClickUp OAuth callback',
+          'GET  /auth/status - Check OAuth authorization status',
           'POST /test-ai - Test AI summarization',
           'POST /test-zendesk-ai - Test Zendesk + AI integration',
           'POST /test-clickup - Test ClickUp integration',
