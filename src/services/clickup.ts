@@ -22,7 +22,7 @@ export class ClickUpService {
   /**
    * Get the appropriate authorization header (OAuth or API token)
    */
-  private getAuthHeader(): string {
+  public getAuthHeader(): string {
     if (this.userOAuthData?.access_token) {
       console.log('🔐 Using OAuth token for ClickUp API');
       return `Bearer ${this.userOAuthData.access_token}`;

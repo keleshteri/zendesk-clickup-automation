@@ -602,25 +602,44 @@ export default {
             });
           }
 
-          const body = await request.json() as { 
+          // ✅ Try to get OAuth data for enhanced permissions (same logic as webhook)
+          let oauthClickUpService = clickupService;
+          if (oauthService && env.TASK_MAPPING) {
+            try {
+              const defaultUserId = 'default';
+              const oauthData = await oauthService.getUserOAuth(defaultUserId);
+
+              if (oauthData && oauthService.isTokenValid(oauthData)) {
+                console.log('✅ Using OAuth tokens for ClickUp test');
+                oauthClickUpService = new ClickUpService(env, oauthData);
+              } else {
+                console.log('⚠️ OAuth data not found or invalid, falling back to API token for test');
+              }
+            } catch (oauthError) {
+              console.warn('⚠️ Error retrieving OAuth data for test, falling back to API token:', oauthError);
+            }
+          }
+
+          const body = await request.json() as {
             action: 'test_auth' | 'create_test_task' | 'list_spaces';
             test_ticket_id?: string;
           };
-          
+
           const results: any = {
             action: body.action,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            using_oauth: oauthClickUpService !== clickupService
           };
           
           switch (body.action) {
             case 'test_auth':
-              // Test ClickUp API authentication
-              const connectionTest = await clickupService.testConnection();
+              // Test ClickUp API authentication using OAuth-enabled service
+              const connectionTest = await oauthClickUpService.testConnection();
               results.connection_test = connectionTest;
               break;
-              
+
             case 'create_test_task':
-              // Create a test task to verify the integration
+              // Create a test task to verify the integration using OAuth-enabled service
               const testTicket = {
                 id: parseInt(body.test_ticket_id || '12345'),
                 subject: 'Test Ticket from TaskGenie',
@@ -631,13 +650,13 @@ export default {
                 requester_id: 123456,
                 tags: ['test', 'automation']
               } as ZendeskTicket;
-              
+
               try {
-                const testTask = await clickupService.createTaskFromTicket(testTicket);
+                const testTask = await oauthClickUpService.createTaskFromTicket(testTicket);
                 results.test_task_creation = {
                   success: !!testTask,
                   task_id: testTask?.id,
-                  task_url: testTask ? clickupService.getTaskUrl(testTask.id) : null
+                  task_url: testTask ? oauthClickUpService.getTaskUrl(testTask.id) : null
                 };
               } catch (error) {
                 results.test_task_creation = {
@@ -648,15 +667,23 @@ export default {
               break;
               
             case 'list_spaces':
-              // List ClickUp spaces to help debug list configuration
+              // List ClickUp spaces to help debug list configuration using OAuth-enabled service
               try {
+                // ✅ Use OAuth-enabled service instead of hardcoded API token
+                if (!oauthClickUpService.hasValidAuth()) {
+                  results.spaces_error = {
+                    message: 'No valid ClickUp authentication available (neither OAuth nor API token)'
+                  };
+                  break;
+                }
+
                 const spacesResponse = await fetch('https://api.clickup.com/api/v2/team', {
                   headers: {
-                    'Authorization': env.CLICKUP_TOKEN,
+                    'Authorization': oauthClickUpService.getAuthHeader(), // Use the service's auth method
                     'Content-Type': 'application/json'
                   }
                 });
-                
+
                 if (spacesResponse.ok) {
                   const spacesData = await spacesResponse.json();
                   results.spaces = spacesData;
@@ -1001,9 +1028,26 @@ export default {
         }
       }
 
-      // Route: Check OAuth Status
+      // Route: Check OAuth Status (with basic security)
       if (url.pathname === '/auth/status' && method === 'GET') {
         try {
+          // Basic security: Check for admin token or local access
+          const authHeader = request.headers.get('Authorization');
+          const adminToken = env.WEBHOOK_SECRET; // Reuse webhook secret as admin token
+          const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+
+          if (!isLocalhost && (!authHeader || authHeader !== `Bearer ${adminToken}`)) {
+            return new Response(JSON.stringify({
+              error: 'Unauthorized',
+              message: 'This endpoint requires authentication',
+              hint: 'Add Authorization: Bearer <WEBHOOK_SECRET> header or access from localhost',
+              timestamp: new Date().toISOString()
+            }), {
+              status: 401,
+              headers: corsHeaders
+            });
+          }
+
           const userId = url.searchParams.get('user_id') || 'default';
 
           if (!oauthService) {
@@ -1063,9 +1107,108 @@ export default {
         }
       }
 
-      // Route: Debug OAuth Storage (for troubleshooting)
+      // Route: Test ClickUp OAuth (comprehensive test) - PROTECTED
+      if (url.pathname === '/auth/test' && method === 'GET') {
+        try {
+          // Security check
+          const authHeader = request.headers.get('Authorization');
+          const adminToken = env.WEBHOOK_SECRET;
+          const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+
+          if (!isLocalhost && (!authHeader || authHeader !== `Bearer ${adminToken}`)) {
+            return new Response(JSON.stringify({
+              error: 'Unauthorized',
+              message: 'This endpoint requires authentication',
+              timestamp: new Date().toISOString()
+            }), {
+              status: 401,
+              headers: corsHeaders
+            });
+          }
+
+          if (!oauthService || !env.TASK_MAPPING) {
+            return new Response(JSON.stringify({
+              error: 'OAuth service or KV storage not available',
+              timestamp: new Date().toISOString()
+            }), {
+              status: 503,
+              headers: corsHeaders
+            });
+          }
+
+          const results: any = {
+            oauth_service: !!oauthService,
+            kv_storage: !!env.TASK_MAPPING,
+            tests: {}
+          };
+
+          // Test 1: Check OAuth data exists
+          const defaultData = await oauthService.getUserOAuth('default');
+          results.tests.oauth_data_exists = !!defaultData;
+
+          if (defaultData) {
+            results.tests.token_valid = oauthService.isTokenValid(defaultData);
+            results.user_info = {
+              user_id: defaultData.user_id,
+              team_id: defaultData.team_id,
+              authorized_at: defaultData.authorized_at,
+              expires_at: defaultData.expires_at
+            };
+
+            // Test 2: Try ClickUp API call
+            try {
+              const clickupService = new ClickUpService(env, defaultData);
+              const testResult = await clickupService.testConnection();
+              results.tests.clickup_api_test = testResult;
+            } catch (apiError) {
+              results.tests.clickup_api_test = {
+                success: false,
+                error: apiError instanceof Error ? apiError.message : 'Unknown API error'
+              };
+            }
+          }
+
+          return new Response(JSON.stringify({
+            status: 'oauth_test_complete',
+            results,
+            overall_status: defaultData && oauthService.isTokenValid(defaultData) ? 'healthy' : 'needs_auth',
+            timestamp: new Date().toISOString()
+          }), {
+            status: 200,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error('❌ OAuth test error:', error);
+          return new Response(JSON.stringify({
+            error: 'OAuth Test Failed',
+            message: error instanceof Error ? error.message : 'Unknown test error',
+            timestamp: new Date().toISOString()
+          }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Debug OAuth Storage (for troubleshooting) - PROTECTED
       if (url.pathname === '/auth/debug' && method === 'GET') {
         try {
+          // Security check
+          const authHeader = request.headers.get('Authorization');
+          const adminToken = env.WEBHOOK_SECRET;
+          const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+
+          if (!isLocalhost && (!authHeader || authHeader !== `Bearer ${adminToken}`)) {
+            return new Response(JSON.stringify({
+              error: 'Unauthorized',
+              message: 'This endpoint requires authentication',
+              timestamp: new Date().toISOString()
+            }), {
+              status: 401,
+              headers: corsHeaders
+            });
+          }
+
           if (!oauthService || !env.TASK_MAPPING) {
             return new Response(JSON.stringify({
               error: 'OAuth service or KV storage not available',
