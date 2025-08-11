@@ -13,7 +13,7 @@
 	},
 	"kv_namespaces": [
 		{
-			"binding": "KV_BINDING",
+			"binding": "TASK_MAPPING",
 			"id": "74c4672059e84e7db2d86dcc82aa4d96",
 			"preview_id": "74c4672059e84e7db2d86dcc82aa4d96"
 		}
