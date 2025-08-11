@@ -118,9 +118,38 @@ curl http://localhost:8787/test
 
 ### 5. Deployment
 
+The project supports environment-specific configurations:
+
+**Development Deployment:**
 ```bash
-# Deploy to Cloudflare Workers
-npm run deploy
+# Deploy to development environment (your personal KV namespace)
+npm run deploy:dev
+# or
+npm run deploy  # Uses default dev config
+```
+
+**Production Deployment:**
+```bash
+# Deploy to production environment (company KV namespace)
+npm run deploy:prod
+```
+
+**Manual Deployment with Specific Config:**
+```bash
+# Development
+wrangler deploy --config wrangler.dev.jsonc
+
+# Production  
+wrangler deploy --config wrangler.production.jsonc
+```
+
+**Local Development:**
+```bash
+# Run locally with dev config
+npm run dev
+
+# Run locally with production config
+npm run dev:prod
 ```
 
 ## Webhook Configuration

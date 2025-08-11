@@ -1,11 +1,11 @@
 /**
- * Development Configuration (Default)
+ * Production/Company Configuration
  * For more details on how to configure Wrangler, refer to:
  * https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "zendesk-clickup-automation-dev",
+	"name": "zendesk-clickup-automation-prod",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-08-03",
 	"observability": {
@@ -13,9 +13,9 @@
 	},
 	"kv_namespaces": [
 		{
-			"binding": "TASK_MAPPING",
-			"id": "9fdfd867b4bd4c5c9ef760578ffd7b52",
-			"preview_id": "9fdfd867b4bd4c5c9ef760578ffd7b52"
+			"binding": "KV_BINDING",
+			"id": "74c4672059e84e7db2d86dcc82aa4d96",
+			"preview_id": "74c4672059e84e7db2d86dcc82aa4d96"
 		}
 	]
 	/**

@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
+    "deploy:dev": "wrangler deploy --config wrangler.dev.jsonc",
+    "deploy:prod": "wrangler deploy --config wrangler.production.jsonc",
     "dev": "wrangler dev",
+    "dev:prod": "wrangler dev --config wrangler.production.jsonc",
     "start": "wrangler dev",
     "cf-typegen": "wrangler types"
   },
