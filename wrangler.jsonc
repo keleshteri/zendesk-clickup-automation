@@ -6,10 +6,17 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "zendesk-clickup-automation",
 	"main": "src/index.ts",
-	"compatibility_date": "2025-08-06",
+	"compatibility_date": "2025-08-03",
 	"observability": {
 		"enabled": true
-	}
+	},
+	"kv_namespaces": [
+		{
+			"binding": "TASK_MAPPING",
+			"id": "9fdfd867b4bd4c5c9ef760578ffd7b52",
+			"preview_id": "9fdfd867b4bd4c5c9ef760578ffd7b52"
+		}
+	]
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
