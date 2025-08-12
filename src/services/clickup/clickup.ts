@@ -1,11 +1,34 @@
 import { ClickUpTask, Env, ZendeskTicket, UserOAuthData } from '../../types/index.js';
 import { mapZendeskToClickUpPriority } from '../../utils/index.js';
 
+/**
+ * ClickUp API Service
+ * 
+ * This service provides integration with the ClickUp API v2 for managing tasks,
+ * comments, and other ClickUp resources. It supports both OAuth and API token authentication.
+ * 
+ * @example
+ * ```typescript
+ * const clickUpService = new ClickUpService(env, oauthData);
+ * const task = await clickUpService.createTaskFromTicket(zendeskTicket);
+ * ```
+ */
 export class ClickUpService {
+  /** Environment configuration containing API keys and settings */
   private env: Env;
+  
+  /** Base URL for ClickUp API v2 endpoints */
   private baseUrl: string = 'https://api.clickup.com/api/v2';
+  
+  /** User OAuth data for authenticated requests (optional) */
   private userOAuthData: UserOAuthData | null = null;
 
+  /**
+   * Creates a new ClickUp service instance
+   * 
+   * @param env - Environment configuration containing API keys and settings
+   * @param userOAuthData - Optional OAuth data for user-specific authentication
+   */
   constructor(env: Env, userOAuthData?: UserOAuthData | null) {
     this.env = env;
     this.userOAuthData = userOAuthData || null;
@@ -13,6 +36,16 @@ export class ClickUpService {
 
   /**
    * Set OAuth data for this service instance
+   * 
+   * This method allows updating the OAuth authentication data after the service
+   * has been instantiated. Useful for dynamic authentication scenarios.
+   * 
+   * @param oauthData - OAuth data containing access token and user info, or null to clear
+   * @example
+   * ```typescript
+   * clickUpService.setOAuthData(newOAuthData);
+   * clickUpService.setOAuthData(null); // Clear OAuth data
+   * ```
    */
   setOAuthData(oauthData: UserOAuthData | null): void {
     this.userOAuthData = oauthData;
@@ -20,7 +53,19 @@ export class ClickUpService {
   }
 
   /**
-   * Get the appropriate authorization header (OAuth or API token)
+   * Get the appropriate authorization header for ClickUp API requests
+   * 
+   * This method determines the best available authentication method and returns
+   * the properly formatted authorization header. OAuth tokens take precedence over API tokens.
+   * 
+   * @returns The authorization header value (either "Bearer {token}" for OAuth or the API token)
+   * @throws {Error} When no authentication method is available
+   * 
+   * @example
+   * ```typescript
+   * const authHeader = clickUpService.getAuthHeader();
+   * // Returns: "Bearer abc123..." or "pk_123..."
+   * ```
    */
   public getAuthHeader(): string {
     if (this.userOAuthData?.access_token) {
@@ -35,7 +80,20 @@ export class ClickUpService {
   }
 
   /**
-   * Check if service has valid authentication
+   * Check if the service has valid authentication configured
+   * 
+   * This method verifies that at least one authentication method is available
+   * (either OAuth token or API token). It logs the authentication status for debugging.
+   * 
+   * @returns True if either OAuth or API token authentication is available, false otherwise
+   * 
+   * @example
+   * ```typescript
+   * if (clickUpService.hasValidAuth()) {
+   *   // Safe to make API calls
+   *   const task = await clickUpService.getTask(taskId);
+   * }
+   * ```
    */
   hasValidAuth(): boolean {
     const hasOAuth = !!(this.userOAuthData?.access_token);
@@ -49,6 +107,26 @@ export class ClickUpService {
     return hasOAuth || hasApiToken;
   }
 
+  /**
+   * Create a ClickUp task from a Zendesk ticket
+   * 
+   * This method converts a Zendesk ticket into a ClickUp task with proper formatting,
+   * tags, and priority mapping. It validates authentication and configuration before
+   * making the API call.
+   * 
+   * @param ticket - The Zendesk ticket to convert into a ClickUp task
+   * @returns Promise resolving to the created ClickUp task, or null if creation fails
+   * @throws {Error} When authentication is not configured or API call fails
+   * 
+   * @example
+   * ```typescript
+   * const zendeskTicket = { id: 123, subject: "Bug report", priority: "high" };
+   * const clickUpTask = await clickUpService.createTaskFromTicket(zendeskTicket);
+   * if (clickUpTask) {
+   *   console.log(`Task created: ${clickUpTask.url}`);
+   * }
+   * ```
+   */
   async createTaskFromTicket(ticket: ZendeskTicket): Promise<ClickUpTask | null> {
     console.log('🚀 Starting ClickUp task creation for ticket:', ticket.id);
     
@@ -146,6 +224,25 @@ export class ClickUpService {
     }
   }
 
+  /**
+   * Retrieve a ClickUp task by its ID
+   * 
+   * Fetches a specific task from ClickUp using the task ID. This method handles
+   * authentication and error cases gracefully.
+   * 
+   * @param taskId - The unique identifier of the ClickUp task to retrieve
+   * @returns Promise resolving to the ClickUp task data, or null if not found or on error
+   * 
+   * @example
+   * ```typescript
+   * const task = await clickUpService.getTask("abc123");
+   * if (task) {
+   *   console.log(`Task: ${task.name}`);
+   * } else {
+   *   console.log("Task not found or error occurred");
+   * }
+   * ```
+   */
   async getTask(taskId: string): Promise<ClickUpTask | null> {
     try {
       console.log('🔍 Fetching ClickUp task:', taskId);
@@ -177,6 +274,28 @@ export class ClickUpService {
     }
   }
 
+  /**
+   * Update a ClickUp task with new data
+   * 
+   * Updates an existing ClickUp task with the provided data. This method can update
+   * any task properties like name, description, status, priority, etc.
+   * 
+   * @param taskId - The unique identifier of the ClickUp task to update
+   * @param updates - Object containing the task properties to update
+   * @returns Promise resolving to true if update was successful, false otherwise
+   * 
+   * @example
+   * ```typescript
+   * const success = await clickUpService.updateTask("abc123", {
+   *   name: "Updated task name",
+   *   status: "in progress",
+   *   priority: 2
+   * });
+   * if (success) {
+   *   console.log("Task updated successfully");
+   * }
+   * ```
+   */
   async updateTask(taskId: string, updates: any): Promise<boolean> {
     try {
       console.log('📝 Updating ClickUp task:', taskId, updates);
@@ -207,6 +326,24 @@ export class ClickUpService {
     }
   }
 
+  /**
+   * Add a comment to a ClickUp task
+   * 
+   * Posts a new comment to the specified ClickUp task. Comments are useful for
+   * adding updates, notes, or communication related to the task.
+   * 
+   * @param taskId - The unique identifier of the ClickUp task to comment on
+   * @param comment - The text content of the comment to add
+   * @returns Promise resolving to true if comment was added successfully, false otherwise
+   * 
+   * @example
+   * ```typescript
+   * const success = await clickUpService.addComment("abc123", "Task has been reviewed");
+   * if (success) {
+   *   console.log("Comment added successfully");
+   * }
+   * ```
+   */
   async addComment(taskId: string, comment: string): Promise<boolean> {
     try {
       console.log('💬 Adding comment to ClickUp task:', taskId);
@@ -239,6 +376,17 @@ export class ClickUpService {
     }
   }
 
+  /**
+   * Format a Zendesk ticket into a ClickUp task description
+   * 
+   * Creates a well-formatted markdown description for the ClickUp task that includes
+   * all relevant information from the Zendesk ticket, including links back to the original ticket.
+   * 
+   * @param ticket - The Zendesk ticket to format
+   * @returns Formatted markdown string for the task description
+   * 
+   * @private
+   */
   private formatTaskDescription(ticket: ZendeskTicket): string {
     return `
 **Zendesk Ticket #${ticket.id}**
@@ -260,11 +408,46 @@ ${ticket.assignee_id ? `- Assignee ID: ${ticket.assignee_id}` : ''}
     `.trim();
   }
 
+  /**
+   * Generate a direct URL to a ClickUp task
+   * 
+   * Creates a clickable URL that opens the specified task in the ClickUp web application.
+   * 
+   * @param taskId - The unique identifier of the ClickUp task
+   * @returns Direct URL to the task in ClickUp's web interface
+   * 
+   * @example
+   * ```typescript
+   * const taskUrl = clickUpService.getTaskUrl("abc123");
+   * console.log(`View task: ${taskUrl}`);
+   * // Output: "View task: https://app.clickup.com/t/abc123"
+   * ```
+   */
   getTaskUrl(taskId: string): string {
     return `https://app.clickup.com/t/${taskId}`;
   }
 
-  // Add a method to test ClickUp API connectivity
+  /**
+   * Test connectivity to the ClickUp API
+   * 
+   * Performs a simple API call to verify that authentication is working and the
+   * ClickUp API is accessible. This is useful for debugging connection issues.
+   * 
+   * @returns Promise resolving to an object containing:
+   *   - success: boolean indicating if the connection test passed
+   *   - error: optional error message if the test failed
+   *   - team: optional team/workspace data if the test succeeded
+   * 
+   * @example
+   * ```typescript
+   * const result = await clickUpService.testConnection();
+   * if (result.success) {
+   *   console.log("ClickUp API is accessible", result.team);
+   * } else {
+   *   console.error("ClickUp API connection failed:", result.error);
+   * }
+   * ```
+   */
   async testConnection(): Promise<{ success: boolean; error?: string; team?: any }> {
     try {
       console.log('🔧 Testing ClickUp API connection...');
