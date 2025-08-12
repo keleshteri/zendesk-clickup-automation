@@ -439,7 +439,8 @@ export class OAuthService {
       const key = `oauth_${userId}`;
       const serializedData = JSON.stringify({
         ...oauthData,
-        stored_at: new Date().toISOString() // Add storage timestamp
+        stored_at: new Date().toISOString(), // Add storage timestamp
+        expires_at: undefined // ClickUp tokens don't expire
       });
       
       await this.env.TASK_MAPPING.put(key, serializedData);
@@ -523,44 +524,89 @@ export class OAuthService {
   }
 
   /**
-   * Check if OAuth token is still valid
+   * Check if OAuth token is valid by testing it against ClickUp API
    * 
-   * Validates whether the stored OAuth token is still usable for API requests.
-   * Note: ClickUp OAuth tokens do not expire according to their documentation,
-   * but this method provides a framework for future expiration handling.
+   * Validates the OAuth token by making a lightweight API call to ClickUp.
+   * This is more reliable than checking expiration dates since ClickUp tokens
+   * don't officially expire but can become invalid for other reasons.
    * 
    * @param oauthData - User OAuth data containing token and expiration info
-   * @returns True if token is valid, false if expired
+   * @param useCache - Whether to use cached validation results (default: true)
+   * @returns Promise resolving to true if token is valid, false otherwise
    * 
    * @example
    * ```typescript
-   * const oauthData = await oauthService.getUserOAuth('user_123');
+   * const oauthData = await oauthService.getUserOAuth(userId);
    * 
-   * if (oauthData && oauthService.isTokenValid(oauthData)) {
-   *   // Token is valid, proceed with API calls
+   * if (await oauthService.isTokenValid(oauthData)) {
+   *   console.log('Token is valid, proceeding with API calls');
    *   const userInfo = await oauthService.getUserInfo(oauthData.access_token);
    * } else {
-   *   // Token expired or invalid, redirect to re-authorization
-   *   const authUrl = oauthService.generateAuthUrl();
-   *   // Redirect user to authUrl
+   *   console.log('Token invalid, redirecting to re-authorization');
+   *   window.location.href = '/auth/clickup';
    * }
    * ```
    */
-  isTokenValid(oauthData: UserOAuthData): boolean {
+  async isTokenValid(oauthData: UserOAuthData, useCache: boolean = true): Promise<boolean> {
     if (!oauthData || !oauthData.access_token) {
       console.log('🔍 Token validation failed: No OAuth data or access token');
       return false;
     }
 
-    // ClickUp tokens don't expire, but check if expiration is set
-    if (!oauthData.expires_at) {
-      console.log('🔍 Token valid: No expiration set (ClickUp tokens don\'t expire)');
+    // Check cache first to avoid excessive API calls
+    const cacheKey = `token_valid_${oauthData.user_id}`;
+    if (useCache && this.env.TASK_MAPPING) {
+      try {
+        const cached = await this.env.TASK_MAPPING.get(cacheKey);
+        if (cached) {
+          const cacheData = JSON.parse(cached);
+          const cacheAge = Date.now() - cacheData.timestamp;
+          // Cache for 5 minutes
+          if (cacheAge < 5 * 60 * 1000) {
+            console.log(`🔍 Using cached token validation: ${cacheData.valid ? '✅ Valid' : '❌ Invalid'}`);
+            return cacheData.valid;
+          }
+        }
+      } catch (error) {
+        console.log('🔍 Cache read failed, proceeding with API validation');
+      }
+    }
+
+    // Validate token by making a lightweight API call
+    try {
+      console.log('🔍 Validating token via ClickUp API...');
+      const response = await fetch(`${this.baseUrl}/user`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${oauthData.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const isValid = response.ok;
+      console.log(`🔍 Token validation result: ${isValid ? '✅ Valid' : '❌ Invalid'} (${response.status})`);
+
+      // Cache the result
+      if (useCache && this.env.TASK_MAPPING) {
+        try {
+          await this.env.TASK_MAPPING.put(cacheKey, JSON.stringify({
+            valid: isValid,
+            timestamp: Date.now()
+          }), { expirationTtl: 300 }); // 5 minutes TTL
+        } catch (error) {
+          console.log('🔍 Failed to cache validation result');
+        }
+      }
+
+      return isValid;
+    } catch (error) {
+      console.error('🔍 Token validation API call failed:', error);
+      
+      // Fallback: if API call fails, assume token might be valid
+      // This prevents false negatives due to network issues
+      console.log('🔍 Fallback: Assuming token valid due to API call failure');
       return true;
     }
-    
-    const isValid = Date.now() < oauthData.expires_at;
-    console.log(`🔍 Token valid check for user: ${isValid ? '✅ Valid' : '❌ Expired'}`);
-    return isValid;
   }
 
   /**
@@ -598,6 +644,100 @@ export class OAuthService {
     const array = new Uint8Array(20);
     crypto.getRandomValues(array);
     return Array.from(array, byte => byte.toString(36)).join('').substring(0, 26);
+  }
+
+  /**
+   * Get comprehensive OAuth status for a user
+   * 
+   * Provides a complete OAuth status including token validation, user info,
+   * and actionable recommendations for token refresh or re-authorization.
+   * 
+   * @param userId - User ID to check OAuth status for
+   * @returns Promise resolving to comprehensive OAuth status object
+   * 
+   * @example
+   * ```typescript
+   * const status = await oauthService.getOAuthStatus(userId);
+   * 
+   * if (status.valid) {
+   *   console.log('OAuth is valid, proceeding...');
+   * } else {
+   *   console.log(`OAuth issue: ${status.message}`);
+   *   if (status.needs_reauth) {
+   *     // Redirect to re-authorization
+   *     window.location.href = status.oauth_url;
+   *   }
+   * }
+   * ```
+   */
+  async getOAuthStatus(userId: string): Promise<{
+    valid: boolean;
+    status: 'valid' | 'missing' | 'invalid' | 'api_error';
+    message: string;
+    user_id?: string;
+    team_id?: string;
+    authorized_at?: string;
+    needs_reauth: boolean;
+    oauth_url: string;
+    timestamp: string;
+  }> {
+    const timestamp = new Date().toISOString();
+    const oauth_url = '/auth/clickup';
+
+    try {
+      // Get stored OAuth data
+      const oauthData = await this.getUserOAuth(userId);
+      
+      if (!oauthData) {
+        return {
+          valid: false,
+          status: 'missing',
+          message: 'No OAuth data found for user',
+          needs_reauth: true,
+          oauth_url,
+          timestamp
+        };
+      }
+
+      // Validate token via API
+      const isValid = await this.isTokenValid(oauthData);
+      
+      if (isValid) {
+        return {
+          valid: true,
+          status: 'valid',
+          message: 'OAuth token is valid',
+          user_id: oauthData.user_id,
+          team_id: oauthData.team_id,
+          authorized_at: oauthData.authorized_at,
+          needs_reauth: false,
+          oauth_url,
+          timestamp
+        };
+      } else {
+        return {
+          valid: false,
+          status: 'invalid',
+          message: 'ClickUp access token is invalid or revoked',
+          user_id: oauthData.user_id,
+          team_id: oauthData.team_id,
+          authorized_at: oauthData.authorized_at,
+          needs_reauth: true,
+          oauth_url,
+          timestamp
+        };
+      }
+    } catch (error) {
+      console.error('🚨 Error checking OAuth status:', error);
+      return {
+        valid: false,
+        status: 'api_error',
+        message: 'Failed to check OAuth status due to API error',
+        needs_reauth: true,
+        oauth_url,
+        timestamp
+      };
+    }
   }
 
   /**
