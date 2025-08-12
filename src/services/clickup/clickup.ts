@@ -1,5 +1,5 @@
-import { ClickUpTask, Env, ZendeskTicket, UserOAuthData } from '../types/index.js';
-import { mapZendeskToClickUpPriority, mapZendeskToClickUpStatus } from '../utils/index.js';
+import { ClickUpTask, Env, ZendeskTicket, UserOAuthData } from '../../types/index.js';
+import { mapZendeskToClickUpPriority } from '../../utils/index.js';
 
 export class ClickUpService {
   private env: Env;

@@ -1,9 +1,9 @@
 import { Env, ZendeskWebhook, ClickUpWebhook, SlackEvent, ZendeskTicket, UserOAuthData } from './types/index.js';
 import { SlackService } from './services/slack.js';
 import { ZendeskService } from './services/zendesk.js';
-import { ClickUpService } from './services/clickup.js';
+import { ClickUpService } from './services/clickup/clickup.js';
 import { AIService } from './services/ai.js';
-import { OAuthService } from './services/oauth.js';
+import { OAuthService } from './services/clickup/clickup_oauth.js';
 import { getCorsHeaders, formatErrorResponse, formatSuccessResponse } from './utils/index.js';
 
 // Helper functions to normalize webhook data
@@ -116,7 +116,7 @@ export default {
             'POST /slack/commands - Slack commands endpoint',
             'GET  /auth/clickup - Start ClickUp OAuth flow',
             'GET  /auth/clickup/callback - ClickUp OAuth callback',
-            'GET  /auth/status - Check OAuth authorization status',
+            'GET  /auth/clickup/status - Check OAuth authorization status',
             'POST /test-ai - Test AI summarization',
             'POST /test-clickup - Test ClickUp integration',
             'POST /test-slack - Test Slack integration'
@@ -1029,7 +1029,7 @@ export default {
       }
 
       // Route: Check OAuth Status (with basic security)
-      if (url.pathname === '/auth/status' && method === 'GET') {
+      if (url.pathname === '/auth/clickup/status' && method === 'GET') {
         try {
           // Basic security: Check for admin token or local access
           const authHeader = request.headers.get('Authorization');
@@ -1264,7 +1264,7 @@ export default {
           'POST /slack/commands - Slack slash commands',
           'GET  /auth/clickup - Start ClickUp OAuth flow',
           'GET  /auth/clickup/callback - ClickUp OAuth callback',
-          'GET  /auth/status - Check OAuth authorization status',
+          'GET  /auth/clickup/status - Check OAuth authorization status',
           'POST /test-ai - Test AI summarization',
           'POST /test-zendesk-ai - Test Zendesk + AI integration',
           'POST /test-clickup - Test ClickUp integration',

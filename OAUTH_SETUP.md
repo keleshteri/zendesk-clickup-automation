@@ -72,7 +72,7 @@ CLICKUP_TOKEN="your_api_token"
 
 3. **Verify Authorization**
    ```
-   GET https://your-worker-domain.workers.dev/auth/status
+   GET https://your-worker-domain.workers.dev/auth/clickup/status
    ```
 
 ## Step 4: Test Integration
@@ -100,7 +100,7 @@ CLICKUP_TOKEN="your_api_token"
 ### Available Endpoints:
 - **`GET /auth/clickup`** - Start OAuth authorization
 - **`GET /auth/clickup/callback`** - OAuth callback handler  
-- **`GET /auth/status`** - Check authorization status
+- **`GET /auth/clickup/status`** - Check authorization status
 
 ### How It Works:
 1. **Authorization**: User grants TaskGenie access to their ClickUp workspace
@@ -118,7 +118,7 @@ CLICKUP_TOKEN="your_api_token"
 
 ### "Team not authorized" Still Happening  
 - Complete OAuth flow: visit `/auth/clickup`
-- Check authorization status: visit `/auth/status`
+- Check authorization status: visit `/auth/clickup/status`
 - Verify you granted permissions to the correct workspace
 
 ### Token Expired

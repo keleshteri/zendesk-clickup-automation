@@ -1,4 +1,4 @@
-import { Env, OAuthTokens, ClickUpOAuthResponse, UserOAuthData } from '../types/index.js';
+import { Env, OAuthTokens, ClickUpOAuthResponse, UserOAuthData } from '../../types/index.js';
 
 export class OAuthService {
   private env: Env;
