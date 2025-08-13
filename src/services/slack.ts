@@ -86,64 +86,260 @@ export class SlackService {
   async handleMention(event: SlackEvent): Promise<void> {
     try {
       const { channel, text, thread_ts, ts } = event;
-      const messageText = text.toLowerCase();
+      const messageText = text?.toLowerCase() || '';
 
-      // Check if user is asking for summarization
+      // Enhanced AI Q&A capabilities
       if (messageText.includes('summarize') || messageText.includes('summary')) {
-        // Send thinking message
-        await this.sendMessage({
-          channel,
-          thread_ts: thread_ts || ts,
-          text: '🤔 Let me analyze the ticket and create a summary for you...'
-        });
-
-        // Get the original message to extract ticket info
-        const context = await this.getTaskGenieContext(channel, thread_ts || ts);
-        
-        if (context?.ticketId) {
-          // Fetch ticket details from Zendesk
-          const ticket = await this.zendeskService.getTicketDetails(context.ticketId);
-          
-          if (ticket) {
-            // Get AI summary
-            const ticketContent = `Subject: ${ticket.subject}\n\nDescription: ${ticket.description}\n\nStatus: ${ticket.status}\nPriority: ${ticket.priority}\nTags: ${ticket.tags.join(', ')}`;
-            const aiResponse = await this.aiService.summarizeTicket(ticketContent);
-            
-            // Send summary response
-            await this.sendMessage({
-              channel,
-              thread_ts: thread_ts || ts,
-              text: `📋 *Ticket Summary* (powered by ${this.aiService.getProviderName()})\n\n${aiResponse.summary}`
-            });
-          } else {
-            await this.sendMessage({
-              channel,
-              thread_ts: thread_ts || ts,
-              text: '❌ Sorry, I couldn\'t retrieve the ticket details. Please check if the ticket still exists.'
-            });
-          }
-        } else {
-          await this.sendMessage({
-            channel,
-            thread_ts: thread_ts || ts,
-            text: '❌ I couldn\'t find the associated ticket information. Please make sure you\'re replying to a TaskGenie message.'
-          });
-        }
-      } else {
-        // General help message
+        await this.handleSummarizeRequest(channel, thread_ts || ts);
+      } else if (messageText.includes('status') || messageText.includes('what\'s the status')) {
+        await this.handleStatusRequest(channel, thread_ts || ts);
+      } else if (messageText.includes('analytics') || messageText.includes('insights') || messageText.includes('report')) {
+        await this.handleAnalyticsRequest(channel, thread_ts || ts);
+      } else if (messageText.includes('help') || messageText.includes('what can you do')) {
         await this.sendHelpMessage(channel, thread_ts || ts);
+      } else if (messageText.includes('create task') || messageText.includes('new task')) {
+        await this.handleCreateTaskRequest(channel, thread_ts || ts, messageText);
+      } else if (messageText.includes('find ticket') || messageText.includes('search ticket')) {
+        await this.handleTicketSearchRequest(channel, thread_ts || ts, messageText);
+      } else {
+        // General AI-powered response for other questions
+        await this.handleGeneralQuestion(channel, thread_ts || ts, messageText);
       }
     } catch (error) {
       console.error('Error handling Slack mention:', error);
     }
   }
 
-  async sendHelpMessage(channel: string, threadTs?: string): Promise<void> {
+  // Handle member joining channel event
+  async handleMemberJoined(event: SlackEvent): Promise<void> {
     try {
+      const { channel, user } = event;
+      await this.sendWelcomeMessage(channel, user);
+    } catch (error) {
+      console.error('Error handling member joined event:', error);
+    }
+  }
+
+  // Send welcome message when bot joins a channel or new member joins
+  async sendWelcomeMessage(channel: string, userId?: string): Promise<void> {
+    try {
+      const userMention = userId ? `<@${userId}>` : 'everyone';
+      
+      const message = {
+        channel,
+        text: `🧞‍♂️ TaskGenie has joined the channel!`,
+        blocks: [
+          {
+            type: 'header',
+            text: {
+              type: 'plain_text',
+              text: '🧞‍♂️ Welcome to TaskGenie!'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `Hi ${userMention}! 👋\n\nI'm *TaskGenie*, your AI-powered task automation assistant. I'm here to help streamline your workflow between Zendesk and ClickUp!`
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*🎯 What I can do for you:*\n• 🎫 Automatically create ClickUp tasks from Zendesk tickets\n• 📋 Provide AI-powered ticket summaries and analysis\n• 📊 Generate insights and analytics reports\n• 🔍 Help you search and find tickets\n• 🤖 Answer questions about your tickets and tasks\n• 🔗 Keep everything connected with smart automation'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*💬 How to interact with me:*\n• Mention me with `@TaskGenie` followed by your question\n• Ask for help: `@TaskGenie help`\n• Get ticket summaries: `@TaskGenie summarize`\n• Check status: `@TaskGenie status`\n• Get analytics: `@TaskGenie analytics`'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '🚀 *Ready to get started?* Just mention me anytime you need assistance!'
+            }
+          }
+        ]
+      };
+
+      await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(message)
+      });
+    } catch (error) {
+      console.error('Error sending welcome message:', error);
+    }
+  }
+
+  // Enhanced AI Q&A methods
+  private async handleSummarizeRequest(channel: string, threadTs: string): Promise<void> {
+    await this.sendMessage({
+      channel,
+      thread_ts: threadTs,
+      text: '🤔 Let me analyze the ticket and create a summary for you...'
+    });
+
+    const context = await this.getTaskGenieContext(channel, threadTs);
+    
+    if (context?.ticketId) {
+      const ticket = await this.zendeskService.getTicketDetails(context.ticketId);
+      
+      if (ticket) {
+        const ticketContent = `Subject: ${ticket.subject}\n\nDescription: ${ticket.description}\n\nStatus: ${ticket.status}\nPriority: ${ticket.priority}\nTags: ${ticket.tags.join(', ')}`;
+        const aiResponse = await this.aiService.summarizeTicket(ticketContent);
+        
+        await this.sendMessage({
+          channel,
+          thread_ts: threadTs,
+          text: `📋 *Ticket Summary* (powered by ${this.aiService.getProviderName()})\n\n${aiResponse.summary}`
+        });
+      } else {
+        await this.sendMessage({
+          channel,
+          thread_ts: threadTs,
+          text: '❌ Sorry, I couldn\'t retrieve the ticket details. Please check if the ticket still exists.'
+        });
+      }
+    } else {
       await this.sendMessage({
         channel,
         thread_ts: threadTs,
-        text: `🧞‍♂️ *TaskGenie Help*\n\nI'm your AI-powered task automation assistant! Here's what I can do:\n\n• 🎫 Automatically create ClickUp tasks from Zendesk tickets\n• 📋 Provide AI-powered ticket summaries\n• 🔗 Keep everything connected with smart links\n\nTo get a ticket summary, reply to a task creation thread and ask for \"summarize\"!`
+        text: '❌ I couldn\'t find the associated ticket information. Please make sure you\'re replying to a TaskGenie message.'
+      });
+    }
+  }
+
+  private async handleStatusRequest(channel: string, threadTs: string): Promise<void> {
+    const context = await this.getTaskGenieContext(channel, threadTs);
+    
+    if (context?.ticketId) {
+      const ticket = await this.zendeskService.getTicketDetails(context.ticketId);
+      
+      if (ticket) {
+        await this.sendMessage({
+          channel,
+          thread_ts: threadTs,
+          text: `📊 *Ticket Status Update*\n\n🎫 *Ticket #${ticket.id}*\n• Status: ${ticket.status.toUpperCase()}\n• Priority: ${ticket.priority.toUpperCase()}\n• Updated: ${new Date(ticket.updated_at).toLocaleString()}\n• Tags: ${ticket.tags.join(', ') || 'None'}`
+        });
+      } else {
+        await this.sendMessage({
+          channel,
+          thread_ts: threadTs,
+          text: '❌ Sorry, I couldn\'t retrieve the current ticket status.'
+        });
+      }
+    } else {
+      await this.sendMessage({
+        channel,
+        thread_ts: threadTs,
+        text: '❌ I couldn\'t find the associated ticket information. Please make sure you\'re replying to a TaskGenie message.'
+      });
+    }
+  }
+
+  private async handleAnalyticsRequest(channel: string, threadTs: string): Promise<void> {
+    await this.sendMessage({
+      channel,
+      thread_ts: threadTs,
+      text: '📊 *Analytics & Insights*\n\nI can provide various analytics reports:\n• Daily ticket insights\n• Team workload analysis\n• Priority distribution\n• Sentiment trends\n\nFor detailed analytics, please check your configured analytics channels or ask for specific metrics!'
+    });
+  }
+
+  private async handleCreateTaskRequest(channel: string, threadTs: string, messageText: string): Promise<void> {
+    await this.sendMessage({
+      channel,
+      thread_ts: threadTs,
+      text: '🎯 *Create Task*\n\nI automatically create ClickUp tasks when new Zendesk tickets are received. If you need to manually create a task, please:\n\n1. Provide the Zendesk ticket URL or ID\n2. I\'ll analyze the ticket and create the corresponding ClickUp task\n\nExample: `@TaskGenie create task for ticket #12345`'
+    });
+  }
+
+  private async handleTicketSearchRequest(channel: string, threadTs: string, messageText: string): Promise<void> {
+    await this.sendMessage({
+      channel,
+      thread_ts: threadTs,
+      text: '🔍 *Ticket Search*\n\nI can help you find tickets! Try:\n• `@TaskGenie find ticket #12345`\n• `@TaskGenie search tickets with tag "urgent"`\n• `@TaskGenie find tickets from customer@example.com`\n\nWhat specific ticket are you looking for?'
+    });
+  }
+
+  private async handleGeneralQuestion(channel: string, threadTs: string, messageText: string): Promise<void> {
+    // Use AI to provide intelligent responses to general questions
+    try {
+      const aiPrompt = `You are TaskGenie, an AI assistant that helps with Zendesk and ClickUp integration. A user asked: "${messageText}". Provide a helpful, concise response about how you can assist with their workflow, ticket management, or task automation. Keep it friendly and professional.`;
+      
+      const aiResponse = await this.aiService.generateResponse(aiPrompt);
+      
+      await this.sendMessage({
+        channel,
+        thread_ts: threadTs,
+        text: `🤖 ${aiResponse || 'I\'m here to help with your Zendesk and ClickUp workflow! Try asking me about ticket summaries, status updates, or say "help" to see what I can do.'}`
+      });
+    } catch (error) {
+      console.error('Error generating AI response:', error);
+      await this.sendHelpMessage(channel, threadTs);
+    }
+  }
+
+  async sendHelpMessage(channel: string, threadTs?: string): Promise<void> {
+    try {
+      const message = {
+        channel,
+        thread_ts: threadTs,
+        text: `🧞‍♂️ TaskGenie Help`,
+        blocks: [
+          {
+            type: 'header',
+            text: {
+              type: 'plain_text',
+              text: '🧞‍♂️ TaskGenie Help'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `I'm your AI-powered task automation assistant! Here's what I can do:`
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*🎯 Core Features:*\n• 🎫 Automatically create ClickUp tasks from Zendesk tickets\n• 📋 Provide AI-powered ticket summaries and analysis\n• 📊 Generate insights and analytics reports\n• 🔍 Help you search and find tickets\n• 🤖 Answer questions about your workflow\n• 🔗 Keep everything connected with smart automation'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*💬 How to use me:*\n• `@TaskGenie help` - Show this help message\n• `@TaskGenie summarize` - Get AI ticket summary\n• `@TaskGenie status` - Check ticket status\n• `@TaskGenie analytics` - Get insights and reports\n• `@TaskGenie create task` - Manual task creation\n• `@TaskGenie find ticket` - Search for tickets\n• Ask me any question about your tickets or workflow!'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '🚀 *Ready to boost your productivity?* Just mention me anytime!'
+            }
+          }
+        ]
+      };
+
+      await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(message)
       });
     } catch (error) {
       console.error('Error sending help message:', error);

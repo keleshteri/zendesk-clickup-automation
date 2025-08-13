@@ -277,9 +277,16 @@ export interface SlackEvent {
   type: string;
   channel: string;
   user: string;
-  text: string;
+  text?: string;
   ts: string;
   thread_ts?: string;
+  // For member_joined_channel events
+  inviter?: string;
+  // For app_mention events
+  bot_id?: string;
+  // Additional properties for enhanced functionality
+  channel_type?: 'channel' | 'group' | 'im' | 'mpim';
+  team?: string;
 }
 
 export interface SlackMessage {

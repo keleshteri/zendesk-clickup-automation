@@ -93,6 +93,22 @@ export class AIService {
     return this.provider?.name || 'none';
   }
 
+  // Generate general AI responses for enhanced Q&A
+  async generateResponse(prompt: string): Promise<string> {
+    if (!this.provider || !this.model) {
+      throw new Error('AI provider is not configured');
+    }
+
+    try {
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      return response.text();
+    } catch (error) {
+      console.error('AI response generation error:', error);
+      throw error;
+    }
+  }
+
   // Phase 1: Enhanced AI Analysis Methods
   async analyzeTicket(ticketContent: string, ticketMetadata?: TicketMetadata): Promise<TicketAnalysis> {
     if (!this.provider) {

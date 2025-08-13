@@ -408,13 +408,21 @@ export default {
             });
           }
 
-          // Handle app mentions and direct messages
+          // Handle app mentions, direct messages, and member joined events
           if (data.type === 'event_callback' && data.event) {
             const event: SlackEvent = data.event;
             
             if (event.type === 'app_mention' || event.type === 'message') {
               // Handle the mention asynchronously
               ctx.waitUntil(slackService.handleMention(event));
+              
+              return new Response('', { status: 200 });
+            }
+            
+            // Handle member joined channel events
+            if (event.type === 'member_joined_channel') {
+              // Send welcome message asynchronously
+              ctx.waitUntil(slackService.handleMemberJoined(event));
               
               return new Response('', { status: 200 });
             }
