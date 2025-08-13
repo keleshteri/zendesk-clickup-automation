@@ -115,8 +115,11 @@ export class SlackService {
     try {
       const { channel, user, bot_id } = event;
       
-      // Check if it's TaskGenie joining the channel
-      let isTaskGenieJoining = false;
+      // Skip if any bot is joining (including TaskGenie)
+      if (bot_id) {
+        console.log('Bot joined channel, skipping welcome message');
+        return;
+      }
       
       // Get bot info to check if the joining user is TaskGenie itself
       try {
@@ -131,22 +134,17 @@ export class SlackService {
         if (botInfoResponse.ok) {
           const botInfo: any = await botInfoResponse.json();
           if (botInfo.user_id === user) {
-            isTaskGenieJoining = true;
+            // TaskGenie is joining - send intro message
+            await this.sendTaskGenieIntroMessage(channel);
+            return;
           }
         }
       } catch (botInfoError) {
         console.error('Error getting bot info:', botInfoError);
       }
       
-      if (isTaskGenieJoining) {
-        // Send TaskGenie introduction message when bot joins
-        await this.sendTaskGenieIntroMessage(channel);
-      } else if (!bot_id) {
-        // Send welcome message to new human users (skip other bots)
-        await this.sendUserWelcomeMessage(channel, user);
-      } else {
-        console.log('Other bot joined channel, skipping welcome message');
-      }
+      // Send welcome message to new human users only
+      await this.sendUserWelcomeMessage(channel, user);
     } catch (error) {
       console.error('Error handling member joined event:', error);
     }
