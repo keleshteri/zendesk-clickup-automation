@@ -412,8 +412,8 @@ export default {
           if (data.type === 'event_callback' && data.event) {
             const event: SlackEvent = data.event;
             
-            if (event.type === 'app_mention' || event.type === 'message') {
-              // Handle the mention asynchronously
+            if (event.type === 'app_mention' || (event.type === 'message' && !event.bot_id)) {
+              // Handle the mention asynchronously (skip bot messages to prevent loops)
               ctx.waitUntil(slackService.handleMention(event));
               
               return new Response('', { status: 200 });
