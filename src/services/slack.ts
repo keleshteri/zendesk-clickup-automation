@@ -115,11 +115,8 @@ export class SlackService {
     try {
       const { channel, user, bot_id } = event;
       
-      // Don't send welcome message if it's a bot joining (including TaskGenie itself)
-      if (bot_id) {
-        console.log('Bot joined channel, skipping welcome message');
-        return;
-      }
+      // Check if it's TaskGenie joining the channel
+      let isTaskGenieJoining = false;
       
       // Get bot info to check if the joining user is TaskGenie itself
       try {
@@ -134,26 +131,31 @@ export class SlackService {
         if (botInfoResponse.ok) {
           const botInfo: any = await botInfoResponse.json();
           if (botInfo.user_id === user) {
-            console.log('TaskGenie joined channel, skipping welcome message');
-            return;
+            isTaskGenieJoining = true;
           }
         }
       } catch (botInfoError) {
         console.error('Error getting bot info:', botInfoError);
-        // Continue with welcome message if we can't determine bot identity
       }
       
-      await this.sendWelcomeMessage(channel, user);
+      if (isTaskGenieJoining) {
+        // Send TaskGenie introduction message when bot joins
+        await this.sendTaskGenieIntroMessage(channel);
+      } else if (!bot_id) {
+        // Send welcome message to new human users (skip other bots)
+        await this.sendUserWelcomeMessage(channel, user);
+      } else {
+        console.log('Other bot joined channel, skipping welcome message');
+      }
     } catch (error) {
       console.error('Error handling member joined event:', error);
     }
   }
 
-  // Send welcome message when bot joins a channel or new member joins
-  async sendWelcomeMessage(channel: string, userId?: string): Promise<void> {
+
+
+  async sendTaskGenieIntroMessage(channel: string): Promise<void> {
     try {
-      const userMention = userId ? `<@${userId}>` : 'everyone';
-      
       const message = {
         channel,
         text: `🧞 TaskGenie has joined the channel!`,
@@ -162,14 +164,14 @@ export class SlackService {
             type: 'header',
             text: {
               type: 'plain_text',
-              text: '🧞 Welcome to TaskGenie!'
+              text: '🧞 TaskGenie has joined!'
             }
           },
           {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: `Hi ${userMention}! 👋\n\nI'm *TaskGenie*, your AI-powered task automation assistant. I'm here to help streamline your workflow between Zendesk and ClickUp!`
+              text: `Hi everyone! 👋\n\nI'm *TaskGenie*, your AI-powered task automation assistant. I'm here to help streamline your workflow between Zendesk and ClickUp!`
             }
           },
           {
@@ -190,7 +192,7 @@ export class SlackService {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '🚀 *Ready to get started?* Just mention me anytime you need assistance!'
+              text: '🚀 *Ready to boost your productivity?* Just mention @TaskGenie and I\'ll assist!'
             }
           }
         ]
@@ -205,7 +207,64 @@ export class SlackService {
         body: JSON.stringify(message)
       });
     } catch (error) {
-      console.error('Error sending welcome message:', error);
+      console.error('Error sending TaskGenie intro message:', error);
+    }
+  }
+
+  async sendUserWelcomeMessage(channel: string, user: string): Promise<void> {
+    try {
+      const message = {
+        channel,
+        text: `🧞 Welcome to TaskGenie!`,
+        blocks: [
+          {
+            type: 'header',
+            text: {
+              type: 'plain_text',
+              text: '🧞 Welcome to TaskGenie!'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `Hi <@${user}>! 👋\n\nI'm *TaskGenie*, your AI-powered task automation assistant. I'm here to help streamline your workflow between Zendesk and ClickUp!`
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*🎯 What I can do for you:*\n• 🎫 Automatically create ClickUp tasks from Zendesk tickets\n• 📋 Provide AI-powered ticket summaries and analysis\n• 📊 Generate insights and analytics reports\n• 🔍 Help you search and find tickets\n• 🤖 Answer questions about your tickets and tasks\n• 🔗 Keep everything connected with smart automation'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*💬 How to interact with me:*\n• Mention me with `@TaskGenie` followed by your question\n• Ask for help: `@TaskGenie help`\n• Get ticket summaries: `@TaskGenie summarize`\n• Check status: `@TaskGenie status`\n• Get analytics: `@TaskGenie analytics`'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '🚀 *Ready to get started?* Just mention @TaskGenie and I\'ll assist!'
+            }
+          }
+        ]
+      };
+
+      await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(message)
+      });
+    } catch (error) {
+      console.error('Error sending user welcome message:', error);
     }
   }
 
