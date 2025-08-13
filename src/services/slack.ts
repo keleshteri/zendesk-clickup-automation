@@ -121,9 +121,27 @@ export class SlackService {
         return;
       }
       
-      // Don't send welcome message if it's TaskGenie's own user ID
-      // You can get your bot's user ID from Slack app settings if needed
-      // For now, we'll rely on bot_id check above
+      // Get bot info to check if the joining user is TaskGenie itself
+      try {
+        const botInfoResponse = await fetch('https://slack.com/api/auth.test', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (botInfoResponse.ok) {
+          const botInfo: any = await botInfoResponse.json();
+          if (botInfo.user_id === user) {
+            console.log('TaskGenie joined channel, skipping welcome message');
+            return;
+          }
+        }
+      } catch (botInfoError) {
+        console.error('Error getting bot info:', botInfoError);
+        // Continue with welcome message if we can't determine bot identity
+      }
       
       await this.sendWelcomeMessage(channel, user);
     } catch (error) {
