@@ -87,6 +87,14 @@ export class SlackService {
     try {
       const { channel, text, thread_ts, ts } = event;
       const messageText = text?.toLowerCase() || '';
+      
+      console.log('🎯 handleMention called:', {
+        channel,
+        user: event.user,
+        bot_id: event.bot_id,
+        text: text?.substring(0, 100),
+        event_ts: ts
+      });
 
       // Enhanced AI Q&A capabilities
       if (messageText.includes('summarize') || messageText.includes('summary')) {
@@ -376,6 +384,7 @@ export class SlackService {
 
   async sendHelpMessage(channel: string, threadTs?: string): Promise<void> {
     try {
+      console.log('📖 Sending help message to channel:', channel, 'thread:', threadTs);
       const message = {
         channel,
         thread_ts: threadTs,
