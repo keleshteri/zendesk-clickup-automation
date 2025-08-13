@@ -101,7 +101,7 @@ export default {
       if (url.pathname === '/' && method === 'GET') {
         return new Response(JSON.stringify({
           status: 'ok',
-          message: 'TaskGenie - Zendesk-ClickUp-Slack Automation Worker is running! 🧞‍♂️',
+          message: 'TaskGenie - Zendesk-ClickUp-Slack Automation Worker is running! 🧞',
           timestamp: new Date().toISOString(),
           version: '2.0.0',
           language: 'TypeScript',
@@ -453,7 +453,7 @@ export default {
           if (command === '/taskgenie') {
             return new Response(JSON.stringify({
               response_type: 'ephemeral',
-              text: '🧞‍♂️ TaskGenie is here to help! I automatically create ClickUp tasks from Zendesk tickets and can provide AI-powered summaries. Just mention me in a thread and ask for "summarize"!'
+              text: '🧞 TaskGenie is here to help! I automatically create ClickUp tasks from Zendesk tickets and can provide AI-powered summaries. Just mention me in a thread and ask for "summarize"!'
             }), {
               status: 200,
               headers: { 'Content-Type': 'application/json' }

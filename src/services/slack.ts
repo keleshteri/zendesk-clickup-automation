@@ -23,13 +23,13 @@ export class SlackService {
     try {
       const message = {
         channel,
-        text: `🧞‍♂️ TaskGenie`,
+        text: `🧞 TaskGenie`,
         blocks: [
           {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: `🧞‍♂️ *TaskGenie*\n\nHi ${assigneeName || 'there'}! 👋\n\nI've created a task for this Zendesk ticket.`
+              text: `🧞 *TaskGenie*\n\nHi ${assigneeName || 'there'}! 👋\n\nI've created a task for this Zendesk ticket.`
             }
           },
           {
@@ -381,13 +381,13 @@ export class SlackService {
       const message = {
         channel,
         thread_ts: threadTs,
-        text: `🧞‍♂️ TaskGenie Help`,
+        text: `🧞 TaskGenie Help`,
         blocks: [
           {
             type: 'header',
             text: {
               type: 'plain_text',
-              text: '🧞‍♂️ TaskGenie Help'
+              text: '🧞 TaskGenie Help'
             }
           },
           {
