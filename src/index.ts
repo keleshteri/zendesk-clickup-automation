@@ -67,15 +67,19 @@ export default {
     }
 
     try {
-      clickupService = new ClickUpService(env);
-    } catch (error) {
-      console.warn('ClickUp service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
-    }
-
-    try {
       aiService = new AIService(env);
     } catch (error) {
       console.warn('AI service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
+
+    try {
+      if (aiService) {
+        clickupService = new ClickUpService(env, aiService);
+      } else {
+        console.warn('ClickUp service initialization skipped: AI service not available');
+      }
+    } catch (error) {
+      console.warn('ClickUp service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
     }
 
     try {
@@ -230,7 +234,11 @@ export default {
                 
                 if (oauthData && oauthService.isTokenValid(oauthData)) {
                   console.log('✅ Using OAuth tokens for ClickUp API');
-                  oauthClickUpService = new ClickUpService(env, oauthData);
+                  if (aiService) {
+                    oauthClickUpService = new ClickUpService(env, aiService, oauthData);
+                  } else {
+                    console.warn('⚠️ AI service not available for OAuth ClickUp service');
+                  }
                 } else {
                   console.log('⚠️ OAuth data not found or invalid, falling back to API token');
                 }
@@ -239,10 +247,28 @@ export default {
               }
             }
             
-            // Create ClickUp task using the service (OAuth or API token)
+            // Generate AI analysis for the ticket
+            let aiAnalysis = null;
+            if (aiService) {
+              try {
+                console.log('🤖 Generating AI analysis for ticket...');
+                aiAnalysis = await aiService.analyzeTicket(JSON.stringify(ticket));
+                console.log('✅ AI analysis completed:', {
+                  priority: aiAnalysis.priority,
+                  category: aiAnalysis.category,
+                  sentiment: aiAnalysis.sentiment,
+                  urgency_indicators: aiAnalysis.urgency_indicators
+                });
+              } catch (aiError) {
+                console.warn('⚠️ AI analysis failed:', aiError);
+                aiAnalysis = null;
+              }
+            }
+
+            // Create ClickUp task using the service (OAuth or API token) with AI analysis
             let clickupTask;
             try {
-              clickupTask = await oauthClickUpService.createTaskFromTicket(ticket);
+              clickupTask = await oauthClickUpService.createTaskFromTicket(ticket, aiAnalysis || undefined);
             } catch (clickupError) {
               console.error('💥 ClickUp task creation failed:', clickupError);
               throw new Error(`ClickUp task creation failed: ${clickupError instanceof Error ? clickupError.message : 'Unknown error'}`);
@@ -256,7 +282,8 @@ export default {
             console.log('🎉 ClickUp task created successfully:', {
               id: clickupTask.id,
               name: clickupTask.name,
-              url: clickupTask.url
+              url: clickupTask.url,
+              ai_enhanced: !!aiAnalysis
             });
 
             // Store mapping in KV if available
@@ -276,20 +303,32 @@ export default {
             let slackThreadTs: string | undefined;
             if (slackService && env.SLACK_BOT_TOKEN && env.SLACK_SIGNING_SECRET) {
               try {
-                // For demo purposes, we'll use a default channel
-                // In production, this should be configurable
-                const defaultChannel = '#taskgenie'; // or get from env
                 const zendeskUrl = zendeskService?.getTicketUrl(ticket.id) || `https://${env.ZENDESK_DOMAIN}/agent/tickets/${ticket.id}`;
                 const clickupUrl = oauthClickUpService.getTaskUrl(clickupTask.id);
                 
-                const slackMessage = await slackService.sendTaskCreationMessage(
-                  defaultChannel,
-                  ticket.id.toString(),
-                  zendeskUrl,
-                  clickupUrl,
-                  'Steve' // In production, get from ticket requester
-                );
-                slackThreadTs = slackMessage?.ts;
+                if (aiAnalysis) {
+                  // Send intelligent notification with AI insights
+                  console.log('💬 Sending intelligent Slack notification with AI insights...');
+                  const slackMessage = await slackService.sendIntelligentNotification(
+                    ticket,
+                    aiAnalysis,
+                    clickupUrl,
+                    null // No assignment recommendation for now
+                  );
+                  slackThreadTs = slackMessage?.ts;
+                } else {
+                  // Fallback to basic notification
+                  console.log('💬 Sending basic Slack notification...');
+                  const defaultChannel = '#zendesk-clickup-automation'; // or get from env
+                  const slackMessage = await slackService.sendTaskCreationMessage(
+                    defaultChannel,
+                    ticket.id.toString(),
+                    zendeskUrl,
+                    clickupUrl,
+                    'Steve' // In production, get from ticket requester
+                  );
+                  slackThreadTs = slackMessage?.ts;
+                }
                 
                 console.log('💬 Slack notification sent:', slackThreadTs);
               } catch (slackError) {
@@ -304,8 +343,16 @@ export default {
               clickup_task_id: clickupTask.id,
               clickup_task_url: oauthClickUpService.getTaskUrl(clickupTask.id),
               slack_thread_ts: slackThreadTs,
-              event_type: data.type
-            }, 'Zendesk ticket successfully converted to ClickUp task and Slack notified')), {
+              event_type: data.type,
+              ai_analysis: aiAnalysis ? {
+                priority: aiAnalysis.priority,
+                category: aiAnalysis.category,
+                sentiment: aiAnalysis.sentiment,
+                urgency_indicators: aiAnalysis.urgency_indicators,
+                action_items: aiAnalysis.action_items
+              } : null,
+              ai_enhanced: !!aiAnalysis
+            }, aiAnalysis ? 'Zendesk ticket successfully converted to ClickUp task with AI analysis and intelligent Slack notification' : 'Zendesk ticket successfully converted to ClickUp task and Slack notified')), {
               status: 200,
               headers: corsHeaders
             });
@@ -611,7 +658,7 @@ export default {
 
               if (oauthData && oauthService.isTokenValid(oauthData)) {
                 console.log('✅ Using OAuth tokens for ClickUp test');
-                oauthClickUpService = new ClickUpService(env, oauthData);
+                oauthClickUpService = new ClickUpService(env, aiService, oauthData);
               } else {
                 console.log('⚠️ OAuth data not found or invalid, falling back to API token for test');
               }
@@ -1157,7 +1204,7 @@ export default {
 
             // Test 2: Try ClickUp API call
             try {
-              const clickupService = new ClickUpService(env, defaultData);
+              const clickupService = new ClickUpService(env, aiService, defaultData);
               const testResult = await clickupService.testConnection();
               results.tests.clickup_api_test = testResult;
             } catch (apiError) {

@@ -1,5 +1,6 @@
-import { ClickUpTask, Env, ZendeskTicket, UserOAuthData } from '../../types/index.js';
+import { ClickUpTask, Env, ZendeskTicket, UserOAuthData, TicketAnalysis } from '../../types/index.js';
 import { mapZendeskToClickUpPriority } from '../../utils/index.js';
+import { AIService } from '../ai.js';
 
 /**
  * ClickUp API Service
@@ -22,15 +23,20 @@ export class ClickUpService {
   
   /** User OAuth data for authenticated requests (optional) */
   private userOAuthData: UserOAuthData | null = null;
+  
+  /** AI service for enhanced task descriptions and analysis */
+  private aiService: AIService;
 
   /**
    * Creates a new ClickUp service instance
    * 
    * @param env - Environment configuration containing API keys and settings
+   * @param aiService - AI service for enhanced task descriptions and analysis
    * @param userOAuthData - Optional OAuth data for user-specific authentication
    */
-  constructor(env: Env, userOAuthData?: UserOAuthData | null) {
+  constructor(env: Env, aiService: AIService, userOAuthData?: UserOAuthData | null) {
     this.env = env;
+    this.aiService = aiService;
     this.userOAuthData = userOAuthData || null;
   }
 
@@ -127,7 +133,7 @@ export class ClickUpService {
    * }
    * ```
    */
-  async createTaskFromTicket(ticket: ZendeskTicket): Promise<ClickUpTask | null> {
+  async createTaskFromTicket(ticket: ZendeskTicket, analysis?: TicketAnalysis): Promise<ClickUpTask | null> {
     console.log('🚀 Starting ClickUp task creation for ticket:', ticket.id);
     
     try {
@@ -145,17 +151,50 @@ export class ClickUpService {
       console.log('✅ Authentication and environment validated');
       console.log('📋 Target ClickUp List ID:', this.env.CLICKUP_LIST_ID);
 
+      // Get AI analysis if not provided
+      let ticketAnalysis = analysis;
+      if (!ticketAnalysis) {
+        console.log('🤖 Generating AI analysis for ticket...');
+        try {
+          ticketAnalysis = await this.aiService.analyzeTicket(JSON.stringify(ticket));
+          console.log('✅ AI analysis completed:', {
+            priority: ticketAnalysis.priority,
+            category: ticketAnalysis.category,
+            sentiment: ticketAnalysis.sentiment
+          });
+        } catch (aiError) {
+          console.warn('⚠️ AI analysis failed, using fallback:', aiError);
+          ticketAnalysis = null;
+        }
+      }
+
+      // Generate enhanced task description
+      const description = ticketAnalysis 
+        ? await this.aiService.generateEnhancedTaskDescription(ticket, ticketAnalysis)
+        : this.formatTaskDescription(ticket);
+
+      // Use AI-suggested priority if available, otherwise fall back to mapping
+      const priority = ticketAnalysis?.priority 
+        ? this.mapAIPriorityToClickUp(ticketAnalysis.priority)
+        : mapZendeskToClickUpPriority(ticket.priority);
+
+      // Enhanced tags with AI insights
+      const tags = [
+        'zendesk',
+        `ticket-${ticket.id}`,
+        ...(ticket.tags || []),
+        ...(ticketAnalysis ? [
+          `category-${ticketAnalysis.category.toLowerCase()}`,
+          `sentiment-${ticketAnalysis.sentiment.toLowerCase()}`,
+          ...(ticketAnalysis.urgency_indicators.length > 0 ? ['urgent'] : [])
+        ] : [])
+      ];
+
       const taskData = {
         name: `[Zendesk #${ticket.id}] ${ticket.subject}`,
-        description: this.formatTaskDescription(ticket),
-        // Remove status - let it use default status from the list
-        // status: mapZendeskToClickUpStatus(ticket.status),
-        priority: mapZendeskToClickUpPriority(ticket.priority),
-        tags: [
-          'zendesk',
-          `ticket-${ticket.id}`,
-          ...(ticket.tags || [])
-        ]
+        description,
+        priority,
+        tags
         // Removed custom_fields as they might require specific field IDs
       };
 
@@ -406,6 +445,27 @@ ${ticket.assignee_id ? `- Assignee ID: ${ticket.assignee_id}` : ''}
 ---
 *This task was automatically created by TaskGenie from a Zendesk ticket.*
     `.trim();
+  }
+
+  /**
+   * Map AI-suggested priority to ClickUp priority values
+   * 
+   * @param aiPriority - Priority from AI analysis (low, normal, high, urgent)
+   * @returns ClickUp priority value (1=urgent, 2=high, 3=normal, 4=low)
+   */
+  private mapAIPriorityToClickUp(aiPriority: string): number {
+    switch (aiPriority.toLowerCase()) {
+      case 'urgent':
+        return 1;
+      case 'high':
+        return 2;
+      case 'normal':
+        return 3;
+      case 'low':
+        return 4;
+      default:
+        return 3; // Default to normal
+    }
   }
 
   /**

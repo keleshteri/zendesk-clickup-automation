@@ -1,4 +1,4 @@
-import { SlackMessage, SlackEvent, TaskGenieContext, Env } from '../types/index.js';
+import { SlackMessage, SlackEvent, TaskGenieContext, Env, TicketAnalysis, ZendeskTicket, AssignmentRecommendation, AIInsights } from '../types/index.js';
 import { AIService } from './ai.js';
 import { ZendeskService } from './zendesk';
 
@@ -148,6 +148,276 @@ export class SlackService {
     } catch (error) {
       console.error('Error sending help message:', error);
     }
+  }
+
+  // Phase 1: Enhanced Intelligent Notifications
+  async sendIntelligentNotification(
+    ticket: ZendeskTicket,
+    analysis: TicketAnalysis,
+    clickupTaskUrl: string,
+    assignment?: AssignmentRecommendation
+  ): Promise<SlackMessage | null> {
+    try {
+      const urgencyEmoji = this.getUrgencyEmoji(analysis.sentiment, analysis.priority);
+      const categoryEmoji = this.getCategoryEmoji(analysis.category);
+      const teamChannel = this.getTeamChannel(analysis.suggested_team);
+      
+      console.log('📍 Slack notification details:', {
+        suggested_team: analysis.suggested_team,
+        target_channel: teamChannel,
+        ticket_id: ticket.id
+      });
+      
+      const blocks = [
+        {
+          type: 'header',
+          text: {
+            type: 'plain_text',
+            text: `${urgencyEmoji} ${categoryEmoji} New ${analysis.category} ticket`
+          }
+        },
+        {
+          type: 'section',
+          fields: [
+            {
+              type: 'mrkdwn',
+              text: `*Ticket*: <${ticket.url}|#${ticket.id}>`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Task*: <${clickupTaskUrl}|View in ClickUp>`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Priority*: ${analysis.priority.toUpperCase()}`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Sentiment*: ${analysis.sentiment}`
+            }
+          ]
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*AI Summary*: ${analysis.summary}`
+          }
+        }
+      ];
+      
+      // Add urgency indicators if present
+      if (analysis.urgency_indicators.length > 0) {
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `⚠️ *Urgency Indicators*: ${analysis.urgency_indicators.join(', ')}`
+          }
+        });
+      }
+      
+      // Add assignment recommendation if available
+      if (assignment) {
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `🎯 *AI Recommendation*: Assign to ${assignment.team} team (${(assignment.confidence * 100).toFixed(1)}% confidence)\n*Reason*: ${assignment.reason}`
+          }
+        });
+      }
+      
+      // Add action items
+      if (analysis.action_items.length > 0) {
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `📋 *Action Items*:\n${analysis.action_items.map(item => `• ${item}`).join('\n')}`
+          }
+        });
+      }
+      
+      const message = {
+        channel: teamChannel,
+        text: `${urgencyEmoji} New ${analysis.category} ticket #${ticket.id}`,
+        blocks
+      };
+      
+      const response = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(message)
+      });
+      
+      const result = await response.json() as any;
+      
+      if (result.ok && result.message) {
+        console.log('✅ Slack message sent successfully:', {
+          channel: result.channel,
+          ts: result.message.ts
+        });
+        return {
+          ts: result.message.ts,
+          channel: result.channel,
+          text: result.message.text || '',
+          user: result.message.user || 'bot',
+          thread_ts: result.message.thread_ts
+        };
+      } else {
+        console.error('❌ Slack API error:', {
+          ok: result.ok,
+          error: result.error,
+          warning: result.warning,
+          response_metadata: result.response_metadata
+        });
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('💥 Failed to send intelligent Slack notification:', error);
+      return null;
+    }
+  }
+  
+  async sendDailyInsights(insights: AIInsights): Promise<void> {
+    try {
+      const channel = this.env.SLACK_MANAGEMENT_CHANNEL || '#management';
+      
+      const blocks = [
+        {
+          type: 'header',
+          text: {
+            type: 'plain_text',
+            text: `📊 Daily Insights - ${insights.period}`
+          }
+        },
+        {
+          type: 'section',
+          fields: [
+            {
+              type: 'mrkdwn',
+              text: `*Total Tickets*: ${insights.total_tickets}`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*High Priority*: ${insights.trends.priority_distribution.high || 0}`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Urgent*: ${insights.trends.priority_distribution.urgent || 0}`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Technical Issues*: ${insights.trends.category_breakdown.technical || 0}`
+            }
+          ]
+        }
+      ];
+      
+      // Add priority distribution
+      const priorityText = Object.entries(insights.trends.priority_distribution)
+        .map(([priority, count]) => `${priority}: ${count}`)
+        .join(' | ');
+      
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `📈 *Priority Distribution*: ${priorityText}`
+        }
+      });
+      
+      // Add alerts
+      if (insights.alerts.length > 0) {
+        const alertText = insights.alerts
+          .map(alert => `${this.getAlertEmoji(alert.severity)} ${alert.message}`)
+          .join('\n');
+        
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*🚨 Alerts*:\n${alertText}`
+          }
+        });
+      }
+      
+      // Add recommendations
+      if (insights.recommendations.length > 0) {
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*💡 Recommendations*:\n${insights.recommendations.map(rec => `• ${rec}`).join('\n')}`
+          }
+        });
+      }
+      
+      const message = {
+        channel,
+        text: `📊 Daily Insights - ${insights.period}`,
+        blocks
+      };
+      
+      await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(message)
+      });
+      
+    } catch (error) {
+      console.error('Failed to send daily insights to Slack:', error);
+    }
+  }
+  
+  private getUrgencyEmoji(sentiment: string, priority: string): string {
+    if (priority === 'urgent' || sentiment === 'angry') return '🚨';
+    if (priority === 'high' || sentiment === 'frustrated') return '⚠️';
+    if (sentiment === 'happy') return '😊';
+    return '📋';
+  }
+  
+  private getCategoryEmoji(category: string): string {
+    const emojiMap: Record<string, string> = {
+      'technical': '🔧',
+      'billing': '💰',
+      'bug': '🐛',
+      'feature': '✨',
+      'account': '👤',
+      'general': '💬'
+    };
+    return emojiMap[category] || '📋';
+  }
+  
+  private getTeamChannel(team: string): string {
+    // Default to #zendesk-clickup-automation for all notifications
+    const defaultChannel = '#zendesk-clickup-automation';
+    
+    const channelMap: Record<string, string> = {
+      'development': this.env.SLACK_DEVELOPMENT_CHANNEL || defaultChannel,
+      'support': this.env.SLACK_SUPPORT_CHANNEL || defaultChannel,
+      'billing': this.env.SLACK_BILLING_CHANNEL || defaultChannel,
+      'management': this.env.SLACK_MANAGEMENT_CHANNEL || defaultChannel
+    };
+    
+    return channelMap[team] || this.env.SLACK_DEFAULT_CHANNEL || defaultChannel;
+  }
+  
+  private getAlertEmoji(severity: string): string {
+    const emojiMap: Record<string, string> = {
+      'high': '🔴',
+      'medium': '🟡',
+      'low': '🟢'
+    };
+    return emojiMap[severity] || '⚪';
   }
 
   private async getTaskGenieContext(channel: string, threadTs: string): Promise<TaskGenieContext | null> {
