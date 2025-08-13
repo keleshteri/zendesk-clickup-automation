@@ -113,7 +113,18 @@ export class SlackService {
   // Handle member joining channel event
   async handleMemberJoined(event: SlackEvent): Promise<void> {
     try {
-      const { channel, user } = event;
+      const { channel, user, bot_id } = event;
+      
+      // Don't send welcome message if it's a bot joining (including TaskGenie itself)
+      if (bot_id) {
+        console.log('Bot joined channel, skipping welcome message');
+        return;
+      }
+      
+      // Don't send welcome message if it's TaskGenie's own user ID
+      // You can get your bot's user ID from Slack app settings if needed
+      // For now, we'll rely on bot_id check above
+      
       await this.sendWelcomeMessage(channel, user);
     } catch (error) {
       console.error('Error handling member joined event:', error);
@@ -127,13 +138,13 @@ export class SlackService {
       
       const message = {
         channel,
-        text: `🧞‍♂️ TaskGenie has joined the channel!`,
+        text: `🧞 TaskGenie has joined the channel!`,
         blocks: [
           {
             type: 'header',
             text: {
               type: 'plain_text',
-              text: '🧞‍♂️ Welcome to TaskGenie!'
+              text: '🧞 Welcome to TaskGenie!'
             }
           },
           {
