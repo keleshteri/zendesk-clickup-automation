@@ -58,7 +58,8 @@ export default {
     let multiAgentService: MultiAgentService | null = null;
 
     try {
-      slackService = new SlackService(env);
+      // Initialize SlackService after multiAgentService is created
+      // Will be properly initialized later in the code
     } catch (error) {
       console.warn('Slack service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
     }
@@ -99,6 +100,13 @@ export default {
       }
     } catch (error) {
       console.warn('MultiAgent service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
+
+    // Initialize SlackService with multiAgentService
+    try {
+      slackService = new SlackService(env, multiAgentService || undefined);
+    } catch (error) {
+      console.warn('Slack service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
     }
 
     // Handle CORS preflight

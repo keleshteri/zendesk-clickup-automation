@@ -1,16 +1,19 @@
 import { SlackMessage, SlackEvent, TaskGenieContext, Env, TicketAnalysis, ZendeskTicket, AssignmentRecommendation, AIInsights } from '../types/index.js';
 import { AIService } from './ai.js';
 import { ZendeskService } from './zendesk';
+import { MultiAgentService } from './multi-agent-service.js';
 
 export class SlackService {
   private env: Env;
   private aiService: AIService;
   private zendeskService: ZendeskService;
+  private multiAgentService: MultiAgentService | null = null;
 
-  constructor(env: Env) {
+  constructor(env: Env, multiAgentService?: MultiAgentService) {
     this.env = env;
     this.aiService = new AIService(env);
     this.zendeskService = new ZendeskService(env);
+    this.multiAgentService = multiAgentService || null;
   }
 
   async sendTaskCreationMessage(
@@ -97,7 +100,9 @@ export class SlackService {
       });
 
       // Enhanced AI Q&A capabilities
-      if (messageText.includes('summarize') || messageText.includes('summary')) {
+      if (messageText.includes('analyze') || messageText.includes('process ticket') || messageText.includes('multi-agent')) {
+        await this.handleMultiAgentRequest(channel, thread_ts || ts, text);
+      } else if (messageText.includes('summarize') || messageText.includes('summary')) {
         await this.handleSummarizeRequest(channel, thread_ts || ts, text);
       } else if (messageText.includes('status') || messageText.includes('what\'s the status')) {
         await this.handleStatusRequest(channel, thread_ts || ts, text);
@@ -374,6 +379,109 @@ export class SlackService {
       thread_ts: threadTs,
       text: '📊 *Analytics & Insights*\n\nI can provide various analytics reports:\n• Daily ticket insights\n• Team workload analysis\n• Priority distribution\n• Sentiment trends\n\nFor detailed analytics, please check your configured analytics channels or ask for specific metrics!'
     });
+  }
+
+  private async handleMultiAgentRequest(channel: string, threadTs: string, messageText?: string): Promise<void> {
+    // Check if multi-agent service is available
+    if (!this.multiAgentService) {
+      await this.sendMessage({
+        channel,
+        thread_ts: threadTs,
+        text: '❌ Multi-agent analysis is currently unavailable. Please try again later or contact your administrator.'
+      });
+      return;
+    }
+
+    await this.sendMessage({
+      channel,
+      thread_ts: threadTs,
+      text: '🤖 Let me analyze this ticket with our multi-agent system...'
+    });
+
+    let ticketId: string | null = null;
+    
+    // First, try to extract ticket ID from the user's message
+    if (messageText) {
+      const ticketMatch = messageText.match(/(?:ticket\s*#?|#)(\d+)/i);
+      if (ticketMatch) {
+        ticketId = ticketMatch[1];
+      }
+    }
+    
+    // If no ticket ID found in message, try to get context from thread
+    if (!ticketId) {
+      const context = await this.getTaskGenieContext(channel, threadTs);
+      ticketId = context?.ticketId || null;
+    }
+    
+    if (ticketId) {
+      try {
+        // Process ticket with multi-agent system
+        const result = await this.multiAgentService.processTicket(ticketId);
+        
+        // Format agent feedback for Slack
+        let agentFeedback = `🎯 *Multi-Agent Analysis for Ticket #${ticketId}*\n\n`;
+        
+        // Add workflow information
+        if (result.workflow && result.workflow.context && result.workflow.context.insights) {
+          agentFeedback += `📋 *Agent Workflow:*\n`;
+          result.workflow.context.insights.forEach((insight: any, index: number) => {
+            agentFeedback += `${index + 1}. **${insight.agentRole}**: ${insight.analysis}\n`;
+            if (insight.recommendedActions && insight.recommendedActions.length > 0) {
+              insight.recommendedActions.forEach((action: string) => {
+                agentFeedback += `   • ${action}\n`;
+              });
+            }
+          });
+          agentFeedback += `\n`;
+        }
+        
+        // Add final recommendations
+        if (result.finalRecommendations && result.finalRecommendations.length > 0) {
+          agentFeedback += `💡 *Final Recommendations:*\n`;
+          result.finalRecommendations.forEach((rec: string) => {
+            agentFeedback += `• ${rec}\n`;
+          });
+          agentFeedback += `\n`;
+        }
+        
+        // Add agent involvement summary
+        if (result.agentsInvolved && result.agentsInvolved.length > 0) {
+          agentFeedback += `👥 *Agents Involved:* ${result.agentsInvolved.join(', ')}\n`;
+        }
+        
+        if (result.confidence) {
+          agentFeedback += `📊 *Confidence Score:* ${(result.confidence * 100).toFixed(1)}%\n`;
+        }
+        
+        if (result.handoffCount !== undefined) {
+          agentFeedback += `🔄 *Handoffs:* ${result.handoffCount}\n`;
+        }
+        
+        if (result.processingTimeMs) {
+          agentFeedback += `⏱️ *Processing Time:* ${result.processingTimeMs}ms`;
+        }
+        
+        await this.sendMessage({
+          channel,
+          thread_ts: threadTs,
+          text: agentFeedback
+        });
+      } catch (error) {
+        console.error('Error in multi-agent processing:', error);
+        await this.sendMessage({
+          channel,
+          thread_ts: threadTs,
+          text: `❌ An error occurred while processing ticket #${ticketId} with the multi-agent system. Please try again later.`
+        });
+      }
+    } else {
+      await this.sendMessage({
+        channel,
+        thread_ts: threadTs,
+        text: '❌ I couldn\'t find a ticket ID. Please specify a ticket number like:\n• `@TaskGenie analyze ticket #27`\n• `@TaskGenie process ticket 27`\n• Or reply to a TaskGenie message in a thread.'
+      });
+    }
   }
 
   private async handleCreateTaskRequest(channel: string, threadTs: string, messageText: string): Promise<void> {
