@@ -421,14 +421,16 @@ export default {
               event_ts: event.ts
             });
             
-            if ((event.type === 'app_mention' && !event.bot_id) || (event.type === 'message' && !event.bot_id)) {
-              console.log('✅ Processing mention event for user:', event.user);
+            if (event.type === 'app_mention' && !event.bot_id) {
+              console.log('✅ Processing app mention event for user:', event.user);
               // Handle the mention asynchronously (skip bot messages to prevent loops)
               ctx.waitUntil(slackService.handleMention(event));
               
               return new Response('', { status: 200 });
             } else if (event.bot_id) {
               console.log('🤖 Skipping bot message from:', event.bot_id);
+            } else if (event.type === 'message') {
+              console.log('📝 Skipping regular message event (not a mention)');
             }
             
             // Handle member joined channel events
