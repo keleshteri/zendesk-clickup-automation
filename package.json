@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --config wrangler.dev.jsonc",
     "deploy:dev": "wrangler deploy --config wrangler.dev.jsonc",
     "deploy:prod": "wrangler deploy --config wrangler.production.jsonc",
     "dev": "wrangler dev",
