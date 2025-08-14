@@ -195,7 +195,10 @@ export class SoftwareEngineerAgent extends BaseAgent {
   }
 
   async shouldHandoff(context: any): Promise<AgentRole | null> {
-    const content = context.content?.toLowerCase() || '';
+    // Extract content from ticket object (subject + description)
+    const subject = context.subject?.toLowerCase() || '';
+    const description = context.description?.toLowerCase() || '';
+    const content = `${subject} ${description}`.toLowerCase();
     
     // Hand off to WordPress developer for WordPress-specific issues
     if (this.containsKeywords(content, ['wordpress', 'wp-', 'plugin', 'theme', 'woocommerce'])) {

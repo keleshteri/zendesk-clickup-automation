@@ -293,7 +293,10 @@ export class BusinessAnalystAgent extends BaseAgent {
   }
 
   async shouldHandoff(context: any): Promise<AgentRole | null> {
-    const content = context.content?.toLowerCase() || '';
+    // Extract content from ticket object (subject + description)
+    const subject = context.subject?.toLowerCase() || '';
+    const description = context.description?.toLowerCase() || '';
+    const content = `${subject} ${description}`.toLowerCase();
     
     // Hand off to Software Engineer for technical implementation
     if (this.containsKeywords(content, ['technical implementation', 'api development', 'system integration', 'database design'])) {

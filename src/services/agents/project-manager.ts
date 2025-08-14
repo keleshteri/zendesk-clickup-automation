@@ -315,27 +315,39 @@ export class ProjectManagerAgent extends BaseAgent {
   }
 
   async shouldHandoff(context: any): Promise<AgentRole | null> {
-    const content = context.content?.toLowerCase() || '';
+    // Extract content from ticket object (subject + description)
+    const subject = context.subject?.toLowerCase() || '';
+    const description = context.description?.toLowerCase() || '';
+    const content = `${subject} ${description}`.toLowerCase();
     
-    // Project Manager typically coordinates but doesn't hand off
-    // Instead, it manages multiple agents working in parallel
+    // Hand off technical issues to appropriate specialists
     
-    // Only hand off if the task is purely technical and doesn't require coordination
-    if (this.containsKeywords(content, ['pure technical task', 'individual development', 'isolated bug fix'])) {
-      if (this.containsKeywords(content, ['wordpress', 'plugin', 'theme'])) {
-        return 'WORDPRESS_DEVELOPER';
-      } else if (this.containsKeywords(content, ['infrastructure', 'server', 'deployment'])) {
-        return 'DEVOPS';
-      } else if (this.containsKeywords(content, ['testing only', 'bug validation'])) {
-        return 'QA_TESTER';
-      } else if (this.containsKeywords(content, ['data analysis only', 'reporting only'])) {
-        return 'BUSINESS_ANALYST';
-      } else if (this.containsKeywords(content, ['coding only', 'api development'])) {
-        return 'SOFTWARE_ENGINEER';
-      }
+    // WordPress-specific issues
+    if (this.containsKeywords(content, ['wordpress', 'wp-', 'plugin', 'theme', 'woocommerce'])) {
+      return 'WORDPRESS_DEVELOPER';
+    }
+    
+    // Server/Infrastructure issues
+    if (this.containsKeywords(content, ['500 error', 'internal server error', 'server error', 'server down', 'deployment', 'infrastructure', 'hosting', 'ssl', 'domain', 'dns', 'docker', 'kubernetes', 'aws', 'cloud'])) {
+      return 'DEVOPS';
+    }
+    
+    // Software/API/Database issues
+    if (this.containsKeywords(content, ['api error', 'api', 'database error', 'database', 'code', 'bug', 'crash', 'not working', 'broken', 'integration', 'backend', 'frontend', 'application error'])) {
+      return 'SOFTWARE_ENGINEER';
+    }
+    
+    // Testing and QA issues
+    if (this.containsKeywords(content, ['testing', 'qa', 'quality', 'test case', 'regression', 'validation'])) {
+      return 'QA_TESTER';
+    }
+    
+    // Business analysis and data issues
+    if (this.containsKeywords(content, ['analytics', 'data', 'report', 'business', 'roi', 'metrics', 'analysis'])) {
+      return 'BUSINESS_ANALYST';
     }
 
-    return null; // Project Manager usually coordinates rather than hands off
+    return null; // Project Manager coordinates when no specific handoff is needed
   }
 
   async canHandle(ticket: ZendeskTicket): Promise<boolean> {

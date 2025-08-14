@@ -281,7 +281,10 @@ export class QATesterAgent extends BaseAgent {
   }
 
   async shouldHandoff(context: any): Promise<AgentRole | null> {
-    const content = context.content?.toLowerCase() || '';
+    // Extract content from ticket object (subject + description)
+    const subject = context.subject?.toLowerCase() || '';
+    const description = context.description?.toLowerCase() || '';
+    const content = `${subject} ${description}`.toLowerCase();
     
     // Hand off to Software Engineer for test automation and technical issues
     if (this.containsKeywords(content, ['test automation', 'unit tests', 'technical bug', 'code issue'])) {

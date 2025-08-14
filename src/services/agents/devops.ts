@@ -282,7 +282,10 @@ export class DevOpsAgent extends BaseAgent {
   }
 
   async shouldHandoff(context: any): Promise<AgentRole | null> {
-    const content = context.content?.toLowerCase() || '';
+    // Extract content from ticket object (subject + description)
+    const subject = context.subject?.toLowerCase() || '';
+    const description = context.description?.toLowerCase() || '';
+    const content = `${subject} ${description}`.toLowerCase();
     
     // Hand off to Software Engineer for application-level issues
     if (this.containsKeywords(content, ['application bug', 'code issue', 'api problem', 'database optimization'])) {

@@ -250,7 +250,10 @@ export class WordPressDeveloperAgent extends BaseAgent {
   }
 
   async shouldHandoff(context: any): Promise<AgentRole | null> {
-    const content = context.content?.toLowerCase() || '';
+    // Extract content from ticket object (subject + description)
+    const subject = context.subject?.toLowerCase() || '';
+    const description = context.description?.toLowerCase() || '';
+    const content = `${subject} ${description}`.toLowerCase();
     
     // Hand off to Software Engineer for complex backend development
     if (this.containsKeywords(content, ['custom api', 'backend development', 'database design', 'complex integration'])) {
