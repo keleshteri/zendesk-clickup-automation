@@ -98,9 +98,9 @@ export class SlackService {
 
       // Enhanced AI Q&A capabilities
       if (messageText.includes('summarize') || messageText.includes('summary')) {
-        await this.handleSummarizeRequest(channel, thread_ts || ts);
+        await this.handleSummarizeRequest(channel, thread_ts || ts, text);
       } else if (messageText.includes('status') || messageText.includes('what\'s the status')) {
-        await this.handleStatusRequest(channel, thread_ts || ts);
+        await this.handleStatusRequest(channel, thread_ts || ts, text);
       } else if (messageText.includes('analytics') || messageText.includes('insights') || messageText.includes('report')) {
         await this.handleAnalyticsRequest(channel, thread_ts || ts);
       } else if (messageText.includes('help') || messageText.includes('what can you do')) {
@@ -191,7 +191,7 @@ export class SlackService {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*💬 How to interact with me:*\n• Mention me with `@TaskGenie` followed by your question\n• Ask for help: `@TaskGenie help`\n• Get ticket summaries: `@TaskGenie summarize`\n• Check status: `@TaskGenie status`\n• Get analytics: `@TaskGenie analytics`'
+              text: '*💬 How to interact with me:*\n• Mention me with `@TaskGenie` followed by your question\n• Ask for help: `@TaskGenie help`\n• Get ticket summaries: `@TaskGenie summarize ticket #27`\n• Check status: `@TaskGenie status ticket #27`\n• Get analytics: `@TaskGenie analytics`'
             }
           },
           {
@@ -248,7 +248,7 @@ export class SlackService {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*💬 How to interact with me:*\n• Mention me with `@TaskGenie` followed by your question\n• Ask for help: `@TaskGenie help`\n• Get ticket summaries: `@TaskGenie summarize`\n• Check status: `@TaskGenie status`\n• Get analytics: `@TaskGenie analytics`'
+              text: '*💬 How to interact with me:*\n• Mention me with `@TaskGenie` followed by your question\n• Ask for help: `@TaskGenie help`\n• Get ticket summaries: `@TaskGenie summarize ticket #27`\n• Check status: `@TaskGenie status ticket #27`\n• Get analytics: `@TaskGenie analytics`'
             }
           },
           {
@@ -275,17 +275,31 @@ export class SlackService {
   }
 
   // Enhanced AI Q&A methods
-  private async handleSummarizeRequest(channel: string, threadTs: string): Promise<void> {
+  private async handleSummarizeRequest(channel: string, threadTs: string, messageText?: string): Promise<void> {
     await this.sendMessage({
       channel,
       thread_ts: threadTs,
       text: '🤔 Let me analyze the ticket and create a summary for you...'
     });
 
-    const context = await this.getTaskGenieContext(channel, threadTs);
+    let ticketId: string | null = null;
     
-    if (context?.ticketId) {
-      const ticket = await this.zendeskService.getTicketDetails(context.ticketId);
+    // First, try to extract ticket ID from the user's message
+    if (messageText) {
+      const ticketMatch = messageText.match(/(?:ticket\s*#?|#)(\d+)/i);
+      if (ticketMatch) {
+        ticketId = ticketMatch[1];
+      }
+    }
+    
+    // If no ticket ID found in message, try to get context from thread
+    if (!ticketId) {
+      const context = await this.getTaskGenieContext(channel, threadTs);
+      ticketId = context?.ticketId || null;
+    }
+    
+    if (ticketId) {
+      const ticket = await this.zendeskService.getTicketDetails(ticketId);
       
       if (ticket) {
         const ticketContent = `Subject: ${ticket.subject}\n\nDescription: ${ticket.description}\n\nStatus: ${ticket.status}\nPriority: ${ticket.priority}\nTags: ${ticket.tags.join(', ')}`;
@@ -294,29 +308,43 @@ export class SlackService {
         await this.sendMessage({
           channel,
           thread_ts: threadTs,
-          text: `📋 *Ticket Summary* (powered by ${this.aiService.getProviderName()})\n\n${aiResponse.summary}`
+          text: `📋 *Ticket #${ticketId} Summary* (powered by ${this.aiService.getProviderName()})\n\n${aiResponse.summary}`
         });
       } else {
         await this.sendMessage({
           channel,
           thread_ts: threadTs,
-          text: '❌ Sorry, I couldn\'t retrieve the ticket details. Please check if the ticket still exists.'
+          text: `❌ Sorry, I couldn't find ticket #${ticketId}. Please check if the ticket ID is correct and exists in Zendesk.`
         });
       }
     } else {
       await this.sendMessage({
         channel,
         thread_ts: threadTs,
-        text: '❌ I couldn\'t find the associated ticket information. Please make sure you\'re replying to a TaskGenie message.'
+        text: '❌ I couldn\'t find a ticket ID. Please specify a ticket number like:\n• `@TaskGenie summarize ticket #27`\n• `@TaskGenie summarize 27`\n• Or reply to a TaskGenie message in a thread.'
       });
     }
   }
 
-  private async handleStatusRequest(channel: string, threadTs: string): Promise<void> {
-    const context = await this.getTaskGenieContext(channel, threadTs);
+  private async handleStatusRequest(channel: string, threadTs: string, messageText?: string): Promise<void> {
+    let ticketId: string | null = null;
     
-    if (context?.ticketId) {
-      const ticket = await this.zendeskService.getTicketDetails(context.ticketId);
+    // First, try to extract ticket ID from the user's message
+    if (messageText) {
+      const ticketMatch = messageText.match(/(?:ticket\s*#?|#)(\d+)/i);
+      if (ticketMatch) {
+        ticketId = ticketMatch[1];
+      }
+    }
+    
+    // If no ticket ID found in message, try to get context from thread
+    if (!ticketId) {
+      const context = await this.getTaskGenieContext(channel, threadTs);
+      ticketId = context?.ticketId || null;
+    }
+    
+    if (ticketId) {
+      const ticket = await this.zendeskService.getTicketDetails(ticketId);
       
       if (ticket) {
         await this.sendMessage({
@@ -328,14 +356,14 @@ export class SlackService {
         await this.sendMessage({
           channel,
           thread_ts: threadTs,
-          text: '❌ Sorry, I couldn\'t retrieve the current ticket status.'
+          text: `❌ Sorry, I couldn't find ticket #${ticketId}. Please check if the ticket ID is correct and exists in Zendesk.`
         });
       }
     } else {
       await this.sendMessage({
         channel,
         thread_ts: threadTs,
-        text: '❌ I couldn\'t find the associated ticket information. Please make sure you\'re replying to a TaskGenie message.'
+        text: '❌ I couldn\'t find a ticket ID. Please specify a ticket number like:\n• `@TaskGenie status ticket #27`\n• `@TaskGenie status 27`\n• Or reply to a TaskGenie message in a thread.'
       });
     }
   }
@@ -415,7 +443,7 @@ export class SlackService {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*💬 How to use me:*\n• `@TaskGenie help` - Show this help message\n• `@TaskGenie summarize` - Get AI ticket summary\n• `@TaskGenie status` - Check ticket status\n• `@TaskGenie analytics` - Get insights and reports\n• `@TaskGenie create task` - Manual task creation\n• `@TaskGenie find ticket` - Search for tickets\n• Ask me any question about your tickets or workflow!'
+              text: '*💬 How to use me:*\n• `@TaskGenie help` - Show this help message\n• `@TaskGenie summarize ticket #27` - Get AI ticket summary\n• `@TaskGenie status ticket #27` - Check ticket status\n• `@TaskGenie analytics` - Get insights and reports\n• `@TaskGenie create task` - Manual task creation\n• `@TaskGenie find ticket` - Search for tickets\n• Ask me any question about your tickets or workflow!'
             }
           },
           {
