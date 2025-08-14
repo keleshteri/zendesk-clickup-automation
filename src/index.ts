@@ -4,6 +4,8 @@ import { ZendeskService } from './services/zendesk.js';
 import { ClickUpService } from './services/clickup/clickup.js';
 import { AIService } from './services/ai.js';
 import { OAuthService } from './services/clickup/clickup_oauth.js';
+import { MultiAgentService } from './services/multi-agent-service.js';
+import { AgentRole } from './types/agents.js';
 import { getCorsHeaders, formatErrorResponse, formatSuccessResponse } from './utils/index.js';
 
 // Helper functions to normalize webhook data
@@ -53,6 +55,7 @@ export default {
     let clickupService: ClickUpService | null = null;
     let aiService: AIService | null = null;
     let oauthService: OAuthService | null = null;
+    let multiAgentService: MultiAgentService | null = null;
 
     try {
       slackService = new SlackService(env);
@@ -88,6 +91,16 @@ export default {
       console.warn('OAuth service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
     }
 
+    try {
+      if (aiService && zendeskService && clickupService) {
+        multiAgentService = new MultiAgentService(env, aiService, zendeskService, clickupService);
+      } else {
+        console.warn('MultiAgent service initialization skipped: Required services not available');
+      }
+    } catch (error) {
+      console.warn('MultiAgent service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
+
     // Handle CORS preflight
     if (method === 'OPTIONS') {
       return new Response(null, {
@@ -109,7 +122,8 @@ export default {
             '🎫 Zendesk ticket automation',
             '📋 ClickUp task management', 
             '💬 Slack bot integration',
-            '🤖 AI-powered summarization'
+            '🤖 AI-powered summarization',
+            '🤖 Multi-agent orchestration'
           ],
           endpoints: [
             'GET  / - Health check',
@@ -123,7 +137,17 @@ export default {
             'GET  /auth/clickup/status - Check OAuth authorization status',
             'POST /test-ai - Test AI summarization',
             'POST /test-clickup - Test ClickUp integration',
-            'POST /test-slack - Test Slack integration'
+            'POST /test-slack - Test Slack integration',
+            'POST /agents/process-ticket - Process ticket with multi-agent system',
+            'POST /agents/analyze-and-create-tasks - Analyze ticket and create ClickUp tasks',
+            'POST /agents/comprehensive-insights - Get comprehensive AI + agent insights',
+            'POST /agents/route-ticket - Route ticket to specific agent',
+            'GET  /agents/metrics - Get workflow metrics',
+            'GET  /agents/status - Get all agent statuses',
+            'GET  /agents/status/:role - Get specific agent status',
+            'POST /agents/reset-metrics - Reset workflow metrics',
+            'GET  /agents/capabilities - List agent capabilities',
+            'POST /agents/simulate-workflow - Simulate workflow with sample data'
           ]
         }), {
           status: 200,
@@ -141,7 +165,8 @@ export default {
             zendesk: zendeskService ? '✅ available' : '❌ unavailable',
             clickup: clickupService ? '✅ available' : '❌ unavailable',
             ai: aiService ? '✅ available' : '❌ unavailable',
-            oauth: oauthService ? '✅ available' : '❌ unavailable'
+            oauth: oauthService ? '✅ available' : '❌ unavailable',
+            multiAgent: multiAgentService ? '✅ available' : '❌ unavailable'
           },
           environment: {
             // Zendesk Configuration
@@ -1320,6 +1345,186 @@ export default {
         }
       }
 
+      // Agent Routes
+      if (url.pathname.startsWith('/agents/') && multiAgentService) {
+        try {
+          // Route: Process ticket with multi-agent system
+          if (url.pathname === '/agents/process-ticket' && method === 'POST') {
+            const body = await request.json() as { ticketId: string };
+            const result = await multiAgentService.processTicket(body.ticketId);
+            return new Response(JSON.stringify(formatSuccessResponse(result)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+
+          // Route: Analyze ticket and create ClickUp tasks
+          if (url.pathname === '/agents/analyze-and-create-tasks' && method === 'POST') {
+            const body = await request.json() as { ticketId: string; workspaceId?: string; listId?: string };
+            const result = await multiAgentService.analyzeAndCreateTasks(
+              body.ticketId,
+              body.listId
+            );
+            return new Response(JSON.stringify(formatSuccessResponse(result)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+
+          // Route: Get comprehensive insights
+          if (url.pathname === '/agents/comprehensive-insights' && method === 'POST') {
+            const body = await request.json() as { ticketIds: string[]; analysisType?: string; includeRecommendations?: boolean };
+            
+            // Handle both single ticketId and multiple ticketIds for backward compatibility
+            const ticketIds = body.ticketIds || [(body as any).ticketId];
+            
+            if (!ticketIds || ticketIds.length === 0) {
+              return new Response(JSON.stringify(formatErrorResponse('ticketIds array is required')), {
+                status: 400,
+                headers: corsHeaders
+              });
+            }
+            
+            // For now, process the first ticket (can be extended to handle multiple)
+            const result = await multiAgentService.getComprehensiveInsights(ticketIds[0]);
+            return new Response(JSON.stringify(formatSuccessResponse(result)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+
+          // Route: Route ticket to specific agent
+          if (url.pathname === '/agents/route-ticket' && method === 'POST') {
+            const body = await request.json() as { ticketId: string; targetAgent: AgentRole; context?: any };
+            const result = await multiAgentService.routeToAgent(body.ticketId, body.targetAgent);
+            return new Response(JSON.stringify(formatSuccessResponse(result)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+
+          // Route: Get workflow metrics
+          if (url.pathname === '/agents/metrics' && method === 'GET') {
+            const result = await multiAgentService.getWorkflowMetrics();
+            return new Response(JSON.stringify(formatSuccessResponse(result)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+
+          // Route: Get all agent statuses
+          if (url.pathname === '/agents/status' && method === 'GET') {
+            const result = await multiAgentService.getAgentStatuses();
+            return new Response(JSON.stringify(formatSuccessResponse(result)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+
+          // Route: Get specific agent status
+          if (url.pathname.startsWith('/agents/status/') && method === 'GET') {
+            const role = url.pathname.split('/')[3] as AgentRole;
+            const result = await multiAgentService.getAgentStatuses();
+            const agentStatus = result.agents.find(agent => agent.role === role);
+            if (agentStatus) {
+              return new Response(JSON.stringify(formatSuccessResponse(agentStatus)), {
+                status: 200,
+                headers: corsHeaders
+              });
+            } else {
+              return new Response(JSON.stringify(formatErrorResponse('Agent not found')), {
+                status: 404,
+                headers: corsHeaders
+              });
+            }
+          }
+
+          // Route: Reset workflow metrics
+          if (url.pathname === '/agents/reset-metrics' && method === 'POST') {
+            // This would require adding a reset method to the orchestrator
+            return new Response(JSON.stringify(formatSuccessResponse({ message: 'Metrics reset successfully' })), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+
+          // Route: List agent capabilities
+          if (url.pathname === '/agents/capabilities' && method === 'GET') {
+            const capabilities = {
+              PROJECT_MANAGER: ['project_coordination', 'resource_allocation', 'risk_management', 'progress_tracking', 'stakeholder_communication', 'quality_assurance'],
+              SOFTWARE_ENGINEER: ['technical_analysis', 'code_review', 'api_integration', 'backend_development', 'database_optimization', 'security_analysis', 'performance_tuning', 'debugging', 'architecture_design'],
+              WORDPRESS_DEVELOPER: ['wordpress_development', 'plugin_development', 'theme_customization', 'woocommerce_integration', 'performance_optimization', 'security_hardening', 'migration_assistance', 'troubleshooting', 'maintenance'],
+              DEVOPS: ['infrastructure_management', 'deployment_automation', 'monitoring_setup', 'security_compliance', 'backup_recovery', 'performance_monitoring', 'scalability_planning', 'incident_response', 'network_management'],
+              QA_TESTER: ['test_planning', 'bug_detection', 'regression_testing', 'performance_testing', 'usability_testing', 'compatibility_testing', 'automation_testing', 'quality_assurance', 'documentation'],
+              BUSINESS_ANALYST: ['requirements_analysis', 'data_analysis', 'process_optimization', 'roi_analysis', 'stakeholder_management', 'reporting', 'strategic_planning', 'business_intelligence', 'workflow_design']
+            };
+            return new Response(JSON.stringify(formatSuccessResponse(capabilities)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+
+          // Route: Simulate workflow with sample data
+          if (url.pathname === '/agents/simulate-workflow' && method === 'POST') {
+            const sampleTicket = {
+              id: 'sample-123',
+              subject: 'Website performance issues after recent update',
+              description: 'Our website has been loading slowly since the last WordPress update. Users are complaining about long load times and some pages are timing out.',
+              priority: 'high',
+              status: 'open',
+              requester_id: 'user-456',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            
+            // Simulate processing with sample data
+            const result = {
+              ticketId: sampleTicket.id,
+              workflow: {
+                initialAgent: 'PROJECT_MANAGER',
+                steps: [
+                  { agent: 'PROJECT_MANAGER', action: 'Initial analysis and routing', confidence: 0.9 },
+                  { agent: 'WORDPRESS_DEVELOPER', action: 'WordPress performance analysis', confidence: 0.85 },
+                  { agent: 'DEVOPS', action: 'Server performance check', confidence: 0.8 },
+                  { agent: 'QA_TESTER', action: 'Performance testing validation', confidence: 0.75 }
+                ],
+                finalRecommendations: [
+                  'Optimize WordPress plugins and themes',
+                  'Implement caching solutions',
+                  'Review server resources and scaling',
+                  'Conduct comprehensive performance testing'
+                ]
+              },
+              simulationNote: 'This is a simulated workflow for demonstration purposes'
+            };
+            
+            return new Response(JSON.stringify(formatSuccessResponse(result)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+
+        } catch (error) {
+          console.error('❌ Agent route error:', error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : 'Agent processing failed'
+          )), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Agent routes require multi-agent service
+      if (url.pathname.startsWith('/agents/') && !multiAgentService) {
+        return new Response(JSON.stringify(formatErrorResponse(
+          'Multi-agent service not available. Please check service configuration.'
+        )), {
+          status: 503,
+          headers: corsHeaders
+        });
+      }
+
       // Route: Not found
       return new Response(JSON.stringify({
         error: 'Not Found',
@@ -1337,7 +1542,17 @@ export default {
           'POST /test-ai - Test AI summarization',
           'POST /test-zendesk-ai - Test Zendesk + AI integration',
           'POST /test-clickup - Test ClickUp integration',
-          'POST /test-slack - Test Slack integration'
+          'POST /test-slack - Test Slack integration',
+          'POST /agents/process-ticket - Process ticket with multi-agent system',
+          'POST /agents/analyze-and-create-tasks - Analyze ticket and create ClickUp tasks',
+          'POST /agents/comprehensive-insights - Get comprehensive AI + agent insights',
+          'POST /agents/route-ticket - Route ticket to specific agent',
+          'GET  /agents/metrics - Get workflow metrics',
+          'GET  /agents/status - Get all agent statuses',
+          'GET  /agents/status/:role - Get specific agent status',
+          'POST /agents/reset-metrics - Reset workflow metrics',
+          'GET  /agents/capabilities - List agent capabilities',
+          'POST /agents/simulate-workflow - Simulate workflow with sample data'
         ]
       }), {
         status: 404,

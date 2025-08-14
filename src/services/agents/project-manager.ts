@@ -238,47 +238,54 @@ export class ProjectManagerAgent extends BaseAgent {
   async execute(task: string | ZendeskTicket, context?: any): Promise<any> {
     const taskLower = (typeof task === 'string' ? task : task.description || '').toLowerCase();
     let result: any = { status: 'completed', details: '' };
+    
+    // Ensure context is defined and extract ticketId
+    const ticketId = typeof task === 'object' && task.id ? task.id : (context?.ticketId || 0);
+    const safeContext = {
+      ...context,
+      ticketId: ticketId
+    };
 
     try {
       if (taskLower.includes('planning') || taskLower.includes('project plan')) {
         result = await this.executeTool('project_planning', {
-          project_name: context.project_name || 'New Project',
-          scope: context.scope || 'To be defined',
-          timeline: context.timeline || '3 months',
-          resources: context.resources || ['team_lead', 'developers']
+          project_name: safeContext.project_name || 'New Project',
+          scope: safeContext.scope || 'To be defined',
+          timeline: safeContext.timeline || '3 months',
+          resources: safeContext.resources || ['team_lead', 'developers']
         });
       } else if (taskLower.includes('resource') || taskLower.includes('allocation')) {
         result = await this.executeTool('resource_allocation', {
-          project: context.project || 'Current Project',
-          team_members: context.team_members || ['developer', 'designer'],
-          roles: context.roles || ['development', 'design'],
-          workload: context.workload || 'balanced'
+          project: safeContext.project || 'Current Project',
+          team_members: safeContext.team_members || ['developer', 'designer'],
+          roles: safeContext.roles || ['development', 'design'],
+          workload: safeContext.workload || 'balanced'
         });
       } else if (taskLower.includes('risk') || taskLower.includes('issue')) {
         result = await this.executeTool('risk_management', {
-          risks: context.risks || ['timeline risk'],
-          impact_level: context.impact_level || 'medium',
-          mitigation_strategies: context.mitigation_strategies || ['contingency planning']
+          risks: safeContext.risks || ['timeline risk'],
+          impact_level: safeContext.impact_level || 'medium',
+          mitigation_strategies: safeContext.mitigation_strategies || ['contingency planning']
         });
       } else if (taskLower.includes('progress') || taskLower.includes('tracking')) {
         result = await this.executeTool('progress_tracking', {
-          project: context.project || 'Current Project',
-          completed_tasks: context.completed_tasks || 0,
-          total_tasks: context.total_tasks || 10,
-          milestones: context.milestones || ['Phase 1']
+          project: safeContext.project || 'Current Project',
+          completed_tasks: safeContext.completed_tasks || 0,
+          total_tasks: safeContext.total_tasks || 10,
+          milestones: safeContext.milestones || ['Phase 1']
         });
       } else if (taskLower.includes('stakeholder') || taskLower.includes('communication')) {
         result = await this.executeTool('stakeholder_communication', {
-          stakeholders: context.stakeholders || ['client', 'team'],
-          communication_type: context.communication_type || 'status_update',
-          frequency: context.frequency || 'weekly',
-          updates: context.updates || ['progress update']
+          stakeholders: safeContext.stakeholders || ['client', 'team'],
+          communication_type: safeContext.communication_type || 'status_update',
+          frequency: safeContext.frequency || 'weekly',
+          updates: safeContext.updates || ['progress update']
         });
       } else if (taskLower.includes('quality') || taskLower.includes('review')) {
         result = await this.executeTool('quality_assurance', {
-          deliverable: context.deliverable || 'project_deliverable',
-          quality_criteria: context.quality_criteria || ['functionality', 'performance'],
-          review_status: context.review_status || 'pending'
+          deliverable: safeContext.deliverable || 'project_deliverable',
+          quality_criteria: safeContext.quality_criteria || ['functionality', 'performance'],
+          review_status: safeContext.review_status || 'pending'
         });
       } else {
         result = {
@@ -294,7 +301,7 @@ export class ProjectManagerAgent extends BaseAgent {
       }
 
       // Store execution result
-      this.storeMemory(context.ticketId || 0, 'task_execution', JSON.stringify(result));
+      this.storeMemory(safeContext.ticketId || 0, 'task_execution', JSON.stringify(result));
       
       return result;
     } catch (error) {

@@ -119,7 +119,15 @@ export class MultiAgentOrchestrator {
 
       // Agent executes its tasks
       const execution = await currentAgent.execute(state.context.ticket);
-      state.context.recommendations.push(...execution.recommendations);
+      
+      // Safely add recommendations if they exist
+      if (execution && execution.recommendations && Array.isArray(execution.recommendations)) {
+        state.context.recommendations.push(...execution.recommendations);
+      } else if (execution && execution.status === 'completed' && execution.details) {
+        // If no recommendations but task completed, add a generic recommendation
+        state.context.recommendations.push(execution.details);
+      }
+      
       state.context.confidence = this.calculateCombinedConfidence(state.context.insights);
 
       // Check if agent should hand off to another agent
