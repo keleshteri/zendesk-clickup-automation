@@ -74,6 +74,9 @@ export class NLPRouter {
         console.log(`⚡ Direct command processed: ${commandResult.intent} (no AI used)`);
         const processingTime = Date.now() - startTime;
         
+        // Clear any previous token usage for direct commands
+        this.lastTokenUsage = undefined;
+        
         const result = await this.routeToTool(commandResult, query);
         
         return {
@@ -97,6 +100,9 @@ export class NLPRouter {
       
       const processingTime = Date.now() - startTime;
       
+      // Use current token usage from this AI call, fallback to zero if not available
+      const currentTokenUsage = this.lastTokenUsage || { input_tokens: 0, output_tokens: 0, total_tokens: 0, cost: 0, currency: 'USD' };
+      
       const response = {
         success: true,
         message: result.message,
@@ -104,7 +110,7 @@ export class NLPRouter {
         executedTools: result.executedTools,
         processingTime,
         confidence: intent.confidence,
-        tokenUsage: this.lastTokenUsage || { input_tokens: 0, output_tokens: 0, total_tokens: 0, cost: 0, currency: 'USD' },
+        tokenUsage: currentTokenUsage,
         aiProvider: this.env.AI_PROVIDER
       };
       
@@ -270,6 +276,8 @@ Extract relevant entities like:
       };
     } catch (error) {
       console.error('Intent analysis failed:', error);
+      // Clear token usage since AI analysis failed
+      this.lastTokenUsage = undefined;
       // Fallback to keyword matching
       return this.fallbackIntentAnalysis(query);
     }
