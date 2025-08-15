@@ -31,6 +31,8 @@ export interface TaskGenieResponse {
   processingTime: number;
   confidence: number;
   context?: TaskGenieContext;
+  tokenUsage?: import('../types/index.js').TokenUsage;
+  aiProvider?: string;
 }
 
 /**
@@ -121,7 +123,9 @@ export class TaskGenie {
         executedTools: nlpResponse.executedTools,
         processingTime: Date.now() - startTime,
         confidence: nlpResponse.confidence,
-        context: this.config.enableContextMemory ? context : undefined
+        context: this.config.enableContextMemory ? context : undefined,
+        tokenUsage: nlpResponse.tokenUsage,
+        aiProvider: nlpResponse.aiProvider
       };
 
       if (this.config.enableLogging) {

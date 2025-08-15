@@ -1,8 +1,9 @@
-import { SlackMessage, SlackEvent, TaskGenieContext, Env, TicketAnalysis, ZendeskTicket, AssignmentRecommendation, AIInsights } from '../types/index.js';
+import { SlackMessage, SlackEvent, TaskGenieContext, Env, TicketAnalysis, ZendeskTicket, AssignmentRecommendation, AIInsights, TokenUsage } from '../types/index.js';
 import { AIService } from './ai.js';
 import { ZendeskService } from './zendesk';
 import { MultiAgentService } from './multi-agent-service.js';
 import { TaskGenie } from './task-genie.js';
+import { TokenCalculator } from './token-calculator.js';
 
 interface SlackCommand {
   isCommand: boolean;
@@ -253,10 +254,10 @@ export class SlackService {
           const response = await this.taskGenie.chat(messageText, user, sessionId);
           
           if (response.success && response.message) {
-            await this.sendSlackResponse(channel, thread_ts || ts, response.message, response.data);
+            await this.sendSlackResponse(channel, thread_ts || ts, response.message, response.data, response.tokenUsage, response.aiProvider);
           } else {
             await this.sendSlackResponse(channel, thread_ts || ts, 
-              response.message || 'Sorry, I couldn\'t process your request. Please try again.');
+              response.message || 'Sorry, I couldn\'t process your request. Please try again.', undefined, response.tokenUsage, response.aiProvider);
           }
           return;
         } catch (taskGenieError) {
@@ -1306,7 +1307,23 @@ export class SlackService {
     }
   }
 
-  private async sendSlackResponse(channel: string, threadTs: string, response: string, data?: any): Promise<void> {
+  /**
+   * Create token usage footer block for AI responses
+   */
+  private createTokenUsageFooter(tokenUsage: TokenUsage, provider: string): any {
+    const footerText = TokenCalculator.formatUsageFooter(tokenUsage, provider);
+    return {
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: `💰 ${footerText}`
+        }
+      ]
+    };
+  }
+
+  private async sendSlackResponse(channel: string, threadTs: string, response: string, data?: any, tokenUsage?: TokenUsage, provider?: string): Promise<void> {
     try {
       let blocks: any[] = [
         {
@@ -1353,6 +1370,11 @@ export class SlackService {
             }
           });
         }
+      }
+
+      // Add token usage footer if available
+      if (tokenUsage && provider) {
+        blocks.push(this.createTokenUsageFooter(tokenUsage, provider));
       }
 
       const message = {

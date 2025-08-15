@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { AIProvider, AIResponse, Env, TicketAnalysis, TicketMetadata, DuplicateAnalysis, ZendeskTicket, AIInsights } from '../types/index.js';
+import { AIProvider, AIResponse, Env, TicketAnalysis, TicketMetadata, DuplicateAnalysis, ZendeskTicket, AIInsights, TokenUsage } from '../types/index.js';
+import { TokenCalculator } from './token-calculator.js';
 
 export class GoogleGeminiProvider implements AIProvider {
   name: 'googlegemini' = 'googlegemini';
@@ -73,11 +74,19 @@ export class AIService {
     try {
       const summary = await this.provider.summarize(ticketContent);
       
+      // Calculate token usage and cost
+      const tokenUsage = TokenCalculator.calculateUsage(
+        this.provider.name,
+        ticketContent,
+        summary
+      );
+      
       return {
         summary,
         provider: this.provider.name,
-        model: this.env.AI_PROVIDER === 'googlegemini' ? 'gemini-pro' : undefined,
-        timestamp: new Date().toISOString()
+        model: this.env.AI_PROVIDER === 'googlegemini' ? 'gemini-1.5-flash' : undefined,
+        timestamp: new Date().toISOString(),
+        token_usage: tokenUsage
       };
     } catch (error) {
       console.error('AI summarization error:', error);
@@ -103,6 +112,34 @@ export class AIService {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       return response.text();
+    } catch (error) {
+      console.error('AI response generation error:', error);
+      throw error;
+    }
+  }
+
+  // Generate AI responses with token usage tracking
+  async generateResponseWithUsage(prompt: string): Promise<{ response: string; tokenUsage: TokenUsage }> {
+    if (!this.provider || !this.model) {
+      throw new Error('AI provider is not configured');
+    }
+
+    try {
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const responseText = response.text();
+      
+      // Calculate token usage and cost
+      const tokenUsage = TokenCalculator.calculateUsage(
+        this.provider.name,
+        prompt,
+        responseText
+      );
+      
+      return {
+        response: responseText,
+        tokenUsage
+      };
     } catch (error) {
       console.error('AI response generation error:', error);
       throw error;

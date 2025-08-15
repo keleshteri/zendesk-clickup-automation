@@ -2,7 +2,7 @@ import { AIService } from './ai.js';
 import { ZendeskService } from './zendesk.js';
 import { MultiAgentService } from './multi-agent-service.js';
 import { AgentRole } from '../types/agents.js';
-import { Env } from '../types/index.js';
+import { Env, TokenUsage } from '../types/index.js';
 
 export interface NLPIntent {
   intent: string;
@@ -18,6 +18,8 @@ export interface NLPResponse {
   executedTools: string[];
   processingTime: number;
   confidence: number;
+  tokenUsage?: TokenUsage;
+  aiProvider?: string;
 }
 
 export interface ToolMapping {
@@ -41,6 +43,7 @@ export class NLPRouter {
   private clickupService: any;
   private env: Env;
   private toolMappings: ToolMapping[];
+  private lastTokenUsage?: TokenUsage;
 
   constructor(
     env: Env,
@@ -74,14 +77,19 @@ export class NLPRouter {
       
       const processingTime = Date.now() - startTime;
       
-      return {
+      const response = {
         success: true,
         message: result.message,
         data: result.data,
         executedTools: result.executedTools,
         processingTime,
-        confidence: intent.confidence
+        confidence: intent.confidence,
+        tokenUsage: this.lastTokenUsage,
+        aiProvider: this.env.AI_PROVIDER
       };
+      
+      console.log('📤 NLP Response with token usage:', response);
+      return response;
 
     } catch (error) {
       const processingTime = Date.now() - startTime;
@@ -143,8 +151,20 @@ Extract relevant entities like:
 `;
 
     try {
-      const response = await this.aiService.generateResponse(prompt);
-      const parsed = JSON.parse(response.trim());
+      const { response, tokenUsage } = await this.aiService.generateResponseWithUsage(prompt);
+      
+      // Extract JSON from markdown code blocks if present
+      let jsonText = response.trim();
+      const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[1].trim();
+      }
+      
+      const parsed = JSON.parse(jsonText);
+      
+      // Store token usage for this request
+      this.lastTokenUsage = tokenUsage;
+      console.log('🔍 Token usage from AI call:', tokenUsage);
       
       return {
         intent: parsed.intent || 'UNKNOWN',

@@ -316,11 +316,20 @@ export interface AIProvider {
   summarize(text: string): Promise<string>;
 }
 
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost: number;
+  currency: string;
+}
+
 export interface AIResponse {
   summary: string;
   provider: string;
   model?: string;
   timestamp: string;
+  token_usage?: TokenUsage;
 }
 
 // Phase 1: Enhanced AI Analysis Types
