@@ -4,7 +4,13 @@
   "description": "AI-powered multi-agent automation for Zendesk tickets with ClickUp task creation and Slack notifications",
   "private": true,
   "keywords": [
-    "zendesk", "clickup", "slack", "automation", "ai", "multi-agent", "cloudflare-workers"
+    "zendesk",
+    "clickup",
+    "slack",
+    "automation",
+    "ai",
+    "multi-agent",
+    "cloudflare-workers"
   ],
   "scripts": {
     "dev": "wrangler dev",
@@ -21,9 +27,15 @@
     "hono": "^4.6.20"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250813.0",
     "@types/node": "22.13.0",
     "@types/service-worker-mock": "^2.0.4",
+    "@typescript-eslint/parser": "^8.39.1",
+    "eslint": "^9.33.0",
+    "miniflare": "^4.20250813.1",
+    "prettier": "^3.6.2",
     "typescript": "^5.9.2",
+    "vitest": "^3.2.4",
     "wrangler": "^4.28.0"
   }
 }
