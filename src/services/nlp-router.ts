@@ -68,11 +68,31 @@ export class NLPRouter {
     console.log(`🤖 @TaskGenie processing query: "${query}"`);
 
     try {
-      // Step 1: Analyze intent and extract entities
+      // Step 1: Check for direct commands first (no AI needed)
+      const commandResult = this.tryDirectCommand(query);
+      if (commandResult) {
+        console.log(`⚡ Direct command processed: ${commandResult.intent} (no AI used)`);
+        const processingTime = Date.now() - startTime;
+        
+        const result = await this.routeToTool(commandResult, query);
+        
+        return {
+          success: true,
+          message: result.message,
+          data: result.data,
+          executedTools: result.executedTools,
+          processingTime,
+          confidence: 1.0, // Direct commands have 100% confidence
+          tokenUsage: { input_tokens: 0, output_tokens: 0, total_tokens: 0, cost: 0, currency: 'USD' },
+          aiProvider: 'none'
+        };
+      }
+
+      // Step 2: Use AI analysis for complex queries
       const intent = await this.analyzeIntent(query);
       console.log(`🎯 Detected intent: ${intent.intent} (confidence: ${intent.confidence})`);
 
-      // Step 2: Route to appropriate tool/service
+      // Step 3: Route to appropriate tool/service
       const result = await this.routeToTool(intent, query);
       
       const processingTime = Date.now() - startTime;
@@ -103,6 +123,82 @@ export class NLPRouter {
         confidence: 0
       };
     }
+  }
+
+  /**
+   * Try to match direct commands without AI processing
+   * Returns NLPIntent if command is recognized, null otherwise
+   */
+  private tryDirectCommand(query: string): NLPIntent | null {
+    const normalizedQuery = query.toLowerCase().trim();
+    
+    // Remove @TaskGenie prefix if present
+    const cleanQuery = normalizedQuery.replace(/@taskgenie\s*/i, '').trim();
+    
+    // Define direct command patterns
+    const commandPatterns = [
+      // Help commands
+      { pattern: /^\/?help$/i, intent: 'GET_HELP' },
+      { pattern: /^\/?h$/i, intent: 'GET_HELP' },
+      
+      // Status commands
+      { pattern: /^\/?status$/i, intent: 'AGENT_STATUS' },
+      { pattern: /^\/?agent\s*status$/i, intent: 'AGENT_STATUS' },
+      
+      // Insights commands
+      { pattern: /^\/?insights$/i, intent: 'GET_INSIGHTS' },
+      { pattern: /^\/?metrics$/i, intent: 'GET_INSIGHTS' },
+      
+      // Ticket count commands
+      { pattern: /^\/?count$/i, intent: 'TICKET_COUNT' },
+      { pattern: /^\/?tickets$/i, intent: 'TICKET_COUNT' },
+      
+      // Ticket details with ID (e.g., /ticket 12345, /show 12345)
+      { pattern: /^\/?(?:ticket|show)\s+(\d+)$/i, intent: 'TICKET_DETAILS' },
+      
+      // Ticket status with ID (e.g., /status 12345)
+      { pattern: /^\/?status\s+(\d+)$/i, intent: 'TICKET_STATUS' },
+      
+      // Create task with ticket ID (e.g., /create 12345, /task 12345)
+      { pattern: /^\/?(?:create|task)\s+(\d+)$/i, intent: 'CREATE_TASK' },
+      
+      // Search commands (e.g., /search recent, /find open)
+      { pattern: /^\/?(?:search|find)\s+(.+)$/i, intent: 'SEARCH_TICKETS' },
+      
+      // Analyze commands (e.g., /analyze 12345) - command parsing is direct, AI used only for analysis
+      { pattern: /^\/?analyze\s+(\d+)$/i, intent: 'ANALYZE_TICKET' },
+    ];
+    
+    // Check each pattern
+    for (const { pattern, intent } of commandPatterns) {
+      const match = cleanQuery.match(pattern);
+      if (match) {
+        const entities: Record<string, any> = {};
+        const parameters: Record<string, any> = {};
+        
+        // Extract entities based on intent
+        if (intent === 'TICKET_DETAILS' || intent === 'TICKET_STATUS' || intent === 'CREATE_TASK' || intent === 'ANALYZE_TICKET') {
+          if (match[1]) {
+            entities.ticketId = match[1];
+            parameters.ticketId = match[1];
+          }
+        } else if (intent === 'SEARCH_TICKETS') {
+          if (match[1]) {
+            entities.searchTerm = match[1];
+            parameters.searchTerm = match[1];
+          }
+        }
+        
+        return {
+          intent,
+          confidence: 1.0,
+          entities,
+          parameters
+        };
+      }
+    }
+    
+    return null;
   }
 
   /**
