@@ -317,13 +317,52 @@ Extract relevant entities like:
 
     executedTools.push('MultiAgentService.processTicket');
     
-    const result = await this.multiAgentService.processTicket(ticketId);
-    
-    return {
-      message: `🔍 **Analysis Complete for Ticket #${ticketId}**\n**Confidence:** ${(result.confidence * 100).toFixed(1)}%\n**Agents Involved:** ${result.agentsInvolved.join(', ')}\n**Recommendations:** ${result.finalRecommendations.slice(0, 3).join(', ')}`,
-      data: result,
-      executedTools
-    };
+    try {
+      const result = await this.multiAgentService.processTicket(ticketId);
+      
+      // Format recommendations properly
+      let recommendationsText = 'No specific recommendations available';
+      if (result.finalRecommendations && result.finalRecommendations.length > 0) {
+        const validRecommendations = result.finalRecommendations.filter(rec => rec && rec.trim().length > 0);
+        if (validRecommendations.length > 0) {
+          recommendationsText = validRecommendations.slice(0, 3).join('\n• ');
+          recommendationsText = '• ' + recommendationsText;
+        }
+      }
+      
+      // Get workflow details if available
+      let workflowDetails = '';
+      if (result.workflow && result.workflow.context && result.workflow.context.insights) {
+        const insights = result.workflow.context.insights;
+        if (insights.length > 0) {
+          workflowDetails = '\n\n**Agent Analysis:**\n';
+          insights.forEach((insight, index) => {
+            if (insight.analysis && insight.analysis.trim().length > 0) {
+              workflowDetails += `${index + 1}. **${insight.agentRole}**: ${insight.analysis.substring(0, 200)}${insight.analysis.length > 200 ? '...' : ''}\n`;
+            }
+          });
+        }
+      }
+      
+      const message = `🔍 **Multi-Agent Analysis for Ticket #${ticketId}**\n` +
+        `**Confidence:** ${(result.confidence * 100).toFixed(1)}%\n` +
+        `**Agents Involved:** ${result.agentsInvolved.join(', ')}\n` +
+        `**Handoffs:** ${result.handoffCount}\n\n` +
+        `**Recommendations:**\n${recommendationsText}${workflowDetails}`;
+      
+      return {
+        message,
+        data: result,
+        executedTools
+      };
+    } catch (error) {
+      console.error('Multi-agent analysis failed:', error);
+      return {
+        message: `❌ Failed to analyze ticket #${ticketId}. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        data: null,
+        executedTools
+      };
+    }
   }
 
   /**

@@ -4,6 +4,13 @@ import { ZendeskService } from './zendesk';
 import { MultiAgentService } from './multi-agent-service.js';
 import { TaskGenie } from './task-genie.js';
 
+interface SlackCommand {
+  isCommand: boolean;
+  command: string;
+  args: string[];
+  originalText: string;
+}
+
 export class SlackService {
   private env: Env;
   private aiService: AIService;
@@ -17,6 +24,135 @@ export class SlackService {
     this.zendeskService = new ZendeskService(env);
     this.multiAgentService = multiAgentService || null;
     this.taskGenie = taskGenie || null;
+  }
+
+  /**
+   * Parse Slack command-style queries (slash commands, hashtag commands)
+   */
+  private parseSlackCommand(text: string): SlackCommand {
+    const trimmedText = text.trim();
+    
+    // Check for slash commands: /help, /analyze, /status, etc.
+    const slashMatch = trimmedText.match(/^\/([a-zA-Z]+)(?:\s+(.*))?$/);
+    if (slashMatch) {
+      const command = slashMatch[1].toLowerCase();
+      const argsString = slashMatch[2] || '';
+      const args = argsString.trim() ? argsString.split(/\s+/) : [];
+      
+      return {
+        isCommand: true,
+        command,
+        args,
+        originalText: trimmedText
+      };
+    }
+    
+    // Check for hashtag commands: #help, #analyze, #status, etc.
+    const hashMatch = trimmedText.match(/^#([a-zA-Z]+)(?:\s+(.*))?$/);
+    if (hashMatch) {
+      const command = hashMatch[1].toLowerCase();
+      const argsString = hashMatch[2] || '';
+      const args = argsString.trim() ? argsString.split(/\s+/) : [];
+      
+      return {
+        isCommand: true,
+        command,
+        args,
+        originalText: trimmedText
+      };
+    }
+    
+    // Check for simple command words at the start
+    const simpleMatch = trimmedText.match(/^(help|status|analytics|list|analyze|summarize|create)(?:\s+(.*))?$/i);
+    if (simpleMatch) {
+      const command = simpleMatch[1].toLowerCase();
+      const argsString = simpleMatch[2] || '';
+      const args = argsString.trim() ? argsString.split(/\s+/) : [];
+      
+      return {
+        isCommand: true,
+        command,
+        args,
+        originalText: trimmedText
+      };
+    }
+    
+    return {
+      isCommand: false,
+      command: '',
+      args: [],
+      originalText: trimmedText
+    };
+  }
+
+  /**
+   * Handle parsed Slack commands
+   */
+  private async handleSlackCommand(channel: string, threadTs: string, commandResult: SlackCommand, user: string): Promise<void> {
+    const { command, args, originalText } = commandResult;
+    
+    try {
+      switch (command) {
+        case 'help':
+          await this.sendHelpMessage(channel, threadTs);
+          break;
+          
+        case 'status':
+          if (args.length > 0 && args[0] === 'ticket' && args[1]) {
+            await this.handleStatusRequest(channel, threadTs, `status ticket ${args[1]}`);
+          } else {
+            await this.handleStatusRequest(channel, threadTs, originalText);
+          }
+          break;
+          
+        case 'analyze':
+          if (args.length > 0 && args[0] === 'ticket' && args[1]) {
+            await this.handleMultiAgentRequest(channel, threadTs, `analyze ticket ${args[1]}`);
+          } else {
+            await this.handleMultiAgentRequest(channel, threadTs, originalText);
+          }
+          break;
+          
+        case 'summarize':
+          if (args.length > 0 && args[0] === 'ticket' && args[1]) {
+            await this.handleSummarizeRequest(channel, threadTs, `summarize ticket ${args[1]}`);
+          } else {
+            await this.handleSummarizeRequest(channel, threadTs, originalText);
+          }
+          break;
+          
+        case 'list':
+          if (args.length > 0 && args[0] === 'tickets') {
+            await this.handleListTicketsRequest(channel, threadTs, originalText);
+          } else {
+            await this.sendSlackResponse(channel, threadTs, 
+              '📋 Please specify what to list. Try: `@TaskGenie /list tickets` or `@TaskGenie #list tickets`');
+          }
+          break;
+          
+        case 'analytics':
+          await this.handleAnalyticsRequest(channel, threadTs);
+          break;
+          
+        case 'create':
+          if (args.length > 0 && args[0] === 'task') {
+            await this.handleCreateTaskRequest(channel, threadTs, originalText);
+          } else {
+            await this.sendSlackResponse(channel, threadTs, 
+              '📝 Please specify what to create. Try: `@TaskGenie /create task from ticket 123`');
+          }
+          break;
+          
+        default:
+          await this.sendSlackResponse(channel, threadTs, 
+            `❓ Unknown command: \`${command}\`. Type \`@TaskGenie /help\` or \`@TaskGenie #help\` for available commands.`);
+          break;
+      }
+    } catch (error) {
+      console.error(`Error handling Slack command '${command}':`, error);
+      await this.sendSlackResponse(channel, threadTs, 
+        `❌ Sorry, there was an error processing the \`${command}\` command. Please try again.`);
+    }
   }
 
   async sendTaskCreationMessage(
@@ -101,6 +237,14 @@ export class SlackService {
         text: text?.substring(0, 100),
         event_ts: ts
       });
+
+      // Parse command-style queries first (slash commands, hashtag commands)
+      const commandResult = this.parseSlackCommand(messageText);
+      
+      if (commandResult.isCommand) {
+        await this.handleSlackCommand(channel, thread_ts || ts, commandResult, user);
+        return;
+      }
 
       // Use TaskGenie for natural language processing if available
       if (this.taskGenie) {
@@ -730,14 +874,28 @@ export class SlackService {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*💬 How to use me:*\n• `@TaskGenie help` - Show this help message\n• `@TaskGenie list tickets` - Show open tickets with ClickUp status\n• `@TaskGenie show tickets` - Alternative command to list tickets\n• `@TaskGenie summarize ticket #27` - Get AI ticket summary\n• `@TaskGenie status ticket #27` - Check ticket status\n• `@TaskGenie analytics` - Get insights and reports\n• `@TaskGenie create task` - Manual task creation\n• `@TaskGenie find ticket` - Search for tickets\n• Ask me any question about your tickets or workflow!'
+              text: '*💬 Command Formats:*\n• Slash commands: `@TaskGenie /help`, `@TaskGenie /analyze ticket 27`\n• Hashtag commands: `@TaskGenie #help`, `@TaskGenie #analyze ticket 27`\n• Natural language: `@TaskGenie analyze ticket 27`\n• Simple commands: `@TaskGenie help`, `@TaskGenie status`'
             }
           },
           {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '🚀 *Ready to boost your productivity?* Just mention me anytime!'
+              text: '*🎯 Available Commands:*\n• `/help` or `#help` - Show this help message\n• `/status` or `#status` - Check system status\n• `/status ticket 123` - Check specific ticket status\n• `/analyze ticket 123` - Multi-agent ticket analysis\n• `/summarize ticket 123` - Get ticket summary\n• `/list tickets` - Show open tickets\n• `/analytics` - Get insights and analytics\n• `/create task from ticket 123` - Create ClickUp task'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*🗣️ Natural Language Examples:*\n• `How many open tickets are there?`\n• `Show me ticket 12345`\n• `What\'s the status of all tickets?`\n• `Search for recent tickets`\n• `Get insights`\n• Ask me any question about your tickets or workflow!'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '🚀 *Ready to boost your productivity?* Choose your preferred command style - they all work!'
             }
           }
         ]
