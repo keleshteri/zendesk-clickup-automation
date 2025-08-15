@@ -490,7 +490,7 @@ Extract relevant entities like:
   }
 
   /**
-   * Handle help requests
+   * Handle help requests (Natural Language)
    */
   private async handleGetHelp(executedTools: string[]): Promise<{
     message: string;
@@ -498,29 +498,39 @@ Extract relevant entities like:
     executedTools: string[];
   }> {
     const helpText = `
-🤖 **@TaskGenie Commands**
+🧞 **TaskGenie Help**
 
-**Ticket Operations:**
+I'm your AI-powered task automation assistant! Here's what I can do:
+
+**🎯 Core Features:**
+• 🎫 Automatically create ClickUp tasks from Zendesk tickets
+• 📋 Provide AI-powered ticket summaries and analysis
+• 📊 Generate insights and analytics reports
+• 🔍 Help you search and find tickets
+• 🤖 Answer questions about your workflow
+• 🔗 Keep everything connected with smart automation
+
+**🗣️ Natural Language Examples:**
 • "How many open tickets are there?"
 • "Show me ticket 12345"
 • "What's the status of all tickets?"
 • "Search for recent tickets"
-
-**AI & Analysis:**
 • "Analyze ticket 12345"
 • "Create task from ticket 12345"
 • "Route ticket 12345 to software engineer"
 
-**System Status:**
+**🤖 System Status:**
 • "Show agent status"
 • "Get system insights"
 • "Show workflow metrics"
 
-**Examples:**
+**💡 Examples:**
 • @TaskGenie how many open tickets do we have?
 • @TaskGenie analyze ticket 12345 with AI
 • @TaskGenie create ClickUp task from ticket 67890
 • @TaskGenie show me agent status
+
+🚀 **Ready to boost your productivity?** Just ask me anything in natural language!
 `;
 
     return {
