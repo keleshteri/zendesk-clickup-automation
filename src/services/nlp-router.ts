@@ -104,7 +104,7 @@ export class NLPRouter {
         executedTools: result.executedTools,
         processingTime,
         confidence: intent.confidence,
-        tokenUsage: this.lastTokenUsage,
+        tokenUsage: this.lastTokenUsage || { input_tokens: 0, output_tokens: 0, total_tokens: 0, cost: 0, currency: 'USD' },
         aiProvider: this.env.AI_PROVIDER
       };
       
