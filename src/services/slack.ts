@@ -2,18 +2,21 @@ import { SlackMessage, SlackEvent, TaskGenieContext, Env, TicketAnalysis, Zendes
 import { AIService } from './ai.js';
 import { ZendeskService } from './zendesk';
 import { MultiAgentService } from './multi-agent-service.js';
+import { TaskGenie } from './task-genie.js';
 
 export class SlackService {
   private env: Env;
   private aiService: AIService;
   private zendeskService: ZendeskService;
   private multiAgentService: MultiAgentService | null = null;
+  private taskGenie: TaskGenie | null = null;
 
-  constructor(env: Env, multiAgentService?: MultiAgentService) {
+  constructor(env: Env, multiAgentService?: MultiAgentService, taskGenie?: TaskGenie) {
     this.env = env;
     this.aiService = new AIService(env);
     this.zendeskService = new ZendeskService(env);
     this.multiAgentService = multiAgentService || null;
+    this.taskGenie = taskGenie || null;
   }
 
   async sendTaskCreationMessage(
@@ -88,8 +91,8 @@ export class SlackService {
 
   async handleMention(event: SlackEvent): Promise<void> {
     try {
-      const { channel, text, thread_ts, ts } = event;
-      const messageText = text?.toLowerCase() || '';
+      const { channel, text, thread_ts, ts, user } = event;
+      const messageText = text || '';
       
       console.log('🎯 handleMention called:', {
         channel,
@@ -99,22 +102,42 @@ export class SlackService {
         event_ts: ts
       });
 
-      // Enhanced AI Q&A capabilities
-      if (messageText.includes('analyze') || messageText.includes('process ticket') || messageText.includes('multi-agent')) {
+      // Use TaskGenie for natural language processing if available
+      if (this.taskGenie) {
+        try {
+          const sessionId = `slack_${channel}_${user}`;
+          const response = await this.taskGenie.chat(messageText, user, sessionId);
+          
+          if (response.success && response.message) {
+            await this.sendSlackResponse(channel, thread_ts || ts, response.message, response.data);
+          } else {
+            await this.sendSlackResponse(channel, thread_ts || ts, 
+              response.message || 'Sorry, I couldn\'t process your request. Please try again.');
+          }
+          return;
+        } catch (taskGenieError) {
+          console.error('TaskGenie processing failed, falling back to legacy handlers:', taskGenieError);
+          // Fall through to legacy handlers
+        }
+      }
+
+      // Legacy keyword-based handling (fallback)
+      const lowerText = messageText.toLowerCase();
+      if (lowerText.includes('analyze') || lowerText.includes('process ticket') || lowerText.includes('multi-agent')) {
         await this.handleMultiAgentRequest(channel, thread_ts || ts, text);
-      } else if (messageText.includes('summarize') || messageText.includes('summary')) {
+      } else if (lowerText.includes('summarize') || lowerText.includes('summary')) {
         await this.handleSummarizeRequest(channel, thread_ts || ts, text);
-      } else if (messageText.includes('status') || messageText.includes('what\'s the status')) {
+      } else if (lowerText.includes('status') || lowerText.includes('what\'s the status')) {
         await this.handleStatusRequest(channel, thread_ts || ts, text);
-      } else if (messageText.includes('analytics') || messageText.includes('insights') || messageText.includes('report')) {
+      } else if (lowerText.includes('analytics') || lowerText.includes('insights') || lowerText.includes('report')) {
         await this.handleAnalyticsRequest(channel, thread_ts || ts);
-      } else if (messageText.includes('help') || messageText.includes('what can you do')) {
+      } else if (lowerText.includes('help') || lowerText.includes('what can you do')) {
         await this.sendHelpMessage(channel, thread_ts || ts);
-      } else if (messageText.includes('create task') || messageText.includes('new task')) {
+      } else if (lowerText.includes('create task') || lowerText.includes('new task')) {
         await this.handleCreateTaskRequest(channel, thread_ts || ts, messageText);
-      } else if (messageText.includes('find ticket') || messageText.includes('search ticket')) {
+      } else if (lowerText.includes('find ticket') || lowerText.includes('search ticket')) {
         await this.handleTicketSearchRequest(channel, thread_ts || ts, messageText);
-      } else if (messageText.includes('list tickets') || messageText.includes('show tickets') || messageText.includes('open tickets')) {
+      } else if (lowerText.includes('list tickets') || lowerText.includes('show tickets') || lowerText.includes('open tickets')) {
         await this.handleListTicketsRequest(channel, thread_ts || ts, messageText);
       } else {
         // General AI-powered response for other questions
@@ -1063,6 +1086,85 @@ export class SlackService {
       }
     } catch (error) {
       console.error('Error sending Slack message:', error);
+    }
+  }
+
+  private async sendSlackResponse(channel: string, threadTs: string, response: string, data?: any): Promise<void> {
+    try {
+      let blocks: any[] = [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `🧞 *TaskGenie*\n\n${response}`
+          }
+        }
+      ];
+
+      // Add data visualization if available
+      if (data) {
+        if (data.tickets && Array.isArray(data.tickets)) {
+          const ticketFields = data.tickets.slice(0, 5).map((ticket: any) => ({
+            type: 'mrkdwn',
+            text: `*#${ticket.id}*: ${ticket.subject?.substring(0, 50)}...`
+          }));
+          
+          if (ticketFields.length > 0) {
+            blocks.push({
+              type: 'section',
+              fields: ticketFields
+            });
+          }
+        }
+        
+        if (data.count !== undefined) {
+          blocks.push({
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `📊 *Count*: ${data.count}`
+            }
+          });
+        }
+        
+        if (data.insights) {
+          blocks.push({
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `💡 *Insights*: ${data.insights}`
+            }
+          });
+        }
+      }
+
+      const message = {
+        channel,
+        text: `🧞 TaskGenie: ${response}`,
+        blocks,
+        thread_ts: threadTs
+      };
+
+      const slackResponse = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(message)
+      });
+
+      if (!slackResponse.ok) {
+        console.error('Failed to send TaskGenie response to Slack:', await slackResponse.text());
+      }
+    } catch (error) {
+      console.error('Error sending TaskGenie response to Slack:', error);
+      // Fallback to simple text message
+      await this.sendMessage({
+        channel,
+        text: `🧞 TaskGenie: ${response}`,
+        thread_ts: threadTs
+      });
     }
   }
   async verifyRequest(body: string, timestamp: string, signature: string): Promise<boolean> {

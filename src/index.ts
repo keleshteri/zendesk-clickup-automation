@@ -5,6 +5,7 @@ import { ClickUpService } from './services/clickup/clickup.js';
 import { AIService } from './services/ai.js';
 import { OAuthService } from './services/clickup/clickup_oauth.js';
 import { MultiAgentService } from './services/multi-agent-service.js';
+import { TaskGenie } from './services/task-genie.js';
 import { AgentRole } from './types/agents.js';
 import { getCorsHeaders, formatErrorResponse, formatSuccessResponse } from './utils/index.js';
 
@@ -56,6 +57,7 @@ export default {
     let aiService: AIService | null = null;
     let oauthService: OAuthService | null = null;
     let multiAgentService: MultiAgentService | null = null;
+    let taskGenie: TaskGenie | null = null;
 
     try {
       // Initialize SlackService after multiAgentService is created
@@ -102,9 +104,20 @@ export default {
       console.warn('MultiAgent service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
     }
 
-    // Initialize SlackService with multiAgentService
+    // Initialize TaskGenie with all required services
     try {
-      slackService = new SlackService(env, multiAgentService || undefined);
+      if (aiService && zendeskService && multiAgentService && clickupService) {
+        taskGenie = new TaskGenie(env, aiService, zendeskService, multiAgentService, clickupService);
+      } else {
+        console.warn('TaskGenie initialization skipped: Required services not available');
+      }
+    } catch (error) {
+      console.warn('TaskGenie initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
+
+    // Initialize SlackService with multiAgentService and TaskGenie
+    try {
+      slackService = new SlackService(env, multiAgentService || undefined, taskGenie || undefined);
     } catch (error) {
       console.warn('Slack service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
     }
@@ -131,7 +144,8 @@ export default {
             '📋 ClickUp task management', 
             '💬 Slack bot integration',
             '🤖 AI-powered summarization',
-            '🤖 Multi-agent orchestration'
+            '🤖 Multi-agent orchestration',
+            '🧞 TaskGenie NLP interface'
           ],
           endpoints: [
             'GET  / - Health check',
@@ -155,7 +169,12 @@ export default {
             'GET  /agents/status/:role - Get specific agent status',
             'POST /agents/reset-metrics - Reset workflow metrics',
             'GET  /agents/capabilities - List agent capabilities',
-            'POST /agents/simulate-workflow - Simulate workflow with sample data'
+            'POST /agents/simulate-workflow - Simulate workflow with sample data',
+            'POST /taskgenie/chat - Chat with TaskGenie using natural language',
+            'GET  /taskgenie/help - Get TaskGenie help and commands',
+            'GET  /taskgenie/status - Get TaskGenie system status',
+            'POST /taskgenie/batch - Process multiple queries in batch',
+            'DELETE /taskgenie/context - Clear conversation context'
           ]
         }), {
           status: 200,
@@ -174,7 +193,8 @@ export default {
             clickup: clickupService ? '✅ available' : '❌ unavailable',
             ai: aiService ? '✅ available' : '❌ unavailable',
             oauth: oauthService ? '✅ available' : '❌ unavailable',
-            multiAgent: multiAgentService ? '✅ available' : '❌ unavailable'
+            multiAgent: multiAgentService ? '✅ available' : '❌ unavailable',
+            taskGenie: taskGenie ? '✅ available' : '❌ unavailable'
           },
           environment: {
             // Zendesk Configuration
@@ -1521,6 +1541,127 @@ export default {
             headers: corsHeaders
           });
         }
+      }
+
+      // TaskGenie Routes
+      if (url.pathname.startsWith('/taskgenie/') && taskGenie) {
+        try {
+          // Route: Chat with TaskGenie
+          if (url.pathname === '/taskgenie/chat' && method === 'POST') {
+            const body = await request.json() as { query: string; userId?: string; sessionId?: string };
+            
+            if (!body.query) {
+              return new Response(JSON.stringify(formatErrorResponse('Query is required')), {
+                status: 400,
+                headers: corsHeaders
+              });
+            }
+            
+            const response = await taskGenie.chat(body.query, body.userId, body.sessionId);
+            
+            return new Response(JSON.stringify(formatSuccessResponse(response)), {
+              status: response.success ? 200 : 400,
+              headers: corsHeaders
+            });
+          }
+          
+          // Route: Get TaskGenie help
+          if (url.pathname === '/taskgenie/help' && method === 'GET') {
+            const response = await taskGenie.getHelp();
+            
+            return new Response(JSON.stringify(formatSuccessResponse(response)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+          
+          // Route: Get TaskGenie status
+          if (url.pathname === '/taskgenie/status' && method === 'GET') {
+            const response = await taskGenie.getStatus();
+            
+            return new Response(JSON.stringify(formatSuccessResponse(response)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+          
+          // Route: Batch process queries
+          if (url.pathname === '/taskgenie/batch' && method === 'POST') {
+            const body = await request.json() as { queries: string[]; userId?: string };
+            
+            if (!body.queries || !Array.isArray(body.queries)) {
+              return new Response(JSON.stringify(formatErrorResponse('Queries array is required')), {
+                status: 400,
+                headers: corsHeaders
+              });
+            }
+            
+            const responses = await taskGenie.batchProcess(body.queries, body.userId);
+            
+            return new Response(JSON.stringify(formatSuccessResponse(responses)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+          
+          // Route: Clear conversation context
+          if (url.pathname === '/taskgenie/context' && method === 'DELETE') {
+            const body = await request.json() as { userId?: string; sessionId?: string };
+            
+            const cleared = taskGenie.clearContext(body.userId, body.sessionId);
+            
+            return new Response(JSON.stringify(formatSuccessResponse({
+              cleared,
+              message: cleared ? 'Context cleared successfully' : 'No context found to clear'
+            })), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+          
+          // Route: Get conversation history
+          if (url.pathname === '/taskgenie/history' && method === 'GET') {
+            const url_params = new URLSearchParams(url.search);
+            const userId = url_params.get('userId') || undefined;
+            const sessionId = url_params.get('sessionId') || undefined;
+            
+            const history = taskGenie.getConversationHistory(userId, sessionId);
+            
+            return new Response(JSON.stringify(formatSuccessResponse(history)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+          
+          // Route: Get TaskGenie statistics
+          if (url.pathname === '/taskgenie/stats' && method === 'GET') {
+            const stats = taskGenie.getStats();
+            
+            return new Response(JSON.stringify(formatSuccessResponse(stats)), {
+              status: 200,
+              headers: corsHeaders
+            });
+          }
+          
+        } catch (error) {
+          console.error('❌ TaskGenie route error:', error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : 'TaskGenie processing failed'
+          )), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
+      }
+      
+      // TaskGenie routes require TaskGenie service
+      if (url.pathname.startsWith('/taskgenie/') && !taskGenie) {
+        return new Response(JSON.stringify(formatErrorResponse(
+          'TaskGenie service not available. Please check service configuration.'
+        )), {
+          status: 503,
+          headers: corsHeaders
+        });
       }
 
       // Agent routes require multi-agent service
