@@ -94,7 +94,7 @@ export class SlackService {
     try {
       switch (command) {
         case 'help':
-          await this.sendHelpMessage(channel, threadTs);
+          await this.sendCommandHelpMessage(channel, threadTs);
           break;
           
         case 'status':
@@ -841,9 +841,68 @@ export class SlackService {
     }
   }
 
+  async sendCommandHelpMessage(channel: string, threadTs?: string): Promise<void> {
+    try {
+      console.log('📖 Sending command help message to channel:', channel, 'thread:', threadTs);
+      const message = {
+        channel,
+        thread_ts: threadTs,
+        text: `🧞 TaskGenie Commands`,
+        blocks: [
+          {
+            type: 'header',
+            text: {
+              type: 'plain_text',
+              text: '🧞 TaskGenie Commands'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*💬 Command Formats:*\n• Slash commands: `@TaskGenie /help`, `@TaskGenie /analyze ticket 27`\n• Hashtag commands: `@TaskGenie #help`, `@TaskGenie #analyze ticket 27`\n• Natural language: `@TaskGenie analyze ticket 27`\n• Simple commands: `@TaskGenie help`, `@TaskGenie status`'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*🎯 Available Commands:*\n• `/help` or `#help` - Show this help message\n• `/status` or `#status` - Check system status\n• `/status ticket 123` - Check specific ticket status\n• `/analyze ticket 123` - Multi-agent ticket analysis\n• `/summarize ticket 123` - Get ticket summary\n• `/list tickets` - Show open tickets\n• `/analytics` - Get insights and analytics\n• `/create task from ticket 123` - Create ClickUp task'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '*🔧 System Status:*\n• `Show agent status`\n• `Get system insights`\n• `Show workflow metrics`'
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '⚡ *Quick Examples:*\n• `@TaskGenie /analyze ticket 27`\n• `@TaskGenie #status ticket 123`\n• `@TaskGenie /list tickets`\n• `@TaskGenie #analytics`'
+            }
+          }
+        ]
+      };
+
+      await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(message)
+      });
+    } catch (error) {
+      console.error('Error sending command help message:', error);
+    }
+  }
+
   async sendHelpMessage(channel: string, threadTs?: string): Promise<void> {
     try {
-      console.log('📖 Sending help message to channel:', channel, 'thread:', threadTs);
+      console.log('📖 Sending natural language help message to channel:', channel, 'thread:', threadTs);
       const message = {
         channel,
         thread_ts: threadTs,
@@ -874,28 +933,28 @@ export class SlackService {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*💬 Command Formats:*\n• Slash commands: `@TaskGenie /help`, `@TaskGenie /analyze ticket 27`\n• Hashtag commands: `@TaskGenie #help`, `@TaskGenie #analyze ticket 27`\n• Natural language: `@TaskGenie analyze ticket 27`\n• Simple commands: `@TaskGenie help`, `@TaskGenie status`'
+              text: '*🗣️ Natural Language Examples:*\n• `How many open tickets are there?`\n• `Show me ticket 12345`\n• `What\'s the status of all tickets?`\n• `Search for recent tickets`\n• `Analyze ticket 12345`\n• `Create task from ticket 12345`\n• `Route ticket 12345 to software engineer`'
             }
           },
           {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*🎯 Available Commands:*\n• `/help` or `#help` - Show this help message\n• `/status` or `#status` - Check system status\n• `/status ticket 123` - Check specific ticket status\n• `/analyze ticket 123` - Multi-agent ticket analysis\n• `/summarize ticket 123` - Get ticket summary\n• `/list tickets` - Show open tickets\n• `/analytics` - Get insights and analytics\n• `/create task from ticket 123` - Create ClickUp task'
+              text: '*🤖 System Status:*\n• `Show agent status`\n• `Get system insights`\n• `Show workflow metrics`'
             }
           },
           {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*🗣️ Natural Language Examples:*\n• `How many open tickets are there?`\n• `Show me ticket 12345`\n• `What\'s the status of all tickets?`\n• `Search for recent tickets`\n• `Get insights`\n• Ask me any question about your tickets or workflow!'
+              text: '*💡 Examples:*\n• @TaskGenie how many open tickets do we have?\n• @TaskGenie analyze ticket 12345 with AI\n• @TaskGenie create ClickUp task from ticket 67890\n• @TaskGenie show me agent status'
             }
           },
           {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '🚀 *Ready to boost your productivity?* Choose your preferred command style - they all work!'
+              text: '🚀 *Ready to boost your productivity?* Just ask me anything in natural language!'
             }
           }
         ]
