@@ -134,4 +134,88 @@ export class ZendeskService {
   async getTicketDetails(ticketId: string): Promise<ZendeskTicket | null> {
     return this.getTicket(parseInt(ticketId));
   }
+
+  /**
+   * Get a list of open tickets from Zendesk
+   * @param limit - Maximum number of tickets to return (default: 25, max: 100)
+   * @param status - Filter by status (default: 'open')
+   * @returns Promise resolving to an array of ZendeskTicket objects
+   */
+  async getOpenTickets(limit: number = 25, status: string = 'open'): Promise<ZendeskTicket[]> {
+    try {
+      // Ensure limit is within Zendesk API bounds
+      const safeLimit = Math.min(Math.max(limit, 1), 100);
+      
+      const url = `${this.baseUrl}/search.json?query=type:ticket status:${status}&per_page=${safeLimit}&sort_by=created_at&sort_order=desc`;
+      console.log(`🔍 Fetching open tickets from: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': this.authHeader,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Failed to fetch open tickets:`, {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          errorBody: errorText
+        });
+        
+        throw new Error(`Zendesk API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json() as { results: ZendeskTicket[], count: number };
+      console.log(`✅ Successfully fetched ${data.results?.length || 0} open tickets`);
+      return data.results || [];
+    } catch (error) {
+      console.error('❌ Error fetching open tickets:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get tickets with multiple status filters
+   * @param statuses - Array of statuses to filter by (e.g., ['new', 'open', 'pending'])
+   * @param limit - Maximum number of tickets to return (default: 25)
+   * @returns Promise resolving to an array of ZendeskTicket objects
+   */
+  async getTicketsByStatus(statuses: string[] = ['new', 'open', 'pending'], limit: number = 25): Promise<ZendeskTicket[]> {
+    try {
+      const safeLimit = Math.min(Math.max(limit, 1), 100);
+      const statusQuery = statuses.map(status => `status:${status}`).join(' OR ');
+      
+      const url = `${this.baseUrl}/search.json?query=type:ticket (${statusQuery})&per_page=${safeLimit}&sort_by=created_at&sort_order=desc`;
+      console.log(`🔍 Fetching tickets by status from: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': this.authHeader,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Failed to fetch tickets by status:`, {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          errorBody: errorText
+        });
+        
+        throw new Error(`Zendesk API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json() as { results: ZendeskTicket[], count: number };
+      console.log(`✅ Successfully fetched ${data.results?.length || 0} tickets with statuses: ${statuses.join(', ')}`);
+      return data.results || [];
+    } catch (error) {
+      console.error('❌ Error fetching tickets by status:', error);
+      throw error;
+    }
+  }
 }

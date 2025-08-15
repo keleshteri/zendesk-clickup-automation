@@ -114,6 +114,8 @@ export class SlackService {
         await this.handleCreateTaskRequest(channel, thread_ts || ts, messageText);
       } else if (messageText.includes('find ticket') || messageText.includes('search ticket')) {
         await this.handleTicketSearchRequest(channel, thread_ts || ts, messageText);
+      } else if (messageText.includes('list tickets') || messageText.includes('show tickets') || messageText.includes('open tickets')) {
+        await this.handleListTicketsRequest(channel, thread_ts || ts, messageText);
       } else {
         // General AI-powered response for other questions
         await this.handleGeneralQuestion(channel, thread_ts || ts, messageText);
@@ -196,7 +198,7 @@ export class SlackService {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*💬 How to interact with me:*\n• Mention me with `@TaskGenie` followed by your question\n• Ask for help: `@TaskGenie help`\n• Get ticket summaries: `@TaskGenie summarize ticket #27`\n• Check status: `@TaskGenie status ticket #27`\n• Get analytics: `@TaskGenie analytics`'
+              text: '*💬 How to interact with me:*\n• Mention me with `@TaskGenie` followed by your question\n• Ask for help: `@TaskGenie help`\n• List open tickets: `@TaskGenie list tickets`\n• Get ticket summaries: `@TaskGenie summarize ticket #27`\n• Check status: `@TaskGenie status ticket #27`\n• Get analytics: `@TaskGenie analytics`'
             }
           },
           {
@@ -500,6 +502,160 @@ export class SlackService {
     });
   }
 
+  private async handleListTicketsRequest(channel: string, threadTs: string, messageText: string): Promise<void> {
+    try {
+      // Extract limit from message if specified
+      const limitMatch = messageText.match(/(?:limit|show)\s+(\d+)/i);
+      const limit = limitMatch ? Math.min(parseInt(limitMatch[1]), 20) : 10; // Max 20 for clean display
+      
+      await this.sendMessage({
+        channel,
+        thread_ts: threadTs,
+        text: '🔍 Fetching open tickets... Please wait.'
+      });
+
+      // Get open tickets from Zendesk
+      const tickets = await this.zendeskService.getTicketsByStatus(['new', 'open', 'pending'], limit);
+      
+      if (tickets.length === 0) {
+        await this.sendMessage({
+          channel,
+          thread_ts: threadTs,
+          text: '✅ Great news! No open tickets found. All caught up! 🎉'
+        });
+        return;
+      }
+
+      // Check ClickUp task associations for each ticket
+      const ticketList = await Promise.all(
+        tickets.map(async (ticket) => {
+          const hasClickUpTask = await this.checkClickUpTaskExists(ticket.id.toString());
+          return {
+            ticket,
+            hasClickUpTask
+          };
+        })
+      );
+
+      // Format the ticket list message
+      const ticketListMessage = await this.formatTicketListMessage(ticketList, limit);
+      
+      await this.sendMessage({
+        channel,
+        thread_ts: threadTs,
+        text: ticketListMessage
+      });
+      
+    } catch (error) {
+      console.error('Error fetching ticket list:', error);
+      await this.sendMessage({
+        channel,
+        thread_ts: threadTs,
+        text: '❌ Sorry, I encountered an error while fetching the ticket list. Please try again later.'
+      });
+    }
+  }
+
+  /**
+   * Check if a Zendesk ticket has an associated ClickUp task
+   */
+  private async checkClickUpTaskExists(ticketId: string): Promise<boolean> {
+    try {
+      if (!this.env.TASK_MAPPING) {
+        return false;
+      }
+      
+      const mapping = await this.env.TASK_MAPPING.get(`ticket:${ticketId}`);
+      return mapping !== null;
+    } catch (error) {
+      console.error(`Error checking ClickUp task for ticket ${ticketId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Format the ticket list message with clean, easy-to-read display
+   */
+  private async formatTicketListMessage(
+    ticketList: Array<{ ticket: ZendeskTicket; hasClickUpTask: boolean }>,
+    requestedLimit: number
+  ): Promise<string> {
+    const totalTickets = ticketList.length;
+    const ticketsWithTasks = ticketList.filter(item => item.hasClickUpTask).length;
+    const ticketsWithoutTasks = totalTickets - ticketsWithTasks;
+
+    let message = `📋 *Open Tickets Summary*\n\n`;
+    message += `📊 *Overview:* ${totalTickets} open tickets\n`;
+    message += `✅ *With ClickUp Tasks:* ${ticketsWithTasks}\n`;
+    message += `⚠️ *Missing ClickUp Tasks:* ${ticketsWithoutTasks}\n\n`;
+
+    // Group tickets by status for better organization
+    const ticketsByStatus = {
+      new: ticketList.filter(item => item.ticket.status === 'new'),
+      open: ticketList.filter(item => item.ticket.status === 'open'),
+      pending: ticketList.filter(item => item.ticket.status === 'pending')
+    };
+
+    for (const [status, tickets] of Object.entries(ticketsByStatus)) {
+      if (tickets.length === 0) continue;
+      
+      const statusEmoji = this.getStatusEmoji(status);
+      message += `${statusEmoji} *${status.toUpperCase()} (${tickets.length})*\n`;
+      
+      tickets.forEach(({ ticket, hasClickUpTask }) => {
+        const priorityEmoji = this.getPriorityEmoji(ticket.priority);
+        const taskStatus = hasClickUpTask ? '✅' : '❌';
+        const ticketUrl = this.zendeskService.getTicketUrl(ticket.id);
+        
+        // Truncate subject if too long
+        const subject = ticket.subject.length > 50 
+          ? ticket.subject.substring(0, 47) + '...'
+          : ticket.subject;
+        
+        message += `  ${taskStatus} ${priorityEmoji} <${ticketUrl}|#${ticket.id}> ${subject}\n`;
+      });
+      message += '\n';
+    }
+
+    message += `💡 *Legend:*\n`;
+    message += `• ✅ = Has ClickUp task\n`;
+    message += `• ❌ = Missing ClickUp task\n`;
+    message += `• 🔴 = Urgent • 🟠 = High • 🟡 = Normal • 🟢 = Low\n\n`;
+    
+    if (totalTickets >= requestedLimit) {
+      message += `📝 *Note:* Showing first ${requestedLimit} tickets. Use \`@TaskGenie list tickets limit 20\` for more.`;
+    }
+
+    return message;
+  }
+
+  /**
+   * Get emoji for ticket status
+   */
+  private getStatusEmoji(status: string): string {
+    switch (status.toLowerCase()) {
+      case 'new': return '🆕';
+      case 'open': return '🔓';
+      case 'pending': return '⏳';
+      case 'solved': return '✅';
+      case 'closed': return '🔒';
+      default: return '📋';
+    }
+  }
+
+  /**
+   * Get emoji for ticket priority
+   */
+  private getPriorityEmoji(priority: string): string {
+    switch (priority?.toLowerCase()) {
+      case 'urgent': return '🔴';
+      case 'high': return '🟠';
+      case 'normal': return '🟡';
+      case 'low': return '🟢';
+      default: return '⚪';
+    }
+  }
+
   private async handleGeneralQuestion(channel: string, threadTs: string, messageText: string): Promise<void> {
     // Use AI to provide intelligent responses to general questions
     try {
@@ -551,7 +707,7 @@ export class SlackService {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*💬 How to use me:*\n• `@TaskGenie help` - Show this help message\n• `@TaskGenie summarize ticket #27` - Get AI ticket summary\n• `@TaskGenie status ticket #27` - Check ticket status\n• `@TaskGenie analytics` - Get insights and reports\n• `@TaskGenie create task` - Manual task creation\n• `@TaskGenie find ticket` - Search for tickets\n• Ask me any question about your tickets or workflow!'
+              text: '*💬 How to use me:*\n• `@TaskGenie help` - Show this help message\n• `@TaskGenie list tickets` - Show open tickets with ClickUp status\n• `@TaskGenie summarize ticket #27` - Get AI ticket summary\n• `@TaskGenie status ticket #27` - Check ticket status\n• `@TaskGenie analytics` - Get insights and reports\n• `@TaskGenie create task` - Manual task creation\n• `@TaskGenie find ticket` - Search for tickets\n• Ask me any question about your tickets or workflow!'
             }
           },
           {
