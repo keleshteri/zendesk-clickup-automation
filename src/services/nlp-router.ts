@@ -614,39 +614,39 @@ Extract relevant entities like:
     executedTools: string[];
   }> {
     const helpText = `
-🧞 **TaskGenie Help**
+🧞 **TaskGenie Command Help**
 
-I'm your AI-powered task automation assistant! Here's what I can do:
+Available slash commands for quick access:
 
-**🎯 Core Features:**
-• 🎫 Automatically create ClickUp tasks from Zendesk tickets
-• 📋 Provide AI-powered ticket summaries and analysis
-• 📊 Generate insights and analytics reports
-• 🔍 Help you search and find tickets
-• 🤖 Answer questions about your workflow
-• 🔗 Keep everything connected with smart automation
+**📋 Ticket Commands:**
+• \`/analyze <ticket_id>\` - Analyze a specific ticket with AI
+• \`/ticket <ticket_id>\` - Get details for a specific ticket
+• \`/count\` - Get count of open tickets
+• \`/status\` - Get status overview of all tickets
+• \`/search <query>\` - Search for tickets
 
-**🗣️ Natural Language Examples:**
+**🎯 Task Management:**
+• \`/create <ticket_id>\` - Create ClickUp task from ticket
+• \`/route <ticket_id> <agent_role>\` - Route ticket to specific agent
+
+**🤖 System Commands:**
+• \`/help\` - Show this help message
+• \`/agents\` - Show agent status
+• \`/insights\` - Get system insights
+
+**💡 Command Examples:**
+• \`/analyze 12345\` - Analyze ticket 12345
+• \`/create 67890\` - Create task from ticket 67890
+• \`/route 12345 software_engineer\` - Route to software engineer
+• \`/count\` - Show open ticket count
+
+**🗣️ Natural Language:**
+You can also use natural language queries like:
 • "How many open tickets are there?"
 • "Show me ticket 12345"
-• "What's the status of all tickets?"
-• "Search for recent tickets"
-• "Analyze ticket 12345"
-• "Create task from ticket 12345"
-• "Route ticket 12345 to software engineer"
+• "Analyze recent tickets"
 
-**🤖 System Status:**
-• "Show agent status"
-• "Get system insights"
-• "Show workflow metrics"
-
-**💡 Examples:**
-• @TaskGenie how many open tickets do we have?
-• @TaskGenie analyze ticket 12345 with AI
-• @TaskGenie create ClickUp task from ticket 67890
-• @TaskGenie show me agent status
-
-🚀 **Ready to boost your productivity?** Just ask me anything in natural language!
+⚡ **Pro tip:** Use slash commands for faster, direct access to specific functions!
 `;
 
     return {
