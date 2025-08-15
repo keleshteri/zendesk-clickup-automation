@@ -707,7 +707,7 @@ export class SlackService {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*💬 How to use me:*\n• `@TaskGenie help` - Show this help message\n• `@TaskGenie list tickets` - Show open tickets with ClickUp status\n• `@TaskGenie summarize ticket #27` - Get AI ticket summary\n• `@TaskGenie status ticket #27` - Check ticket status\n• `@TaskGenie analytics` - Get insights and reports\n• `@TaskGenie create task` - Manual task creation\n• `@TaskGenie find ticket` - Search for tickets\n• Ask me any question about your tickets or workflow!'
+              text: '*💬 How to use me:*\n• `@TaskGenie help` - Show this help message\n• `@TaskGenie list tickets` - Show open tickets with ClickUp status\n• `@TaskGenie show tickets` - Alternative command to list tickets\n• `@TaskGenie summarize ticket #27` - Get AI ticket summary\n• `@TaskGenie status ticket #27` - Check ticket status\n• `@TaskGenie analytics` - Get insights and reports\n• `@TaskGenie create task` - Manual task creation\n• `@TaskGenie find ticket` - Search for tickets\n• Ask me any question about your tickets or workflow!'
             }
           },
           {

@@ -186,17 +186,78 @@ export class ZendeskService {
   async getTicketsByStatus(statuses: string[] = ['new', 'open', 'pending'], limit: number = 25): Promise<ZendeskTicket[]> {
     try {
       const safeLimit = Math.min(Math.max(limit, 1), 100);
-      const statusQuery = statuses.map(status => `status:${status}`).join(' OR ');
       
-      const url = `${this.baseUrl}/search.json?query=type:ticket (${statusQuery})&per_page=${safeLimit}&sort_by=created_at&sort_order=desc`;
-      console.log(`🔍 Fetching tickets by status from: ${url}`);
+      // Try multiple approaches to find tickets
+      let tickets: ZendeskTicket[] = [];
       
-      const response = await fetch(url, {
+      // Approach 1: Use search API with lowercase status
+      const statusQuery = statuses.map(status => `status:${status.toLowerCase()}`).join(' OR ');
+      let url = `${this.baseUrl}/search.json?query=type:ticket (${statusQuery})&per_page=${safeLimit}&sort_by=created_at&sort_order=desc`;
+      console.log(`🔍 Fetching tickets by status (lowercase) from: ${url}`);
+      
+      let response = await fetch(url, {
         headers: {
           'Authorization': this.authHeader,
           'Content-Type': 'application/json'
         }
       });
+
+      if (response.ok) {
+        const data = await response.json() as { results: ZendeskTicket[], count: number };
+        tickets = data.results || [];
+        console.log(`✅ Found ${tickets.length} tickets with lowercase status search`);
+      }
+      
+      // Approach 2: If no results, try with capitalized status
+      if (tickets.length === 0) {
+        const capitalizedStatusQuery = statuses.map(status => `status:${status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}`).join(' OR ');
+        url = `${this.baseUrl}/search.json?query=type:ticket (${capitalizedStatusQuery})&per_page=${safeLimit}&sort_by=created_at&sort_order=desc`;
+        console.log(`🔍 Fetching tickets by status (capitalized) from: ${url}`);
+        
+        response = await fetch(url, {
+          headers: {
+            'Authorization': this.authHeader,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json() as { results: ZendeskTicket[], count: number };
+          tickets = data.results || [];
+          console.log(`✅ Found ${tickets.length} tickets with capitalized status search`);
+        }
+      }
+      
+      // Approach 3: If still no results, try the tickets endpoint directly
+      if (tickets.length === 0) {
+        url = `${this.baseUrl}/tickets.json?per_page=${safeLimit}&sort_by=created_at&sort_order=desc`;
+        console.log(`🔍 Fetching all recent tickets from: ${url}`);
+        
+        response = await fetch(url, {
+          headers: {
+            'Authorization': this.authHeader,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json() as { tickets: ZendeskTicket[] };
+          const allTickets = data.tickets || [];
+          
+          // Filter by status locally (case-insensitive)
+          const statusesLower = statuses.map(s => s.toLowerCase());
+          tickets = allTickets.filter(ticket => 
+            statusesLower.includes(ticket.status.toLowerCase())
+          );
+          
+          console.log(`✅ Found ${tickets.length} tickets after local filtering from ${allTickets.length} total tickets`);
+          
+          // Log some ticket details for debugging
+          if (allTickets.length > 0) {
+            console.log(`📊 Sample ticket statuses found:`, allTickets.slice(0, 5).map(t => ({ id: t.id, status: t.status })));
+          }
+        }
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -210,9 +271,8 @@ export class ZendeskService {
         throw new Error(`Zendesk API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      const data = await response.json() as { results: ZendeskTicket[], count: number };
-      console.log(`✅ Successfully fetched ${data.results?.length || 0} tickets with statuses: ${statuses.join(', ')}`);
-      return data.results || [];
+      console.log(`✅ Successfully fetched ${tickets.length} tickets with statuses: ${statuses.join(', ')}`);
+      return tickets;
     } catch (error) {
       console.error('❌ Error fetching tickets by status:', error);
       throw error;
