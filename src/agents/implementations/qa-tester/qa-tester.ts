@@ -1,6 +1,6 @@
-import { BaseAgent } from '../../agents/core/base-agent.js';
-import { AgentRole, AgentAnalysis, AgentTool } from '../../agents/types/agent-types.js';
-import { ZendeskTicket } from '../../types/index.js';
+import { BaseAgent } from '../../core/base-agent.js';
+import { AgentRole, AgentAnalysis, AgentTool } from '../../types/agent-types.js';
+import { ZendeskTicket } from '../../../types/index.js';
 
 export class QATesterAgent extends BaseAgent {
   constructor() {

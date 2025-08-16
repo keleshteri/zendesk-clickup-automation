@@ -1,11 +1,11 @@
 import { AgentRole, WorkflowState, MultiAgentResponse, WorkflowMetrics, AgentAnalysis } from '../../agents/types/agent-types.js';
 import { ZendeskTicket } from '../../types/index.js';
-import { ProjectManagerAgent } from './project-manager.js';
-import { SoftwareEngineerAgent } from './software-engineer.js';
-import { WordPressDeveloperAgent } from './wordpress-developer.js';
-import { DevOpsAgent } from './devops.js';
-import { QATesterAgent } from './qa-tester.js';
-import { BusinessAnalystAgent } from './business-analyst.js';
+import { ProjectManagerAgent } from '../../agents/implementations/project-manager/index.js';
+import { SoftwareEngineerAgent } from '../../agents/implementations/software-engineer/index.js';
+import { WordPressDeveloperAgent } from '../../agents/implementations/wordpress-developer/index.js';
+import { DevOpsAgent } from '../../agents/implementations/devops/index.js';
+import { QATesterAgent } from '../../agents/implementations/qa-tester/index.js';
+import { BusinessAnalystAgent } from '../../agents/implementations/business-analyst/index.js';
 import { BaseAgent } from '../../agents/core/base-agent.js';
 
 /**
