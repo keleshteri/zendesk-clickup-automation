@@ -1,4 +1,4 @@
-import { AgentRole, WorkflowState, MultiAgentResponse, WorkflowMetrics, AgentAnalysis } from '../../types/agents.js';
+import { AgentRole, WorkflowState, MultiAgentResponse, WorkflowMetrics, AgentAnalysis } from '../../agents/types/agent-types.js';
 import { ZendeskTicket } from '../../types/index.js';
 import { ProjectManagerAgent } from './project-manager.js';
 import { SoftwareEngineerAgent } from './software-engineer.js';
@@ -6,7 +6,7 @@ import { WordPressDeveloperAgent } from './wordpress-developer.js';
 import { DevOpsAgent } from './devops.js';
 import { QATesterAgent } from './qa-tester.js';
 import { BusinessAnalystAgent } from './business-analyst.js';
-import { BaseAgent } from './base-agent.js';
+import { BaseAgent } from '../../agents/core/base-agent.js';
 
 /**
  * Simplified Multi-Agent Orchestrator for Cloudflare Workers

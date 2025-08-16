@@ -1,4 +1,4 @@
-import { AgentRole, WorkflowState, AgentAnalysis, AgentTool, AgentMemory } from '../../types/agents.js';
+import { AgentRole, WorkflowState, AgentAnalysis, AgentTool, AgentMemory } from '../types/agent-types.js';
 import { ZendeskTicket } from '../../types/index.js';
 
 export abstract class BaseAgent {

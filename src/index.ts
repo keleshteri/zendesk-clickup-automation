@@ -6,7 +6,7 @@ import { AIService } from './services/ai/ai-service.js';
 import { OAuthService } from './services/integrations/clickup/clickup_oauth.js';
 import { MultiAgentService } from './services/multi-agent-service.js';
 import { TaskGenie } from './services/task-genie.js';
-import { AgentRole } from './types/agents.js';
+import { AgentRole } from './agents/types/agent-types.js';
 import { getCorsHeaders, formatErrorResponse, formatSuccessResponse } from './utils/index.js';
 import {
   SLACK_DEFAULTS,

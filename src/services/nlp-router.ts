@@ -1,7 +1,7 @@
 import { AIService } from './ai/ai-service.js';
 import { ZendeskService } from './integrations/zendesk/zendesk.js';
 import { MultiAgentService } from './multi-agent-service.js';
-import { AgentRole } from '../types/agents.js';
+import { AgentRole } from '../agents/types/agent-types.js';
 import { Env, TokenUsage } from '../types/index.js';
 
 export interface NLPIntent {

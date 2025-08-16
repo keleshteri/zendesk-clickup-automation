@@ -1,5 +1,5 @@
-import { BaseAgent } from './base-agent.js';
-import { AgentRole, AgentAnalysis, AgentTool } from '../../types/agents.js';
+import { BaseAgent } from '../../agents/core/base-agent.js';
+import { AgentRole, AgentAnalysis, AgentTool } from '../../agents/types/agent-types.js';
 import { ZendeskTicket } from '../../types/index.js';
 
 export class ProjectManagerAgent extends BaseAgent {
