@@ -1,5 +1,5 @@
 import { MultiAgentOrchestrator } from './agents/multi-agent-orchestrator.js';
-import { AIService } from './ai.js';
+import { AIService } from './ai/ai-service.js';
 import { ZendeskTicket, ClickUpTask, AIResponse, TicketAnalysis } from '../types/index.js';
 import { MultiAgentResponse, AgentRole, WorkflowMetrics } from '../types/agents.js';
 

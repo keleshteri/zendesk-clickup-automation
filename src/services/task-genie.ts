@@ -1,6 +1,6 @@
 import { NLPRouter, NLPResponse } from './nlp-router.js';
-import { AIService } from './ai.js';
-import { ZendeskService } from './zendesk.js';
+import { AIService } from './ai/ai-service.js';
+import { ZendeskService } from './integrations/zendesk/zendesk.js';
 import { MultiAgentService } from './multi-agent-service.js';
 import { Env } from '../types/index.js';
 

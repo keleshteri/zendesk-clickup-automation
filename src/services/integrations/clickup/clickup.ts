@@ -1,6 +1,6 @@
-import { ClickUpTask, Env, ZendeskTicket, UserOAuthData, TicketAnalysis } from '../../types/index.js';
-import { mapZendeskToClickUpPriority } from '../../utils/index.js';
-import { AIService } from '../ai.js';
+import { ClickUpTask, Env, ZendeskTicket, UserOAuthData, TicketAnalysis } from '../../../types/index.js';
+import { mapZendeskToClickUpPriority } from '../../../utils/index.js';
+import { AIService } from '../../ai/ai-service.js';
 
 /**
  * ClickUp API Service

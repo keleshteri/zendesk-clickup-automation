@@ -1,5 +1,5 @@
-import { AIService } from './ai.js';
-import { ZendeskService } from './zendesk.js';
+import { AIService } from './ai/ai-service.js';
+import { ZendeskService } from './integrations/zendesk/zendesk.js';
 import { MultiAgentService } from './multi-agent-service.js';
 import { AgentRole } from '../types/agents.js';
 import { Env, TokenUsage } from '../types/index.js';

@@ -1,13 +1,23 @@
 import { Env, ZendeskWebhook, ClickUpWebhook, SlackEvent, ZendeskTicket, UserOAuthData } from './types/index.js';
-import { SlackService } from './services/slack.js';
-import { ZendeskService } from './services/zendesk.js';
-import { ClickUpService } from './services/clickup/clickup.js';
-import { AIService } from './services/ai.js';
-import { OAuthService } from './services/clickup/clickup_oauth.js';
+import { SlackService } from './services/integrations/slack/slack.js';
+import { ZendeskService } from './services/integrations/zendesk/zendesk.js';
+import { ClickUpService } from './services/integrations/clickup/clickup.js';
+import { AIService } from './services/ai/ai-service.js';
+import { OAuthService } from './services/integrations/clickup/clickup_oauth.js';
 import { MultiAgentService } from './services/multi-agent-service.js';
 import { TaskGenie } from './services/task-genie.js';
 import { AgentRole } from './types/agents.js';
 import { getCorsHeaders, formatErrorResponse, formatSuccessResponse } from './utils/index.js';
+import {
+  SLACK_DEFAULTS,
+  ZENDESK_DEFAULTS,
+  CLICKUP_DEFAULTS,
+  HTTP_STATUS,
+  LOG_CONFIG,
+  ERROR_MESSAGES,
+  TASK_MAPPING,
+  APP_ENDPOINTS
+} from './config/index.js';
 
 // Helper functions to normalize webhook data
 function mapPriority(priority: string): 'low' | 'normal' | 'high' | 'urgent' {
@@ -59,49 +69,52 @@ export default {
     let multiAgentService: MultiAgentService | null = null;
     let taskGenie: TaskGenie | null = null;
 
-    try {
-      // Initialize SlackService after multiAgentService is created
-      // Will be properly initialized later in the code
-    } catch (error) {
-      console.warn('Slack service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
-    }
+    // Standardized service initialization with consistent error logging
+    const logError = (service: string, error: unknown) => {
+      console.error(`${LOG_CONFIG.PREFIXES.ERROR} ${service} service initialization failed:`, 
+        error instanceof Error ? error.message : ERROR_MESSAGES.SERVICE_UNAVAILABLE);
+    };
+
+    const logWarning = (service: string, message: string) => {
+      console.warn(`${LOG_CONFIG.PREFIXES.WARNING} ${service} service initialization skipped: ${message}`);
+    };
 
     try {
       zendeskService = new ZendeskService(env);
     } catch (error) {
-      console.warn('Zendesk service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+      logError('Zendesk', error);
     }
 
     try {
       aiService = new AIService(env);
     } catch (error) {
-      console.warn('AI service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+      logError('AI', error);
     }
 
     try {
       if (aiService) {
         clickupService = new ClickUpService(env, aiService);
       } else {
-        console.warn('ClickUp service initialization skipped: AI service not available');
+        logWarning('ClickUp', 'AI service not available');
       }
     } catch (error) {
-      console.warn('ClickUp service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+      logError('ClickUp', error);
     }
 
     try {
       oauthService = new OAuthService(env);
     } catch (error) {
-      console.warn('OAuth service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+      logError('OAuth', error);
     }
 
     try {
       if (aiService && zendeskService && clickupService) {
         multiAgentService = new MultiAgentService(env, aiService, zendeskService, clickupService);
       } else {
-        console.warn('MultiAgent service initialization skipped: Required services not available');
+        logWarning('MultiAgent', 'Required services not available');
       }
     } catch (error) {
-      console.warn('MultiAgent service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+      logError('MultiAgent', error);
     }
 
     // Initialize TaskGenie with all required services
@@ -109,23 +122,23 @@ export default {
       if (aiService && zendeskService && multiAgentService && clickupService) {
         taskGenie = new TaskGenie(env, aiService, zendeskService, multiAgentService, clickupService);
       } else {
-        console.warn('TaskGenie initialization skipped: Required services not available');
+        logWarning('TaskGenie', 'Required services not available');
       }
     } catch (error) {
-      console.warn('TaskGenie initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+      logError('TaskGenie', error);
     }
 
     // Initialize SlackService with multiAgentService and TaskGenie
     try {
       slackService = new SlackService(env, multiAgentService || undefined, taskGenie || undefined);
     } catch (error) {
-      console.warn('Slack service initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+      logError('Slack', error);
     }
 
     // Handle CORS preflight
     if (method === 'OPTIONS') {
       return new Response(null, {
-        status: 200,
+        status: HTTP_STATUS.OK,
         headers: corsHeaders
       });
     }
@@ -177,7 +190,7 @@ export default {
             'DELETE /taskgenie/context - Clear conversation context'
           ]
         }), {
-          status: 200,
+          status: HTTP_STATUS.OK,
           headers: corsHeaders
         });
       }
@@ -225,18 +238,18 @@ export default {
           },
           timestamp: new Date().toISOString()
         }), {
-          status: 200,
+          status: HTTP_STATUS.OK,
           headers: corsHeaders
         });
       }
 
       // Route: Zendesk webhook - Create ClickUp task and notify Slack
-      if (url.pathname === '/zendesk-webhook' && method === 'POST') {
+      if (url.pathname === APP_ENDPOINTS.WEBHOOK_ZENDESK && method === 'POST') {
         try {
           // Check if required services are available
           if (!clickupService) {
-            return new Response(JSON.stringify(formatErrorResponse('ClickUp service not available - check environment configuration')), {
-              status: 503,
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
               headers: corsHeaders
             });
           }
@@ -246,8 +259,8 @@ export default {
           const expectedSecret = `Bearer ${env.WEBHOOK_SECRET}`;
           
           if (!authHeader || authHeader !== expectedSecret) {
-            return new Response(JSON.stringify(formatErrorResponse('Unauthorized - Invalid webhook secret')), {
-              status: 401,
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.UNAUTHORIZED)), {
+              status: HTTP_STATUS.UNAUTHORIZED,
               headers: corsHeaders
             });
           }
@@ -282,21 +295,21 @@ export default {
             if (oauthService && env.TASK_MAPPING) {
               try {
                 // For demo, use 'default' user - in production, this should come from the webhook or be configurable
-                const defaultUserId = 'default'; 
+                const defaultUserId = SLACK_DEFAULTS.USER_ID; 
                 const oauthData = await oauthService.getUserOAuth(defaultUserId);
                 
                 if (oauthData && oauthService.isTokenValid(oauthData)) {
-                  console.log('✅ Using OAuth tokens for ClickUp API');
+                  console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Using OAuth tokens for ClickUp API`);
                   if (aiService) {
                     oauthClickUpService = new ClickUpService(env, aiService, oauthData);
                   } else {
                     console.warn('⚠️ AI service not available for OAuth ClickUp service');
                   }
                 } else {
-                  console.log('⚠️ OAuth data not found or invalid, falling back to API token');
+                  console.log(`${LOG_CONFIG.PREFIXES.WARNING} OAuth data not found or invalid, falling back to API token`);
                 }
               } catch (oauthError) {
-                console.warn('⚠️ Error retrieving OAuth data, falling back to API token:', oauthError);
+                console.warn(`${LOG_CONFIG.PREFIXES.WARNING} Error retrieving OAuth data, falling back to API token:`, oauthError);
               }
             }
             
@@ -304,16 +317,16 @@ export default {
             let aiAnalysis = null;
             if (aiService) {
               try {
-                console.log('🤖 Generating AI analysis for ticket...');
+                console.log(`${LOG_CONFIG.PREFIXES.AI} Generating AI analysis for ticket...`);
                 aiAnalysis = await aiService.analyzeTicket(JSON.stringify(ticket));
-                console.log('✅ AI analysis completed:', {
+                console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} AI analysis completed:`, {
                   priority: aiAnalysis.priority,
                   category: aiAnalysis.category,
                   sentiment: aiAnalysis.sentiment,
                   urgency_indicators: aiAnalysis.urgency_indicators
                 });
               } catch (aiError) {
-                console.warn('⚠️ AI analysis failed:', aiError);
+                console.warn(`${LOG_CONFIG.PREFIXES.WARNING} AI analysis failed:`, aiError);
                 aiAnalysis = null;
               }
             }
@@ -323,16 +336,16 @@ export default {
             try {
               clickupTask = await oauthClickUpService.createTaskFromTicket(ticket, aiAnalysis || undefined);
             } catch (clickupError) {
-              console.error('💥 ClickUp task creation failed:', clickupError);
+              console.error(`${LOG_CONFIG.PREFIXES.ERROR} ClickUp task creation failed:`, clickupError);
               throw new Error(`ClickUp task creation failed: ${clickupError instanceof Error ? clickupError.message : 'Unknown error'}`);
             }
             
             if (!clickupTask) {
-              console.error('❌ ClickUp task creation returned null');
+              console.error(`${LOG_CONFIG.PREFIXES.ERROR} ClickUp task creation returned null`);
               throw new Error('Failed to create ClickUp task - service returned null');
             }
 
-            console.log('🎉 ClickUp task created successfully:', {
+            console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} ClickUp task created successfully:`, {
               id: clickupTask.id,
               name: clickupTask.name,
               url: clickupTask.url,
@@ -346,10 +359,10 @@ export default {
                 zendesk_ticket_id: ticket.id,
                 clickup_task_id: clickupTask.id,
                 created_at: new Date().toISOString(),
-                status: 'active'
+                status: TASK_MAPPING.STATUS.ACTIVE
               };
               await env.TASK_MAPPING.put(mappingKey, JSON.stringify(mappingValue));
-              console.log('💾 Task mapping stored:', mappingKey);
+              console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Task mapping stored:`, mappingKey);
             }
 
             // Send Slack notification if configured
@@ -361,7 +374,7 @@ export default {
                 
                 if (aiAnalysis) {
                   // Send intelligent notification with AI insights
-                  console.log('💬 Sending intelligent Slack notification with AI insights...');
+                  console.log(`${LOG_CONFIG.PREFIXES.SLACK} Sending intelligent Slack notification with AI insights...`);
                   const slackMessage = await slackService.sendIntelligentNotification(
                     ticket,
                     aiAnalysis,
@@ -371,21 +384,21 @@ export default {
                   slackThreadTs = slackMessage?.ts;
                 } else {
                   // Fallback to basic notification
-                  console.log('💬 Sending basic Slack notification...');
-                  const defaultChannel = '#zendesk-clickup-automation'; // or get from env
+                  console.log(`${LOG_CONFIG.PREFIXES.SLACK} Sending basic Slack notification...`);
+                  const defaultChannel = SLACK_DEFAULTS.CHANNEL;
                   const slackMessage = await slackService.sendTaskCreationMessage(
                     defaultChannel,
                     ticket.id.toString(),
                     zendeskUrl,
                     clickupUrl,
-                    'Steve' // In production, get from ticket requester
+                    SLACK_DEFAULTS.USER_NAME // In production, get from ticket requester
                   );
                   slackThreadTs = slackMessage?.ts;
                 }
                 
-                console.log('💬 Slack notification sent:', slackThreadTs);
+                console.log(`${LOG_CONFIG.PREFIXES.SLACK} Slack notification sent:`, slackThreadTs);
               } catch (slackError) {
-                console.error('⚠️ Slack notification failed:', slackError);
+                console.error(`${LOG_CONFIG.PREFIXES.ERROR} Slack notification failed:`, slackError);
                 // Don't fail the whole process if Slack fails
               }
             }
@@ -406,35 +419,35 @@ export default {
               } : null,
               ai_enhanced: !!aiAnalysis
             }, aiAnalysis ? 'Zendesk ticket successfully converted to ClickUp task with AI analysis and intelligent Slack notification' : 'Zendesk ticket successfully converted to ClickUp task and Slack notified')), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           } else {
             return new Response(JSON.stringify(formatSuccessResponse(null, 'Event type not processed')), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
 
         } catch (error) {
-          console.error('❌ Error processing Zendesk webhook:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error processing Zendesk webhook:`, error);
           
           return new Response(JSON.stringify(formatErrorResponse(
-            error instanceof Error ? error.message : 'Unknown error',
+            error instanceof Error ? error.message : ERROR_MESSAGES.WEBHOOK_PROCESSING_FAILED,
             'zendesk-webhook'
           )), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
       }
 
       // Route: Slack Events API
-      if (url.pathname === '/slack/events' && method === 'POST') {
+      if (url.pathname === APP_ENDPOINTS.SLACK_EVENTS && method === 'POST') {
         try {
           if (!slackService) {
-            return new Response(JSON.stringify(formatErrorResponse('Slack service not available - check environment configuration')), {
-              status: 503,
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
               headers: corsHeaders
             });
           }
@@ -445,8 +458,8 @@ export default {
 
           // Verify Slack request signature
           if (!await slackService.verifyRequest(body, timestamp, signature)) {
-            return new Response(JSON.stringify(formatErrorResponse('Invalid Slack signature')), {
-              status: 401,
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.UNAUTHORIZED)), {
+              status: HTTP_STATUS.UNAUTHORIZED,
               headers: corsHeaders
             });
           }
@@ -456,7 +469,7 @@ export default {
           // Handle URL verification challenge
           if (data.type === 'url_verification') {
             return new Response(data.challenge, {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: { 'Content-Type': 'text/plain' }
             });
           }
@@ -466,7 +479,7 @@ export default {
             const event: SlackEvent = data.event;
             
             // Debug logging for event processing
-            console.log('🔔 Slack event received:', {
+            console.log(`${LOG_CONFIG.PREFIXES.SLACK} Slack event received:`, {
               type: event.type,
               bot_id: event.bot_id,
               user: event.user,
@@ -475,15 +488,15 @@ export default {
             });
             
             if (event.type === 'app_mention' && !event.bot_id) {
-              console.log('✅ Processing app mention event for user:', event.user);
+              console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Processing app mention event for user:`, event.user);
               // Handle the mention asynchronously (skip bot messages to prevent loops)
               ctx.waitUntil(slackService.handleMention(event));
               
-              return new Response('', { status: 200 });
+              return new Response('', { status: HTTP_STATUS.OK });
             } else if (event.bot_id) {
-              console.log('🤖 Skipping bot message from:', event.bot_id);
+              console.log(`${LOG_CONFIG.PREFIXES.INFO} Skipping bot message from:`, event.bot_id);
             } else if (event.type === 'message') {
-              console.log('📝 Skipping regular message event (not a mention)');
+              console.log(`${LOG_CONFIG.PREFIXES.INFO} Skipping regular message event (not a mention)`);
             }
             
             // Handle member joined channel events
@@ -491,25 +504,25 @@ export default {
               // Send welcome message asynchronously
               ctx.waitUntil(slackService.handleMemberJoined(event));
               
-              return new Response('', { status: 200 });
+              return new Response('', { status: HTTP_STATUS.OK });
             }
           }
 
-          return new Response('', { status: 200 });
+          return new Response('', { status: HTTP_STATUS.OK });
         } catch (error) {
-          console.error('❌ Error processing Slack event:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error processing Slack event:`, error);
           return new Response(JSON.stringify(formatErrorResponse(
-            error instanceof Error ? error.message : 'Unknown error',
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
             'slack-events'
           )), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
       }
 
       // Route: Slack Slash Commands
-      if (url.pathname === '/slack/commands' && method === 'POST') {
+      if (url.pathname === APP_ENDPOINTS.SLACK_COMMANDS && method === 'POST') {
         try {
           const formData = await request.formData();
           const command = formData.get('command');
@@ -522,7 +535,7 @@ export default {
               response_type: 'ephemeral',
               text: '🧞 TaskGenie is here to help! I automatically create ClickUp tasks from Zendesk tickets and can provide AI-powered summaries. Just mention me in a thread and ask for "summarize"!'
             }), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: { 'Content-Type': 'application/json' }
             });
           }
@@ -531,26 +544,26 @@ export default {
             response_type: 'ephemeral',
             text: 'Unknown command. Try `/taskgenie` for help.'
           }), {
-            status: 200,
+            status: HTTP_STATUS.OK,
             headers: { 'Content-Type': 'application/json' }
           });
         } catch (error) {
-          console.error('❌ Error processing Slack command:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error processing Slack command:`, error);
           return new Response(JSON.stringify(formatErrorResponse(
-            error instanceof Error ? error.message : 'Unknown error',
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
             'slack-commands'
           )), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
       }
 
       // Route: ClickUp webhook (placeholder)
-      if (url.pathname === '/clickup-webhook' && method === 'POST') {
+      if (url.pathname === APP_ENDPOINTS.WEBHOOK_CLICKUP && method === 'POST') {
         const data: ClickUpWebhook = await request.json();
         
-        console.log('📝 ClickUp webhook received:', {
+        console.log(`${LOG_CONFIG.PREFIXES.INFO} ClickUp webhook received:`, {
           event: data.event,
           task_id: data.task_id,
           webhook_id: data.webhook_id
@@ -566,7 +579,7 @@ export default {
           },
           timestamp: new Date().toISOString()
         }), {
-          status: 200,
+          status: HTTP_STATUS.OK,
           headers: corsHeaders
         });
       }
@@ -577,10 +590,10 @@ export default {
           if (!aiService) {
             return new Response(JSON.stringify({
               error: 'AI Service Not Available',
-              message: 'AI service is not configured. Please check your environment variables.',
+              message: ERROR_MESSAGES.SERVICE_UNAVAILABLE,
               timestamp: new Date().toISOString()
             }), {
-              status: 503,
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
               headers: corsHeaders
             });
           }
@@ -591,9 +604,9 @@ export default {
           if (!text || typeof text !== 'string') {
             return new Response(JSON.stringify({
               error: 'Bad Request',
-              message: 'Missing or invalid "text" field in request body'
+              message: ERROR_MESSAGES.INVALID_REQUEST
             }), {
-              status: 400,
+              status: HTTP_STATUS.BAD_REQUEST,
               headers: corsHeaders
             });
           }
@@ -608,19 +621,19 @@ export default {
             summary: aiResponse.summary,
             timestamp: new Date().toISOString()
           }), {
-            status: 200,
+            status: HTTP_STATUS.OK,
             headers: corsHeaders
           });
           
         } catch (error) {
-          console.error('❌ AI test error:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} AI test error:`, error);
           return new Response(JSON.stringify({
             error: 'AI Test Failed',
-            message: error instanceof Error ? error.message : 'Unknown AI error',
+            message: error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
             provider: aiService.getProviderName(),
             timestamp: new Date().toISOString()
           }), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
@@ -635,9 +648,9 @@ export default {
           if (!ticketId) {
             return new Response(JSON.stringify({
               error: 'Bad Request',
-              message: 'Missing "ticket_id" field in request body'
+              message: ERROR_MESSAGES.INVALID_REQUEST
             }), {
-              status: 400,
+              status: HTTP_STATUS.BAD_REQUEST,
               headers: corsHeaders
             });
           }
@@ -647,7 +660,7 @@ export default {
           try {
             ticket = await zendeskService.getTicket(Number(ticketId));
           } catch (zendeskError) {
-            console.error('❌ Zendesk API error:', zendeskError);
+            console.error(`${LOG_CONFIG.PREFIXES.ERROR} Zendesk API error:`, zendeskError);
             return new Response(JSON.stringify({
               error: 'Zendesk API Error',
               message: zendeskError instanceof Error ? zendeskError.message : 'Failed to fetch ticket from Zendesk',
@@ -666,7 +679,7 @@ export default {
               ticket_id: ticketId,
               timestamp: new Date().toISOString()
             }), {
-              status: 404,
+              status: HTTP_STATUS.NOT_FOUND,
               headers: corsHeaders
             });
           }
@@ -693,18 +706,18 @@ export default {
             },
             timestamp: new Date().toISOString()
           }), {
-            status: 200,
+            status: HTTP_STATUS.OK,
             headers: corsHeaders
           });
           
         } catch (error) {
-          console.error('❌ Zendesk + AI test error:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Zendesk + AI test error:`, error);
           return new Response(JSON.stringify({
             error: 'Integration Test Failed',
-            message: error instanceof Error ? error.message : 'Unknown integration error',
+            message: error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
             timestamp: new Date().toISOString()
           }), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
@@ -716,10 +729,10 @@ export default {
           if (!clickupService) {
             return new Response(JSON.stringify({
               error: 'ClickUp Service Not Available',
-              message: 'ClickUp service is not configured. Please check your environment variables.',
+              message: ERROR_MESSAGES.SERVICE_UNAVAILABLE,
               timestamp: new Date().toISOString()
             }), {
-              status: 503,
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
               headers: corsHeaders
             });
           }
@@ -728,17 +741,17 @@ export default {
           let oauthClickUpService = clickupService;
           if (oauthService && env.TASK_MAPPING) {
             try {
-              const defaultUserId = 'default';
+              const defaultUserId = SLACK_DEFAULTS.USER_ID;
               const oauthData = await oauthService.getUserOAuth(defaultUserId);
 
               if (oauthData && oauthService.isTokenValid(oauthData)) {
-                console.log('✅ Using OAuth tokens for ClickUp test');
+                console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Using OAuth tokens for ClickUp test`);
                 oauthClickUpService = new ClickUpService(env, aiService, oauthData);
               } else {
-                console.log('⚠️ OAuth data not found or invalid, falling back to API token for test');
+                console.log(`${LOG_CONFIG.PREFIXES.WARNING} OAuth data not found or invalid, falling back to API token for test`);
               }
             } catch (oauthError) {
-              console.warn('⚠️ Error retrieving OAuth data for test, falling back to API token:', oauthError);
+              console.warn(`${LOG_CONFIG.PREFIXES.WARNING} Error retrieving OAuth data for test, falling back to API token:`, oauthError);
             }
           }
 
@@ -747,7 +760,33 @@ export default {
             test_ticket_id?: string;
           };
 
-          const results: any = {
+          interface TestResults {
+            action: string;
+            timestamp: string;
+            using_oauth: boolean;
+            connection_test?: any;
+            test_task_creation?: {
+              success: boolean;
+              task_id?: string;
+              task_url?: string | null;
+              error?: string;
+            };
+            spaces?: any;
+            spaces_error?: {
+              message?: string;
+              status?: number;
+              statusText?: string;
+              body?: string;
+            };
+            environment_check?: {
+              clickup_token: boolean;
+              clickup_list_id: boolean;
+              clickup_team_id: boolean;
+              clickup_space_id: boolean;
+            };
+          }
+
+          const results: TestResults = {
             action: body.action,
             timestamp: new Date().toISOString(),
             using_oauth: oauthClickUpService !== clickupService
@@ -819,7 +858,7 @@ export default {
                 }
               } catch (error) {
                 results.spaces_error = {
-                  message: error instanceof Error ? error.message : 'Unknown error'
+                  message: error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR
                 };
               }
               break;
@@ -827,11 +866,11 @@ export default {
             default:
               return new Response(JSON.stringify({
                 error: 'Invalid Action',
-                message: 'action must be one of: test_auth, create_test_task, list_spaces',
+                message: ERROR_MESSAGES.INVALID_REQUEST,
                 available_actions: ['test_auth', 'create_test_task', 'list_spaces'],
                 timestamp: new Date().toISOString()
               }), {
-                status: 400,
+                status: HTTP_STATUS.BAD_REQUEST,
                 headers: corsHeaders
               });
           }
@@ -840,25 +879,26 @@ export default {
           results.environment_check = {
             clickup_token: !!env.CLICKUP_TOKEN,
             clickup_list_id: !!env.CLICKUP_LIST_ID,
-            clickup_list_id_value: env.CLICKUP_LIST_ID || 'not set'
+            clickup_team_id: !!env.CLICKUP_TEAM_ID,
+            clickup_space_id: !!env.CLICKUP_SPACE_ID
           };
           
           return new Response(JSON.stringify({
             status: 'success',
             clickup_test_results: results
           }), {
-            status: 200,
+            status: HTTP_STATUS.OK,
             headers: corsHeaders
           });
           
         } catch (error) {
-          console.error('❌ ClickUp test error:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} ClickUp test error:`, error);
           return new Response(JSON.stringify({
             error: 'ClickUp Test Failed',
-            message: error instanceof Error ? error.message : 'Unknown ClickUp test error',
+            message: error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
             timestamp: new Date().toISOString()
           }), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
@@ -872,7 +912,33 @@ export default {
             test_signature?: boolean;
           };
           
-          const results: any = {
+          interface SlackTestResults {
+            action: string;
+            timestamp: string;
+            message_sent?: {
+              channel: string;
+              text: string;
+              status: string;
+            };
+            auth_test?: {
+              ok: boolean;
+              [key: string]: any;
+            };
+            webhook_verification?: {
+              test_body: string;
+              test_timestamp: string;
+              test_signature: string;
+              verification_result: boolean;
+              signing_secret_configured: boolean;
+            };
+            environment_check?: {
+              slack_bot_token: boolean;
+              slack_signing_secret: boolean;
+              slack_app_token: boolean;
+            };
+          }
+
+          const results: SlackTestResults = {
             action: body.action,
             timestamp: new Date().toISOString()
           };
@@ -882,11 +948,11 @@ export default {
               if (!body.channel || !body.message) {
                 return new Response(JSON.stringify({
                   error: 'Missing Parameters',
-                  message: 'channel and message are required for send_message action',
+                  message: ERROR_MESSAGES.INVALID_REQUEST,
                   required_params: ['channel', 'message'],
                   timestamp: new Date().toISOString()
                 }), {
-                  status: 400,
+                  status: HTTP_STATUS.BAD_REQUEST,
                   headers: corsHeaders
                 });
               }
@@ -941,12 +1007,12 @@ export default {
               
             default:
               return new Response(JSON.stringify({
-                error: 'Invalid Action',
+                error: ERROR_MESSAGES.INVALID_REQUEST,
                 message: 'action must be one of: send_message, test_auth, verify_webhook',
                 available_actions: ['send_message', 'test_auth', 'verify_webhook'],
                 timestamp: new Date().toISOString()
               }), {
-                status: 400,
+                status: HTTP_STATUS.BAD_REQUEST,
                 headers: corsHeaders
               });
           }
@@ -962,18 +1028,18 @@ export default {
             status: 'success',
             slack_test_results: results
           }), {
-            status: 200,
+            status: HTTP_STATUS.OK,
             headers: corsHeaders
           });
           
         } catch (error) {
-          console.error('❌ Slack test error:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Slack test error:`, error);
           return new Response(JSON.stringify({
-            error: 'Slack Test Failed',
+            error: ERROR_MESSAGES.INTERNAL_ERROR,
             message: error instanceof Error ? error.message : 'Unknown Slack test error',
             timestamp: new Date().toISOString()
           }), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
@@ -984,11 +1050,11 @@ export default {
         try {
           if (!oauthService) {
             return new Response(JSON.stringify({
-              error: 'OAuth Service Not Available',
+              error: ERROR_MESSAGES.SERVICE_UNAVAILABLE,
               message: 'OAuth service is not configured. Please check your ClickUp OAuth environment variables.',
               timestamp: new Date().toISOString()
             }), {
-              status: 503,
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
               headers: corsHeaders
             });
           }
@@ -1020,17 +1086,17 @@ export default {
             ],
             timestamp: new Date().toISOString()
           }), {
-            status: 200,
+            status: HTTP_STATUS.OK,
             headers: corsHeaders
           });
         } catch (error) {
-          console.error('❌ OAuth start error:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} OAuth start error:`, error);
           return new Response(JSON.stringify({
-            error: 'OAuth Start Failed',
+            error: ERROR_MESSAGES.INTERNAL_ERROR,
             message: error instanceof Error ? error.message : 'Unknown OAuth error',
             timestamp: new Date().toISOString()
           }), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
@@ -1041,11 +1107,11 @@ export default {
         try {
           if (!oauthService) {
             return new Response(JSON.stringify({
-              error: 'OAuth Service Not Available',
+              error: ERROR_MESSAGES.SERVICE_UNAVAILABLE,
               message: 'OAuth service is not configured.',
               timestamp: new Date().toISOString()
             }), {
-              status: 503,
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
               headers: corsHeaders
             });
           }
@@ -1056,24 +1122,24 @@ export default {
 
           // Handle OAuth errors
           if (error) {
-            console.error('❌ OAuth callback error:', error);
+            console.error(`${LOG_CONFIG.PREFIXES.ERROR} OAuth callback error:`, error);
             return new Response(JSON.stringify({
-              error: 'OAuth Authorization Failed',
+              error: ERROR_MESSAGES.INVALID_REQUEST,
               message: `ClickUp OAuth error: ${error}`,
               timestamp: new Date().toISOString()
             }), {
-              status: 400,
+              status: HTTP_STATUS.BAD_REQUEST,
               headers: corsHeaders
             });
           }
 
           if (!code) {
             return new Response(JSON.stringify({
-              error: 'Missing Authorization Code',
+              error: ERROR_MESSAGES.INVALID_REQUEST,
               message: 'No authorization code provided by ClickUp',
               timestamp: new Date().toISOString()
             }), {
-              status: 400,
+              status: HTTP_STATUS.BAD_REQUEST,
               headers: corsHeaders
             });
           }
@@ -1083,11 +1149,11 @@ export default {
             const storedStateData = await env.TASK_MAPPING.get(`oauth_state_${state}`);
             if (!storedStateData) {
               return new Response(JSON.stringify({
-                error: 'Invalid State Parameter',
+                error: ERROR_MESSAGES.INVALID_REQUEST,
                 message: 'OAuth state parameter is invalid or expired',
                 timestamp: new Date().toISOString()
               }), {
-                status: 400,
+                status: HTTP_STATUS.BAD_REQUEST,
                 headers: corsHeaders
               });
             }
@@ -1134,17 +1200,17 @@ export default {
             access_granted: true,
             timestamp: new Date().toISOString()
           }), {
-            status: 200,
+            status: HTTP_STATUS.OK,
             headers: corsHeaders
           });
         } catch (error) {
-          console.error('❌ OAuth callback error:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} OAuth callback error:`, error);
           return new Response(JSON.stringify({
-            error: 'OAuth Callback Failed',
+            error: ERROR_MESSAGES.INTERNAL_ERROR,
             message: error instanceof Error ? error.message : 'Unknown OAuth callback error',
             timestamp: new Date().toISOString()
           }), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
@@ -1160,12 +1226,12 @@ export default {
 
           if (!isLocalhost && (!authHeader || authHeader !== `Bearer ${adminToken}`)) {
             return new Response(JSON.stringify({
-              error: 'Unauthorized',
+              error: ERROR_MESSAGES.UNAUTHORIZED,
               message: 'This endpoint requires authentication',
               hint: 'Add Authorization: Bearer <WEBHOOK_SECRET> header or access from localhost',
               timestamp: new Date().toISOString()
             }), {
-              status: 401,
+              status: HTTP_STATUS.UNAUTHORIZED,
               headers: corsHeaders
             });
           }
@@ -1178,16 +1244,16 @@ export default {
               message: 'OAuth service is not configured',
               timestamp: new Date().toISOString()
             }), {
-              status: 503,
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
               headers: corsHeaders
             });
           }
 
-          console.log(`🔍 Checking OAuth status for user: ${userId}`);
+          console.log(`${LOG_CONFIG.PREFIXES.INFO} Checking OAuth status for user: ${userId}`);
           const oauthData = await oauthService.getUserOAuth(userId);
 
           if (!oauthData) {
-            console.log(`❌ No OAuth data found for user: ${userId}`);
+            console.log(`${LOG_CONFIG.PREFIXES.ERROR} No OAuth data found for user: ${userId}`);
             return new Response(JSON.stringify({
               status: 'not_authorized',
               message: 'User has not authorized ClickUp access',
@@ -1195,7 +1261,7 @@ export default {
               checked_user_id: userId,
               timestamp: new Date().toISOString()
             }), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1213,17 +1279,17 @@ export default {
             oauth_url: !isValid ? `/auth/clickup` : undefined,
             timestamp: new Date().toISOString()
           }), {
-            status: 200,
+            status: HTTP_STATUS.OK,
             headers: corsHeaders
           });
         } catch (error) {
-          console.error('❌ OAuth status check error:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} OAuth status check error:`, error);
           return new Response(JSON.stringify({
-            error: 'OAuth Status Check Failed',
+            error: ERROR_MESSAGES.INTERNAL_ERROR,
             message: error instanceof Error ? error.message : 'Unknown status check error',
             timestamp: new Date().toISOString()
           }), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
@@ -1239,21 +1305,21 @@ export default {
 
           if (!isLocalhost && (!authHeader || authHeader !== `Bearer ${adminToken}`)) {
             return new Response(JSON.stringify({
-              error: 'Unauthorized',
+              error: ERROR_MESSAGES.UNAUTHORIZED,
               message: 'This endpoint requires authentication',
               timestamp: new Date().toISOString()
             }), {
-              status: 401,
+              status: HTTP_STATUS.UNAUTHORIZED,
               headers: corsHeaders
             });
           }
 
           if (!oauthService || !env.TASK_MAPPING) {
             return new Response(JSON.stringify({
-              error: 'OAuth service or KV storage not available',
+              error: ERROR_MESSAGES.SERVICE_UNAVAILABLE,
               timestamp: new Date().toISOString()
             }), {
-              status: 503,
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
               headers: corsHeaders
             });
           }
@@ -1296,17 +1362,17 @@ export default {
             overall_status: defaultData && oauthService.isTokenValid(defaultData) ? 'healthy' : 'needs_auth',
             timestamp: new Date().toISOString()
           }), {
-            status: 200,
+            status: HTTP_STATUS.OK,
             headers: corsHeaders
           });
         } catch (error) {
-          console.error('❌ OAuth test error:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} OAuth test error:`, error);
           return new Response(JSON.stringify({
-            error: 'OAuth Test Failed',
+            error: ERROR_MESSAGES.INTERNAL_ERROR,
             message: error instanceof Error ? error.message : 'Unknown test error',
             timestamp: new Date().toISOString()
           }), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
@@ -1322,21 +1388,21 @@ export default {
 
           if (!isLocalhost && (!authHeader || authHeader !== `Bearer ${adminToken}`)) {
             return new Response(JSON.stringify({
-              error: 'Unauthorized',
+              error: ERROR_MESSAGES.UNAUTHORIZED,
               message: 'This endpoint requires authentication',
               timestamp: new Date().toISOString()
             }), {
-              status: 401,
+              status: HTTP_STATUS.UNAUTHORIZED,
               headers: corsHeaders
             });
           }
 
           if (!oauthService || !env.TASK_MAPPING) {
             return new Response(JSON.stringify({
-              error: 'OAuth service or KV storage not available',
+              error: ERROR_MESSAGES.SERVICE_UNAVAILABLE,
               timestamp: new Date().toISOString()
             }), {
-              status: 503,
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
               headers: corsHeaders
             });
           }
@@ -1357,17 +1423,17 @@ export default {
             } : null,
             timestamp: new Date().toISOString()
           }), {
-            status: 200,
+            status: HTTP_STATUS.OK,
             headers: corsHeaders
           });
         } catch (error) {
-          console.error('❌ OAuth debug error:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} OAuth debug error:`, error);
           return new Response(JSON.stringify({
-            error: 'OAuth Debug Failed',
+            error: ERROR_MESSAGES.INTERNAL_ERROR,
             message: error instanceof Error ? error.message : 'Unknown debug error',
             timestamp: new Date().toISOString()
           }), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
@@ -1381,7 +1447,7 @@ export default {
             const body = await request.json() as { ticketId: string };
             const result = await multiAgentService.processTicket(body.ticketId);
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1394,7 +1460,7 @@ export default {
               body.listId
             );
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1407,8 +1473,8 @@ export default {
             const ticketIds = body.ticketIds || [(body as any).ticketId];
             
             if (!ticketIds || ticketIds.length === 0) {
-              return new Response(JSON.stringify(formatErrorResponse('ticketIds array is required')), {
-                status: 400,
+              return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.INVALID_REQUEST)), {
+                status: HTTP_STATUS.BAD_REQUEST,
                 headers: corsHeaders
               });
             }
@@ -1416,7 +1482,7 @@ export default {
             // For now, process the first ticket (can be extended to handle multiple)
             const result = await multiAgentService.getComprehensiveInsights(ticketIds[0]);
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1426,7 +1492,7 @@ export default {
             const body = await request.json() as { ticketId: string; targetAgent: AgentRole; context?: any };
             const result = await multiAgentService.routeToAgent(body.ticketId, body.targetAgent);
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1435,7 +1501,7 @@ export default {
           if (url.pathname === '/agents/metrics' && method === 'GET') {
             const result = await multiAgentService.getWorkflowMetrics();
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1444,7 +1510,7 @@ export default {
           if (url.pathname === '/agents/status' && method === 'GET') {
             const result = await multiAgentService.getAgentStatuses();
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1456,12 +1522,12 @@ export default {
             const agentStatus = result.agents.find(agent => agent.role === role);
             if (agentStatus) {
               return new Response(JSON.stringify(formatSuccessResponse(agentStatus)), {
-                status: 200,
+                status: HTTP_STATUS.OK,
                 headers: corsHeaders
               });
             } else {
-              return new Response(JSON.stringify(formatErrorResponse('Agent not found')), {
-                status: 404,
+              return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.NOT_FOUND)), {
+                status: HTTP_STATUS.NOT_FOUND,
                 headers: corsHeaders
               });
             }
@@ -1471,7 +1537,7 @@ export default {
           if (url.pathname === '/agents/reset-metrics' && method === 'POST') {
             // This would require adding a reset method to the orchestrator
             return new Response(JSON.stringify(formatSuccessResponse({ message: 'Metrics reset successfully' })), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1487,7 +1553,7 @@ export default {
               BUSINESS_ANALYST: ['requirements_analysis', 'data_analysis', 'process_optimization', 'roi_analysis', 'stakeholder_management', 'reporting', 'strategic_planning', 'business_intelligence', 'workflow_design']
             };
             return new Response(JSON.stringify(formatSuccessResponse(capabilities)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1527,17 +1593,17 @@ export default {
             };
             
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
 
         } catch (error) {
-          console.error('❌ Agent route error:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Agent route error:`, error);
           return new Response(JSON.stringify(formatErrorResponse(
-            error instanceof Error ? error.message : 'Agent processing failed'
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR
           )), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
@@ -1551,8 +1617,8 @@ export default {
             const body = await request.json() as { query: string; userId?: string; sessionId?: string };
             
             if (!body.query) {
-              return new Response(JSON.stringify(formatErrorResponse('Query is required')), {
-                status: 400,
+              return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.INVALID_REQUEST)), {
+                status: HTTP_STATUS.BAD_REQUEST,
                 headers: corsHeaders
               });
             }
@@ -1560,7 +1626,7 @@ export default {
             const response = await taskGenie.chat(body.query, body.userId, body.sessionId);
             
             return new Response(JSON.stringify(formatSuccessResponse(response)), {
-              status: response.success ? 200 : 400,
+              status: response.success ? HTTP_STATUS.OK : HTTP_STATUS.BAD_REQUEST,
               headers: corsHeaders
             });
           }
@@ -1570,7 +1636,7 @@ export default {
             const response = await taskGenie.getHelp();
             
             return new Response(JSON.stringify(formatSuccessResponse(response)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1580,7 +1646,7 @@ export default {
             const response = await taskGenie.getStatus();
             
             return new Response(JSON.stringify(formatSuccessResponse(response)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1590,8 +1656,8 @@ export default {
             const body = await request.json() as { queries: string[]; userId?: string };
             
             if (!body.queries || !Array.isArray(body.queries)) {
-              return new Response(JSON.stringify(formatErrorResponse('Queries array is required')), {
-                status: 400,
+              return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.INVALID_REQUEST)), {
+                status: HTTP_STATUS.BAD_REQUEST,
                 headers: corsHeaders
               });
             }
@@ -1599,7 +1665,7 @@ export default {
             const responses = await taskGenie.batchProcess(body.queries, body.userId);
             
             return new Response(JSON.stringify(formatSuccessResponse(responses)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1614,7 +1680,7 @@ export default {
               cleared,
               message: cleared ? 'Context cleared successfully' : 'No context found to clear'
             })), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1628,7 +1694,7 @@ export default {
             const history = taskGenie.getConversationHistory(userId, sessionId);
             
             return new Response(JSON.stringify(formatSuccessResponse(history)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
@@ -1638,17 +1704,17 @@ export default {
             const stats = taskGenie.getStats();
             
             return new Response(JSON.stringify(formatSuccessResponse(stats)), {
-              status: 200,
+              status: HTTP_STATUS.OK,
               headers: corsHeaders
             });
           }
           
         } catch (error) {
-          console.error('❌ TaskGenie route error:', error);
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} TaskGenie route error:`, error);
           return new Response(JSON.stringify(formatErrorResponse(
-            error instanceof Error ? error.message : 'TaskGenie processing failed'
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR
           )), {
-            status: 500,
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders
           });
         }
@@ -1657,9 +1723,9 @@ export default {
       // TaskGenie routes require TaskGenie service
       if (url.pathname.startsWith('/taskgenie/') && !taskGenie) {
         return new Response(JSON.stringify(formatErrorResponse(
-          'TaskGenie service not available. Please check service configuration.'
+          ERROR_MESSAGES.SERVICE_UNAVAILABLE
         )), {
-          status: 503,
+          status: HTTP_STATUS.SERVICE_UNAVAILABLE,
           headers: corsHeaders
         });
       }
@@ -1667,16 +1733,16 @@ export default {
       // Agent routes require multi-agent service
       if (url.pathname.startsWith('/agents/') && !multiAgentService) {
         return new Response(JSON.stringify(formatErrorResponse(
-          'Multi-agent service not available. Please check service configuration.'
+          ERROR_MESSAGES.SERVICE_UNAVAILABLE
         )), {
-          status: 503,
+          status: HTTP_STATUS.SERVICE_UNAVAILABLE,
           headers: corsHeaders
         });
       }
 
       // Route: Not found
       return new Response(JSON.stringify({
-        error: 'Not Found',
+        error: ERROR_MESSAGES.NOT_FOUND,
         message: `Endpoint ${method} ${url.pathname} not found`,
         available_endpoints: [
           'GET  / - Health check',
@@ -1704,19 +1770,19 @@ export default {
           'POST /agents/simulate-workflow - Simulate workflow with sample data'
         ]
       }), {
-        status: 404,
+        status: HTTP_STATUS.NOT_FOUND,
         headers: corsHeaders
       });
 
     } catch (error) {
-      console.error('❌ Worker error:', error);
+      console.error(`${LOG_CONFIG.PREFIXES.ERROR} Worker error:`, error);
       
       return new Response(JSON.stringify({
-        error: 'Internal Server Error',
+        error: ERROR_MESSAGES.INTERNAL_ERROR,
         message: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString()
       }), {
-        status: 500,
+        status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
         headers: corsHeaders
       });
     }

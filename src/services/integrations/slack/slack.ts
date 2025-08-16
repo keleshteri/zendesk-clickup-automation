@@ -1,9 +1,9 @@
-import { SlackMessage, SlackEvent, TaskGenieContext, Env, TicketAnalysis, ZendeskTicket, AssignmentRecommendation, AIInsights, TokenUsage } from '../types/index.js';
-import { AIService } from './ai.js';
-import { ZendeskService } from './zendesk';
-import { MultiAgentService } from './multi-agent-service.js';
-import { TaskGenie } from './task-genie.js';
-import { TokenCalculator } from './token-calculator.js';
+import { SlackMessage, SlackEvent, TaskGenieContext, Env, TicketAnalysis, ZendeskTicket, AssignmentRecommendation, AIInsights, TokenUsage } from '../../../types/index.js';
+import { AIService } from '../../ai/ai-service.js';
+import { ZendeskService } from '../zendesk/zendesk.js';
+import { MultiAgentService } from '../../multi-agent-service.js';
+import { TaskGenie } from '../../task-genie.js';
+import { TokenCalculator } from '../../token-calculator.js';
 
 interface SlackCommand {
   isCommand: boolean;

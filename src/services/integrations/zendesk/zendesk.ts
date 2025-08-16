@@ -1,5 +1,5 @@
-import { ZendeskTicket, Env } from '../types/index.js';
-import { createZendeskAuth } from '../utils/index.js';
+import { ZendeskTicket, Env } from '../../../types/index.js';
+import { createZendeskAuth } from '../../../utils/index.js';
 
 export class ZendeskService {
   private env: Env;
