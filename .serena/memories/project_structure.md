@@ -24,7 +24,7 @@ zendesk-clickup-automation/
 │   │       ├── qa-tester.ts
 │   │       ├── software-engineer.ts
 │   │       ├── wordpress-developer.ts
-│   │       ├── multi-agent-orchestrator.ts
+│   │       └── (multi-agent-orchestrator.ts moved to ../agents/orchestration/)
 │   │       └── index.ts
 │   ├── utils/                    # Utility functions
 │   │   └── index.ts             # CORS, response formatting, mapping

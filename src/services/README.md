@@ -45,7 +45,7 @@ Implementations of specialized agents for different roles:
 - **Software Engineer** (`software-engineer.ts`): Code development and technical implementation
 - **WordPress Developer** (`wordpress-developer.ts`): WordPress-specific development tasks
 
-#### Multi-Agent Orchestrator (`multi-agent-orchestrator.ts`)
+#### Orchestrator (moved to `../agents/orchestration/orchestrator.ts`)
 - Coordinates multiple agents for complex tasks
 - Task delegation and load balancing
 - Inter-agent communication

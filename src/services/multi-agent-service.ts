@@ -1,4 +1,4 @@
-import { MultiAgentOrchestrator } from './agents/multi-agent-orchestrator.js';
+import { Orchestrator } from '../agents/orchestration/orchestrator.js';
 import { AIService } from './ai/ai-service.js';
 import { ZendeskTicket, ClickUpTask, AIResponse, TicketAnalysis } from '../types/index.js';
 import { MultiAgentResponse, AgentRole, WorkflowMetrics } from '../agents/types/agent-types.js';
@@ -8,7 +8,7 @@ import { MultiAgentResponse, AgentRole, WorkflowMetrics } from '../agents/types/
  * with existing Zendesk and ClickUp functionality
  */
 export class MultiAgentService {
-  private orchestrator: MultiAgentOrchestrator;
+  private orchestrator: Orchestrator;
   private aiService: AIService;
   private zendeskService: any;
   private clickupService: any;
@@ -18,7 +18,7 @@ export class MultiAgentService {
     this.aiService = aiService;
     this.zendeskService = zendeskService;
     this.clickupService = clickupService;
-    this.orchestrator = new MultiAgentOrchestrator();
+    this.orchestrator = new Orchestrator();
     this.isInitialized = true;
   }
 

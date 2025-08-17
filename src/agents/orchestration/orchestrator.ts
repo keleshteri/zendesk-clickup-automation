@@ -1,18 +1,18 @@
-import { AgentRole, WorkflowState, MultiAgentResponse, WorkflowMetrics, AgentAnalysis } from '../../agents/types/agent-types.js';
+import { AgentRole, WorkflowState, MultiAgentResponse, WorkflowMetrics, AgentAnalysis } from '../types/agent-types.js';
 import { ZendeskTicket } from '../../types/index.js';
-import { ProjectManagerAgent } from '../../agents/implementations/project-manager/index.js';
-import { SoftwareEngineerAgent } from '../../agents/implementations/software-engineer/index.js';
-import { WordPressDeveloperAgent } from '../../agents/implementations/wordpress-developer/index.js';
-import { DevOpsAgent } from '../../agents/implementations/devops/index.js';
-import { QATesterAgent } from '../../agents/implementations/qa-tester/index.js';
-import { BusinessAnalystAgent } from '../../agents/implementations/business-analyst/index.js';
-import { BaseAgent } from '../../agents/core/base-agent.js';
+import { ProjectManagerAgent } from '../implementations/project-manager/project-manager.js';
+import { SoftwareEngineerAgent } from '../implementations/software-engineer/software-engineer.js';
+import { WordPressDeveloperAgent } from '../implementations/wordpress-developer/wordpress-developer.js';
+import { DevOpsAgent } from '../implementations/devops/devops.js';
+import { QATesterAgent } from '../implementations/qa-tester/qa-tester.js';
+import { BusinessAnalystAgent } from '../implementations/business-analyst/business-analyst.js';
+import { BaseAgent } from '../core/base-agent.js';
 
 /**
- * Simplified Multi-Agent Orchestrator for Cloudflare Workers
+ * Simplified Orchestrator for Cloudflare Workers
  * This implementation doesn't use LangGraphJS to maintain compatibility
  */
-export class MultiAgentOrchestrator {
+export class Orchestrator {
   private agents: Map<AgentRole, BaseAgent>;
   private workflowMetrics: WorkflowMetrics;
 
