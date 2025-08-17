@@ -26,12 +26,7 @@ import {
   QUERY_PARAMS
 } from './endpoints';
 
-import {
-  AGENT_CAPABILITIES,
-  AGENT_SELECTION_CONFIG,
-  AGENT_WORKFLOW_CONFIG,
-  AGENT_METRICS
-} from './agent-capabilities';
+// Agent capabilities moved to ../agents/config/agent-capabilities.js
 
 // Export all constants
 export * from './constants';
@@ -39,8 +34,7 @@ export * from './constants';
 // Export all endpoints
 export * from './endpoints';
 
-// Export all agent capabilities
-export * from './agent-capabilities';
+// Agent capabilities moved to ../agents/config/
 
 // Re-export commonly used configurations for convenience
 export {
@@ -62,17 +56,10 @@ export {
   WEBHOOK_EVENTS
 } from './endpoints';
 
-export {
-  AGENT_CAPABILITIES,
-  AGENT_SELECTION_CONFIG,
-  AGENT_WORKFLOW_CONFIG,
-  AGENT_METRICS
-} from './agent-capabilities';
+// Agent capabilities exports moved to ../agents/config/
 
 // Configuration utility functions
-export const getAgentByRole = (role: string) => {
-  return AGENT_CAPABILITIES[role as keyof typeof AGENT_CAPABILITIES];
-};
+// getAgentByRole moved to ../agents/config/
 
 export const getEndpointUrl = (service: 'zendesk' | 'clickup' | 'slack', endpoint: string, params?: Record<string, any>) => {
   switch (service) {

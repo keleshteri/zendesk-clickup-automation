@@ -15,3 +15,13 @@ export {
 
 // Type exports
 export * from './types/agent-types.js';
+
+// Configuration exports
+export {
+  AGENT_CAPABILITIES,
+  AGENT_SELECTION_CONFIG,
+  AGENT_WORKFLOW_CONFIG,
+  AGENT_METRICS,
+  getAgentByRole
+} from './config/index.js';
+export type { AgentCapability as AgentCapabilityConfig } from './config/agent-capabilities.js';

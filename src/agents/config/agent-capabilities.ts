@@ -3,7 +3,7 @@
  * Defines capabilities, keywords, and settings for each agent type
  */
 
-import { AgentRole } from '../agents/types/agent-types.js';
+import { AgentRole } from '../types/agent-types.js';
 
 // Agent Capability Definitions
 export interface AgentCapability {
