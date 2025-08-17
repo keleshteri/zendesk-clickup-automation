@@ -1,6 +1,7 @@
 import { BaseAgent } from '../../core/base-agent.js';
 import { AgentRole, AgentAnalysis, AgentTool } from '../../types/agent-types.js';
 import { ZendeskTicket } from '../../../types/index.js';
+import { QATesterPrompts } from './prompts.js';
 
 export class QATesterAgent extends BaseAgent {
   constructor() {
@@ -87,6 +88,7 @@ export class QATesterAgent extends BaseAgent {
     // Bug reports and validation
     if (this.containsKeywords(content, ['bug', 'error', 'issue', 'problem', 'not working', 'broken'])) {
       analysis += '• Bug Validation: Reported bug requires validation and reproduction\n';
+      analysis += `\n${QATesterPrompts.bugReporting.bugReportTemplate}\n`;
       recommendedActions.push('Reproduce the bug following provided steps');
       recommendedActions.push('Document exact reproduction steps and environment');
       recommendedActions.push('Verify bug across different browsers/devices');
@@ -99,6 +101,7 @@ export class QATesterAgent extends BaseAgent {
     // Feature testing requests
     if (this.containsKeywords(content, ['test', 'testing', 'qa', 'quality', 'validation', 'verify'])) {
       analysis += '• Feature Testing: New feature or functionality requires testing\n';
+      analysis += `\n${QATesterPrompts.testCases.functionalTestCase}\n`;
       recommendedActions.push('Create comprehensive test plan and test cases');
       recommendedActions.push('Perform functional testing of all features');
       recommendedActions.push('Conduct edge case and boundary testing');
@@ -111,6 +114,7 @@ export class QATesterAgent extends BaseAgent {
     // Performance issues
     if (this.containsKeywords(content, ['slow', 'performance', 'speed', 'loading', 'timeout', 'lag'])) {
       analysis += '• Performance Testing: Performance issues require load and stress testing\n';
+      analysis += `\n${QATesterPrompts.testingStrategy.testPlanTemplate}\n`;
       recommendedActions.push('Conduct performance baseline measurements');
       recommendedActions.push('Perform load testing with realistic user scenarios');
       recommendedActions.push('Test under various network conditions');

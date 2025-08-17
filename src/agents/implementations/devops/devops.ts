@@ -1,6 +1,7 @@
 import { BaseAgent } from '../../core/base-agent.js';
 import { AgentRole, AgentAnalysis, AgentTool } from '../../types/agent-types.js';
 import { ZendeskTicket } from '../../../types/index.js';
+import { DevOpsPrompts } from './prompts.js';
 
 export class DevOpsAgent extends BaseAgent {
   constructor() {
@@ -87,6 +88,7 @@ export class DevOpsAgent extends BaseAgent {
     // Server/Infrastructure issues
     if (this.containsKeywords(content, ['server', 'infrastructure', 'hosting', 'downtime', 'outage'])) {
       analysis += '• Infrastructure Issue: Server or infrastructure problem detected\n';
+      analysis += `\n${DevOpsPrompts.infrastructureAnalysis.systemArchitectureReview}\n`;
       recommendedActions.push('Perform immediate server health check');
       recommendedActions.push('Review system logs and error messages');
       recommendedActions.push('Check resource utilization (CPU, memory, disk)');
@@ -100,6 +102,7 @@ export class DevOpsAgent extends BaseAgent {
     // Deployment issues
     if (this.containsKeywords(content, ['deployment', 'deploy', 'ci/cd', 'pipeline', 'build', 'release'])) {
       analysis += '• Deployment Issue: CI/CD pipeline or deployment problem\n';
+      analysis += `\n${DevOpsPrompts.deploymentGuides.cicdPipeline}\n`;
       recommendedActions.push('Review deployment logs and pipeline status');
       recommendedActions.push('Check environment configuration and variables');
       recommendedActions.push('Verify code repository and branch status');

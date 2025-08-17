@@ -1,6 +1,7 @@
 import { BaseAgent } from '../../core/base-agent.js';
 import { AgentRole, AgentAnalysis, AgentTool } from '../../types/agent-types.js';
 import { ZendeskTicket } from '../../../types/index.js';
+import { SoftwareEngineerPrompts } from './prompts.js';
 
 export class SoftwareEngineerAgent extends BaseAgent {
   constructor() {
@@ -71,6 +72,7 @@ export class SoftwareEngineerAgent extends BaseAgent {
     // Analyze for different technical issues
     if (this.containsKeywords(content, ['bug', 'error', 'exception', 'crash', 'broken'])) {
       analysis += '• Bug/Error Analysis: Critical issue detected requiring immediate investigation\n';
+      analysis += `\n${SoftwareEngineerPrompts.debugging.bugInvestigationTemplate}\n`;
       recommendedActions.push('Reproduce the issue in development environment');
       recommendedActions.push('Analyze error logs and stack traces');
       recommendedActions.push('Implement fix and create test cases');
@@ -80,6 +82,7 @@ export class SoftwareEngineerAgent extends BaseAgent {
 
     if (this.containsKeywords(content, ['api', 'integration', 'webhook', 'endpoint'])) {
       analysis += '• API Integration Issue: Requires API analysis and testing\n';
+      analysis += `\n${SoftwareEngineerPrompts.technicalSolutions.apiDesignTemplate}\n`;
       recommendedActions.push('Test API endpoints and authentication');
       recommendedActions.push('Review API documentation and rate limits');
       recommendedActions.push('Implement proper error handling');
@@ -88,6 +91,7 @@ export class SoftwareEngineerAgent extends BaseAgent {
 
     if (this.containsKeywords(content, ['performance', 'slow', 'timeout', 'optimization'])) {
       analysis += '• Performance Issue: Requires optimization and monitoring\n';
+      analysis += `\n${SoftwareEngineerPrompts.codeAnalysis.performanceAnalysisTemplate}\n`;
       recommendedActions.push('Profile application performance');
       recommendedActions.push('Analyze database queries and indexes');
       recommendedActions.push('Implement caching strategies');

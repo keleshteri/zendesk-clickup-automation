@@ -1,6 +1,7 @@
 import { BaseAgent } from '../../core/base-agent.js';
 import { AgentRole, AgentAnalysis, AgentTool } from '../../types/agent-types.js';
 import { ZendeskTicket } from '../../../types/index.js';
+import { BusinessAnalystPrompts } from './prompts.js';
 
 export class BusinessAnalystAgent extends BaseAgent {
   constructor() {
@@ -87,6 +88,7 @@ export class BusinessAnalystAgent extends BaseAgent {
     // Requirements and specifications
     if (this.containsKeywords(content, ['requirements', 'specification', 'acceptance criteria', 'user story', 'feature request'])) {
       analysis += '• Requirements Analysis: Business requirements need analysis and documentation\n';
+      analysis += `\n${BusinessAnalystPrompts.requirementElicitation.functionalRequirements}\n`;
       recommendedActions.push('Gather and document detailed business requirements');
       recommendedActions.push('Define clear acceptance criteria and success metrics');
       recommendedActions.push('Identify stakeholders and their needs');
@@ -99,6 +101,7 @@ export class BusinessAnalystAgent extends BaseAgent {
     // Data analysis and reporting
     if (this.containsKeywords(content, ['data', 'analytics', 'report', 'dashboard', 'metrics', 'kpi', 'insights'])) {
       analysis += '• Data Analysis: Data analysis and business intelligence needed\n';
+      analysis += `\n${BusinessAnalystPrompts.analysisTemplates.swotAnalysis}\n`;
       recommendedActions.push('Identify relevant data sources and metrics');
       recommendedActions.push('Perform comprehensive data analysis');
       recommendedActions.push('Create visualizations and dashboards');
@@ -111,6 +114,7 @@ export class BusinessAnalystAgent extends BaseAgent {
     // Process improvement
     if (this.containsKeywords(content, ['process', 'workflow', 'optimization', 'efficiency', 'improvement', 'automation'])) {
       analysis += '• Process Optimization: Business process analysis and improvement\n';
+      analysis += `\nUsing template: ${BusinessAnalystPrompts.processAnalysis.currentStateAnalysis.split('\n')[0]}\n`;
       recommendedActions.push('Map current business processes and workflows');
       recommendedActions.push('Identify bottlenecks and inefficiencies');
       recommendedActions.push('Design optimized process flows');
@@ -135,6 +139,7 @@ export class BusinessAnalystAgent extends BaseAgent {
     // Stakeholder management
     if (this.containsKeywords(content, ['stakeholder', 'user', 'customer', 'client', 'team', 'communication'])) {
       analysis += '• Stakeholder Analysis: Stakeholder impact and communication planning\n';
+      analysis += `\nUsing template: ${BusinessAnalystPrompts.stakeholderInterviews.executiveInterview.split('\n')[0]}\n`;
       recommendedActions.push('Identify all affected stakeholders');
       recommendedActions.push('Assess impact levels for each stakeholder group');
       recommendedActions.push('Develop stakeholder communication plan');

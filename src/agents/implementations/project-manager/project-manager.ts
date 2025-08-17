@@ -1,6 +1,7 @@
 import { BaseAgent } from '../../core/base-agent.js';
 import { AgentRole, AgentAnalysis, AgentTool } from '../../types/agent-types.js';
 import { ZendeskTicket } from '../../../types/index.js';
+import { ProjectManagerPrompts } from './prompts.js';
 
 export class ProjectManagerAgent extends BaseAgent {
   constructor() {
@@ -88,6 +89,7 @@ export class ProjectManagerAgent extends BaseAgent {
     // Project planning and initiation
     if (this.containsKeywords(content, ['project', 'planning', 'initiation', 'scope', 'timeline', 'milestone'])) {
       analysis += '• Project Planning: New project requires planning and coordination\n';
+      analysis += `\n${ProjectManagerPrompts.projectPlanning.projectInitiation}\n`;
       recommendedActions.push('Define project scope, objectives, and success criteria');
       recommendedActions.push('Create detailed project timeline with milestones');
       recommendedActions.push('Identify required resources and team members');
@@ -100,6 +102,7 @@ export class ProjectManagerAgent extends BaseAgent {
     // Resource and team management
     if (this.containsKeywords(content, ['resource', 'team', 'allocation', 'assignment', 'workload', 'capacity'])) {
       analysis += '• Resource Management: Team resource allocation and management needed\n';
+      analysis += `\n${ProjectManagerPrompts.projectPlanning.resourcePlanning}\n`;
       recommendedActions.push('Assess current team capacity and availability');
       recommendedActions.push('Allocate resources based on skills and priorities');
       recommendedActions.push('Balance workload across team members');
@@ -125,6 +128,7 @@ export class ProjectManagerAgent extends BaseAgent {
     // Risk and issue management
     if (this.containsKeywords(content, ['risk', 'issue', 'problem', 'blocker', 'escalation', 'mitigation'])) {
       analysis += '• Risk Management: Project risks and issues require management\n';
+      analysis += `\n${ProjectManagerPrompts.riskAssessment.riskIdentification}\n`;
       recommendedActions.push('Identify and assess project risks and issues');
       recommendedActions.push('Develop risk mitigation and contingency plans');
       recommendedActions.push('Escalate critical issues to appropriate stakeholders');
