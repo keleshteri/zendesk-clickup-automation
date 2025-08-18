@@ -1550,7 +1550,7 @@ export class SlackService {
     channel: string,
     threadTs: string,
     mentions: string[],
-    goal: string,
+    enhancedMessage: string,
     timeline?: string,
     nextSteps?: string[]
   ): Promise<SlackApiResponse | null> {
@@ -1560,17 +1560,21 @@ export class SlackService {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `👥 *Team Assignment*\n${mentions.join(' ')}`
-          }
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `🎯 *Goal*: ${goal}${timeline ? `\n⏰ *Timeline*: ${timeline}` : ''}`
+            text: enhancedMessage
           }
         }
       ];
+
+      // Add next steps if provided
+      if (nextSteps && nextSteps.length > 0) {
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `📋 *Next Steps:*\n${nextSteps.map(step => `• ${step}`).join('\n')}`
+          }
+        });
+      }
 
       const response = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',

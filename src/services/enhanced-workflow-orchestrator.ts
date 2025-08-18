@@ -344,7 +344,7 @@ export class EnhancedWorkflowOrchestrator {
         context.channel,
         context.initialSlackTs || '',
         mentions,
-        category,
+        mentionMessage,
         urgency,
         this.generateNextSteps(aiAnalysis)
       );
