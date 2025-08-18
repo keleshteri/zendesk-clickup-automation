@@ -87,7 +87,8 @@ export class Orchestrator {
         confidence: workflow.context.confidence,
         processingTimeMs: processingTime,
         agentsInvolved: [workflow.currentAgent, ...workflow.previousAgents],
-        handoffCount: workflow.previousAgents.length
+        handoffCount: workflow.previousAgents.length,
+        agentAnalyses: workflow.context.insights
       };
 
     } catch (error) {

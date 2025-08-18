@@ -130,8 +130,7 @@ export class AIService {
     }
 
     try {
-      const prompt = `
-Analyze this Zendesk ticket and provide structured analysis:
+      const prompt = `You are an expert technical support analyst. Analyze this support ticket and provide a detailed, structured JSON response.
 
 TICKET CONTENT:
 ${ticketContent}
@@ -139,19 +138,30 @@ ${ticketContent}
 METADATA:
 ${ticketMetadata ? JSON.stringify(ticketMetadata, null, 2) : 'None'}
 
-Please provide analysis in this JSON format:
+Provide analysis in this exact JSON format:
 {
-  "summary": "2-3 sentence summary",
+  "summary": "Detailed 2-3 sentence summary explaining what the user is experiencing and what they need",
   "priority": "low|normal|high|urgent",
-  "category": "technical|billing|general|account|bug|feature",
+  "category": "technical|billing|general|account|bug|feature|wordpress",
   "sentiment": "frustrated|neutral|happy|angry",
   "urgency_indicators": ["list of urgent keywords found"],
   "suggested_team": "development|support|billing|management",
   "action_items": ["specific actions needed"],
   "estimated_complexity": "simple|medium|complex",
-  "confidence_score": 0.95
+  "confidence_score": 0.95,
+  "key_issues": ["main problems identified"],
+  "recommended_actions": ["specific next steps"]
 }
 
+Analysis Guidelines:
+- Create a meaningful summary that explains the actual issue, not generic text
+- Identify specific technical problems, user requests, or business needs
+- Consider impact on users and business operations for priority
+- Look for WordPress-specific terms (plugins, themes, wp-admin, etc.)
+- Detect urgency from words like: critical, urgent, down, broken, error, not working
+- Provide actionable recommendations based on the issue type
+
+Be specific and avoid generic responses. The summary should help a technical team understand the issue immediately.
 Respond with ONLY the JSON object, no additional text.`;
 
       const result = await this.model.generateContent(prompt);
@@ -330,12 +340,15 @@ Respond with ONLY the JSON object.`;
     let priority: 'low' | 'normal' | 'high' | 'urgent' = 'normal';
     let category: 'technical' | 'billing' | 'general' | 'account' | 'bug' | 'feature' = 'general';
     let sentiment: 'frustrated' | 'neutral' | 'happy' | 'angry' = 'neutral';
+    const urgencyIndicators: string[] = [];
     
     // Priority detection
     if (content.includes('urgent') || content.includes('critical') || content.includes('emergency')) {
       priority = 'urgent';
+      urgencyIndicators.push('urgent', 'critical', 'emergency');
     } else if (content.includes('important') || content.includes('asap') || content.includes('high priority')) {
       priority = 'high';
+      urgencyIndicators.push('important', 'asap', 'high priority');
     }
     
     // Category detection
@@ -345,6 +358,8 @@ Respond with ONLY the JSON object.`;
       category = 'billing';
     } else if (content.includes('technical') || content.includes('api') || content.includes('integration')) {
       category = 'technical';
+    } else if (content.includes('feature') || content.includes('enhancement') || content.includes('request')) {
+      category = 'feature';
     }
     
     // Sentiment detection
@@ -354,17 +369,72 @@ Respond with ONLY the JSON object.`;
       sentiment = 'happy';
     }
     
+    // Generate a basic summary from the content
+    const summary = this.generateBasicSummary(ticketContent, category, priority);
+    
+    // Generate action items based on category
+    const actionItems = this.generateActionItems(category, priority);
+    
     return {
-      summary: 'Automated analysis of ticket content',
+      summary,
       priority,
       category,
       sentiment,
-      urgency_indicators: [],
+      urgency_indicators: urgencyIndicators.filter(indicator => content.includes(indicator)),
       suggested_team: category === 'technical' || category === 'bug' ? 'development' : 'support',
-      action_items: ['Review ticket details', 'Assign to appropriate team'],
-      estimated_complexity: 'medium',
-      confidence_score: 0.5
+      action_items: actionItems,
+      estimated_complexity: priority === 'urgent' ? 'complex' : 'medium',
+      confidence_score: 0.6
     };
+  }
+
+  private generateBasicSummary(ticketContent: string, category: string, priority: string): string {
+    // Extract first sentence or first 100 characters as base summary
+    const firstSentence = ticketContent.split('.')[0];
+    const baseSummary = firstSentence.length > 100 ? 
+      ticketContent.substring(0, 100) + '...' : 
+      firstSentence;
+    
+    return `${category.charAt(0).toUpperCase() + category.slice(1)} issue with ${priority} priority: ${baseSummary}`;
+  }
+
+  private generateActionItems(category: string, priority: string): string[] {
+    const baseItems = ['Review ticket details', 'Assign to appropriate team member'];
+    
+    switch (category) {
+      case 'bug':
+        return [
+          'Investigate and reproduce the issue',
+          'Identify root cause and impact',
+          'Develop and test fix',
+          'Deploy solution and verify'
+        ];
+      case 'technical':
+        return [
+          'Analyze technical requirements',
+          'Review system architecture',
+          'Implement technical solution',
+          'Test and validate changes'
+        ];
+      case 'billing':
+        return [
+          'Review billing records',
+          'Verify payment information',
+          'Process billing adjustment if needed',
+          'Follow up with customer'
+        ];
+      case 'feature':
+        return [
+          'Analyze feature requirements',
+          'Estimate development effort',
+          'Create implementation plan',
+          'Schedule development work'
+        ];
+      default:
+        return priority === 'urgent' ? 
+          ['Immediate triage required', ...baseItems, 'Escalate if necessary'] :
+          baseItems;
+    }
   }
 
   private createBasicTaskDescription(ticket: ZendeskTicket, analysis: TicketAnalysis): string {

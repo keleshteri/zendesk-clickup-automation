@@ -74,6 +74,7 @@ export interface MultiAgentResponse {
   processingTimeMs: number;
   agentsInvolved: AgentRole[];
   handoffCount: number;
+  agentAnalyses?: AgentAnalysis[];
 }
 
 export interface AgentMetrics {

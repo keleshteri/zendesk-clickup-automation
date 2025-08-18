@@ -319,39 +319,88 @@ export class ProjectManagerAgent extends BaseAgent {
   }
 
   async shouldHandoff(context: any): Promise<AgentRole | null> {
-    // Extract content from ticket object (subject + description)
-    const subject = context.subject?.toLowerCase() || '';
-    const description = context.description?.toLowerCase() || '';
-    const content = `${subject} ${description}`.toLowerCase();
+    const ticket = context.ticket || context;
+    const content = `${ticket.subject} ${ticket.description}`.toLowerCase();
     
-    // Hand off technical issues to appropriate specialists
+    // Enhanced PM coordination logic
+    const agentAssignment = this.determineOptimalAgent(ticket, content);
     
-    // WordPress-specific issues
-    if (this.containsKeywords(content, ['wordpress', 'wp-', 'plugin', 'theme', 'woocommerce'])) {
-      return 'WORDPRESS_DEVELOPER';
+    // Log PM decision making
+    console.log(`🎯 PM Agent Decision for ticket ${ticket.id}:`, {
+      ticketSubject: ticket.subject,
+      recommendedAgent: agentAssignment.agent,
+      confidence: agentAssignment.confidence,
+      reasoning: agentAssignment.reasoning
+    });
+    
+    return agentAssignment.agent;
+  }
+  
+  /**
+   * Enhanced agent assignment logic with confidence scoring
+   */
+  private determineOptimalAgent(ticket: any, content: string): {
+    agent: AgentRole | null;
+    confidence: number;
+    reasoning: string;
+  } {
+    const assignments = [
+      {
+        agent: 'DEVOPS' as AgentRole,
+        keywords: ['server', 'deployment', 'infrastructure', 'docker', 'kubernetes', 'aws', 'cloud', 'database', 'performance', 'monitoring'],
+        weight: 0.9
+      },
+      {
+        agent: 'SOFTWARE_ENGINEER' as AgentRole,
+        keywords: ['api', 'code', 'programming', 'development', 'feature', 'function', 'integration', 'backend', 'frontend'],
+        weight: 0.8
+      },
+      {
+        agent: 'WORDPRESS_DEVELOPER' as AgentRole,
+        keywords: ['wordpress', 'wp', 'plugin', 'theme', 'cms', 'gutenberg', 'woocommerce'],
+        weight: 0.95
+      },
+      {
+        agent: 'QA_TESTER' as AgentRole,
+        keywords: ['test', 'testing', 'qa', 'quality', 'bug', 'defect', 'validation', 'verification'],
+        weight: 0.85
+      },
+      {
+        agent: 'BUSINESS_ANALYST' as AgentRole,
+        keywords: ['requirements', 'analysis', 'business', 'process', 'workflow', 'specification', 'documentation'],
+        weight: 0.7
+      }
+    ];
+    
+    let bestMatch = { agent: null as AgentRole | null, score: 0, reasoning: '' };
+    
+    for (const assignment of assignments) {
+      const matchCount = assignment.keywords.filter(keyword => content.includes(keyword)).length;
+      const score = (matchCount / assignment.keywords.length) * assignment.weight;
+      
+      if (score > bestMatch.score && score > 0.3) { // Minimum confidence threshold
+        bestMatch = {
+          agent: assignment.agent,
+          score,
+          reasoning: `Matched ${matchCount}/${assignment.keywords.length} keywords for ${assignment.agent}`
+        };
+      }
     }
     
-    // Server/Infrastructure issues
-    if (this.containsKeywords(content, ['500 error', 'internal server error', 'server error', 'server down', 'deployment', 'infrastructure', 'hosting', 'ssl', 'domain', 'dns', 'docker', 'kubernetes', 'aws', 'cloud'])) {
-      return 'DEVOPS';
+    // If no clear match, PM handles coordination
+    if (bestMatch.score < 0.4) {
+      bestMatch = {
+        agent: null,
+        score: 1.0,
+        reasoning: 'No clear specialization match - PM will coordinate'
+      };
     }
     
-    // Software/API/Database issues
-    if (this.containsKeywords(content, ['api error', 'api', 'database error', 'database', 'code', 'bug', 'crash', 'not working', 'broken', 'integration', 'backend', 'frontend', 'application error'])) {
-      return 'SOFTWARE_ENGINEER';
-    }
-    
-    // Testing and QA issues
-    if (this.containsKeywords(content, ['testing', 'qa', 'quality', 'test case', 'regression', 'validation'])) {
-      return 'QA_TESTER';
-    }
-    
-    // Business analysis and data issues
-    if (this.containsKeywords(content, ['analytics', 'data', 'report', 'business', 'roi', 'metrics', 'analysis'])) {
-      return 'BUSINESS_ANALYST';
-    }
-
-    return null; // Project Manager coordinates when no specific handoff is needed
+    return {
+      agent: bestMatch.agent,
+      confidence: bestMatch.score,
+      reasoning: bestMatch.reasoning
+    };
   }
 
   async canHandle(ticket: ZendeskTicket): Promise<boolean> {

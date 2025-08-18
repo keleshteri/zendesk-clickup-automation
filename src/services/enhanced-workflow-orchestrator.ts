@@ -206,46 +206,40 @@ export class EnhancedWorkflowOrchestrator {
   }
 
   /**
-   * Step 6: Intelligent Agent Assignment
-   * Use multi-agent system to assign appropriate agent
+   * Step 6: Enhanced Multi-Agent Analysis
+   * Use improved multi-agent system with PM coordination
    */
   private async executeStep6_IntelligentAgentAssignment(
     context: EnhancedWorkflowContext,
     aiAnalysis?: TicketAnalysis
   ): Promise<WorkflowStepResult> {
     try {
-      console.log(`👥 Step 6: Intelligent Agent Assignment for ticket ${context.ticket.id}`);
+      console.log(`👥 Step 6: Enhanced Multi-Agent Analysis for ticket ${context.ticket.id}`);
 
-      // Determine recommended agent based on analysis
-      const recommendedAgent = this.determineRecommendedAgent(aiAnalysis, context.ticket);
+      // Get comprehensive multi-agent analysis
+      const multiAgentResponse = await this.multiAgentService.processTicket(context.ticket.id.toString());
       
-      // Get agent analysis
-      const agentResponse = await this.multiAgentService.routeToAgent(
-          context.ticket.id.toString(),
-          recommendedAgent
-        );
-
-      // Send agent feedback in thread
-      const slackResponse = await this.slackService.sendThreadedAgentFeedback(
-        context.channel,
-        context.initialSlackTs || '',
-        recommendedAgent,
-        agentResponse.analysis?.summary || 'Agent analysis completed',
-        agentResponse.analysis?.recommendations || []
-      );
+      // Format enhanced analysis message
+      const analysisMessage = this.formatMultiAgentAnalysis(multiAgentResponse, aiAnalysis);
+      
+      // Send enhanced agent analysis in thread
+      await this.slackService.sendMessage({
+        channel: context.channel,
+        text: analysisMessage,
+        thread_ts: context.initialSlackTs // Thread to original message
+      });
 
       return {
         success: true,
-        stepName: 'intelligent_agent_assignment',
-        data: agentResponse,
-        slackTs: slackResponse?.ts
+        stepName: 'enhanced_multi_agent_analysis',
+        data: multiAgentResponse
       };
 
     } catch (error) {
       console.error('❌ Step 6 failed:', error);
       return {
         success: false,
-        stepName: 'intelligent_agent_assignment',
+        stepName: 'enhanced_multi_agent_analysis',
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
@@ -393,6 +387,78 @@ export class EnhancedWorkflowOrchestrator {
     }
 
     return baseSteps;
+  }
+
+  /**
+   * Format multi-agent analysis for Slack display
+   */
+  private formatMultiAgentAnalysis(multiAgentResponse: MultiAgentResponse, aiAnalysis?: TicketAnalysis): string {
+    const confidence = Math.round(multiAgentResponse.confidence * 100);
+    const agentsInvolved = multiAgentResponse.agentsInvolved.join(', ');
+    
+    let message = `:mag: **Multi-Agent Analysis for Ticket #${multiAgentResponse.ticketId}**\n\n`;
+    message += `:chart_with_upwards_trend: **Confidence:** ${confidence}%\n`;
+    message += `:busts_in_silhouette: **Agents Involved:** ${agentsInvolved}\n`;
+    message += `:arrows_counterclockwise: **Handoffs:** ${multiAgentResponse.handoffCount}\n\n`;
+    
+    // Add individual agent analyses
+    if (multiAgentResponse.agentAnalyses && multiAgentResponse.agentAnalyses.length > 0) {
+      message += `:clipboard: **Agent Analysis:**\n`;
+      multiAgentResponse.agentAnalyses.forEach((analysis, index) => {
+        const agentEmoji = this.getAgentEmoji(analysis.agentRole);
+        message += `${index + 1}. **${agentEmoji} ${analysis.agentRole}**: ${analysis.analysis}\n`;
+        
+        if (analysis.recommendedActions && analysis.recommendedActions.length > 0) {
+          message += `   • Actions: ${analysis.recommendedActions.join(', ')}\n`;
+        }
+        
+        if (analysis.priority) {
+          message += `   • Priority: ${analysis.priority}\n`;
+        }
+        
+        if (analysis.estimatedTime) {
+          message += `   • Est. Time: ${analysis.estimatedTime}\n`;
+        }
+        
+        message += '\n';
+      });
+    }
+    
+    if (multiAgentResponse.finalRecommendations && multiAgentResponse.finalRecommendations.length > 0) {
+      message += `:bulb: **Final Recommendations:**\n`;
+      multiAgentResponse.finalRecommendations.forEach(rec => {
+        message += `• ${rec}\n`;
+      });
+      message += '\n';
+    }
+    
+    // Add AI analysis summary if available
+    if (aiAnalysis?.summary && aiAnalysis.summary !== 'Automated analysis of ticket content') {
+      message += `:robot_face: **AI Summary:** ${aiAnalysis.summary}\n\n`;
+    }
+    
+    // Add processing time
+    if (multiAgentResponse.processingTimeMs) {
+      const processingTime = Math.round(multiAgentResponse.processingTimeMs / 1000 * 100) / 100;
+      message += `:stopwatch: **Processing Time:** ${processingTime}s`;
+    }
+    
+    return message;
+  }
+  
+  /**
+   * Get emoji for agent role
+   */
+  private getAgentEmoji(agentRole: string): string {
+    const emojiMap: Record<string, string> = {
+      'PROJECT_MANAGER': ':briefcase:',
+      'SOFTWARE_ENGINEER': ':computer:',
+      'WORDPRESS_DEVELOPER': ':globe_with_meridians:',
+      'DEVOPS': ':gear:',
+      'QA_TESTER': ':mag:',
+      'BUSINESS_ANALYST': ':chart_with_upwards_trend:'
+    };
+    return emojiMap[agentRole] || ':robot_face:';
   }
 
   /**
