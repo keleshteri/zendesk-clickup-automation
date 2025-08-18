@@ -221,28 +221,28 @@ export class ProjectManagerAgent extends BaseAgent {
   } {
     const assignments = [
       {
-        agent: 'DEVOPS' as AgentRole,
-        keywords: ['server', 'deployment', 'infrastructure', 'docker', 'kubernetes', 'aws', 'cloud', 'database', 'performance', 'monitoring'],
+        agent: 'SOFTWARE_ENGINEER' as AgentRole,
+        keywords: ['500 error', 'server error', 'api', 'code', 'programming', 'development', 'feature', 'function', 'integration', 'backend', 'frontend', 'error', '500', 'bug', 'crash', 'exception', 'database error', 'application'],
         weight: 0.9
       },
       {
-        agent: 'SOFTWARE_ENGINEER' as AgentRole,
-        keywords: ['api', 'code', 'programming', 'development', 'feature', 'function', 'integration', 'backend', 'frontend', 'error', '500', 'bug', 'crash', 'exception', 'server', 'database'],
-        weight: 0.8
-      },
-      {
         agent: 'WORDPRESS_DEVELOPER' as AgentRole,
-        keywords: ['wordpress', 'wp', 'plugin', 'theme', 'cms', 'gutenberg', 'woocommerce'],
+        keywords: ['wordpress', 'wp-', 'plugin', 'theme', 'cms', 'gutenberg', 'woocommerce', 'wp_'],
         weight: 0.95
       },
       {
-        agent: 'QA_TESTER' as AgentRole,
-        keywords: ['test', 'testing', 'qa', 'quality', 'bug', 'defect', 'validation', 'verification'],
+        agent: 'DEVOPS' as AgentRole,
+        keywords: ['deployment', 'infrastructure', 'docker', 'kubernetes', 'aws', 'cloud', 'server', 'hosting', 'performance', 'monitoring', 'ssl', 'domain', 'dns'],
         weight: 0.85
       },
       {
+        agent: 'QA_TESTER' as AgentRole,
+        keywords: ['test', 'testing', 'qa', 'quality', 'defect', 'validation', 'verification', 'automation'],
+        weight: 0.8
+      },
+      {
         agent: 'BUSINESS_ANALYST' as AgentRole,
-        keywords: ['requirements', 'analysis', 'business', 'process', 'workflow', 'specification', 'documentation'],
+        keywords: ['requirements', 'analysis', 'business', 'process', 'workflow', 'specification', 'documentation', 'metrics', 'reporting'],
         weight: 0.7
       }
     ];
@@ -253,7 +253,8 @@ export class ProjectManagerAgent extends BaseAgent {
       const matchCount = assignment.keywords.filter(keyword => content.includes(keyword)).length;
       const score = (matchCount / assignment.keywords.length) * assignment.weight;
       
-      if (score > bestMatch.score && score > 0.3) { // Minimum confidence threshold
+      // Lower threshold to ensure more handoffs occur
+      if (score > bestMatch.score && score > 0.1) {
         bestMatch = {
           agent: assignment.agent,
           score,
@@ -262,13 +263,26 @@ export class ProjectManagerAgent extends BaseAgent {
       }
     }
     
-    // If no clear match, PM handles coordination
-    if (bestMatch.score < 0.4) {
-      bestMatch = {
-        agent: null,
-        score: 1.0,
-        reasoning: 'No clear specialization match - PM will coordinate'
-      };
+    // More aggressive routing - only return null if absolutely no technical keywords found
+    if (bestMatch.score < 0.15) {
+      // Check for any technical indicators that should trigger handoff
+      const technicalKeywords = ['error', 'bug', 'issue', 'problem', 'fix', 'broken', 'not working', 'fail'];
+      const hasTechnicalContent = technicalKeywords.some(keyword => content.includes(keyword));
+      
+      if (hasTechnicalContent) {
+        // Default to SOFTWARE_ENGINEER for technical issues
+        bestMatch = {
+          agent: 'SOFTWARE_ENGINEER',
+          score: 0.6,
+          reasoning: 'Technical issue detected - routing to Software Engineer'
+        };
+      } else {
+        bestMatch = {
+          agent: null,
+          score: 1.0,
+          reasoning: 'No technical specialization needed - PM will coordinate'
+        };
+      }
     }
     
     return {

@@ -115,15 +115,22 @@ export class Orchestrator {
     
     console.log(`📋 PM Analysis completed for ticket ${state.ticketId}`);
     
-    // Step 2: Determine technical agent for handoff
+    // Step 2: Execute PM tasks and add initial recommendations
+    const pmExecution = await pmAgent.execute(state.context.ticket);
+    if (pmExecution && pmExecution.recommendations && Array.isArray(pmExecution.recommendations)) {
+      state.context.recommendations.push(...pmExecution.recommendations);
+    }
+    
+    // Step 3: Determine technical agent for handoff
     const targetAgent = await pmAgent.shouldHandoff(state.context.ticket);
     
     if (targetAgent) {
       console.log(`🔄 Handing off ticket ${state.ticketId} from PM to ${targetAgent}`);
       
-      // Step 3: Technical Agent Analysis
+      // Step 4: Technical Agent Analysis and Execution
       const techAgent = this.agents.get(targetAgent);
       if (techAgent) {
+        // Technical agent analysis
         const techAnalysis = await techAgent.analyze(state.context.ticket);
         state.context.insights.push(techAnalysis);
         
@@ -133,22 +140,21 @@ export class Orchestrator {
           state.context.recommendations.push(...techExecution.recommendations);
         }
         
-        // Update state
+        // Update state to reflect handoff
         state.previousAgents.push(state.currentAgent);
         state.currentAgent = targetAgent;
         state.handoffReason = `Handoff from PROJECT_MANAGER to ${targetAgent}`;
         this.workflowMetrics.handoffCount++;
         
-        console.log(`🔧 ${targetAgent} analysis completed for ticket ${state.ticketId}`);
+        // Update agent utilization metrics
+        this.updateAgentUtilization(targetAgent);
+        
+        console.log(`🔧 ${targetAgent} analysis and execution completed for ticket ${state.ticketId}`);
+      } else {
+        console.warn(`⚠️ Target agent ${targetAgent} not found, continuing with PM only`);
       }
     } else {
       console.log(`📋 PM will handle ticket ${state.ticketId} without technical handoff`);
-    }
-    
-    // Step 4: Execute PM tasks and add recommendations
-    const pmExecution = await pmAgent.execute(state.context.ticket);
-    if (pmExecution && pmExecution.recommendations && Array.isArray(pmExecution.recommendations)) {
-      state.context.recommendations.push(...pmExecution.recommendations);
     }
     
     // Calculate final confidence and complete workflow
@@ -194,13 +200,20 @@ export class Orchestrator {
       
       if (targetAgent) {
         // Perform handoff
+        const previousAgent = state.currentAgent;
         state.previousAgents.push(state.currentAgent);
         state.currentAgent = targetAgent;
-        state.handoffReason = `Handoff from ${state.currentAgent} to ${targetAgent}`;
+        state.handoffReason = `Handoff from ${previousAgent} to ${targetAgent}`;
         this.workflowMetrics.handoffCount++;
+        
+        // Update agent utilization metrics
+        this.updateAgentUtilization(targetAgent);
+        
+        console.log(`🔄 Handoff executed: ${previousAgent} → ${targetAgent} for ticket ${state.ticketId}`);
       } else {
         // Workflow is complete
         state.isComplete = true;
+        console.log(`✅ Workflow completed by ${state.currentAgent} for ticket ${state.ticketId}`);
       }
     }
 
@@ -336,6 +349,16 @@ export class Orchestrator {
     
     const totalConfidence = insights.reduce((sum, insight) => sum + insight.confidence, 0);
     return totalConfidence / insights.length;
+  }
+
+  /**
+   * Update agent utilization metrics
+   */
+  private updateAgentUtilization(agentRole: AgentRole): void {
+    const utilization = this.workflowMetrics.agentUtilization.get(agentRole);
+    if (utilization) {
+      utilization.tasksHandled++;
+    }
   }
 
   /**

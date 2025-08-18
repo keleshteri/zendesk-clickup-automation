@@ -103,7 +103,7 @@ export class EnhancedWorkflowOrchestrator {
       }
 
       // Step 7: Team Member Mentions
-      const mentionStep = await this.executeStep7_TeamMemberMentions(context, result.aiAnalysis);
+      const mentionStep = await this.executeStep7_TeamMemberMentions(context, result.aiAnalysis, result.agentResponse);
       this.addStepResult(result, mentionStep);
       if (mentionStep.success && mentionStep.data) {
         result.teamMentions = mentionStep.data;
@@ -260,27 +260,52 @@ export class EnhancedWorkflowOrchestrator {
 
   /**
    * Step 7: Team Member Mentions
-   * Mention relevant team members based on ticket category and urgency
+   * Mention relevant team members based on ticket category, urgency, and agent analysis
    */
   private async executeStep7_TeamMemberMentions(
     context: EnhancedWorkflowContext,
-    aiAnalysis?: TicketAnalysis
+    aiAnalysis?: TicketAnalysis,
+    agentResponse?: MultiAgentResponse
   ): Promise<WorkflowStepResult> {
     try {
       console.log(`👥 Step 7: Team Member Mentions for ticket ${context.ticket.id}`);
 
       const category = aiAnalysis?.category || 'general';
       const urgency = aiAnalysis?.priority || 'medium';
+      const ticketContent = `${context.ticket.subject} ${context.ticket.description}`;
       
-      // Generate mention message
+      // Extract agent role and recommendations from agent response
+      let agentRole: string | undefined;
+      let agentRecommendations: string[] = [];
+      
+      if (agentResponse) {
+        // Get the primary agent role (last agent in the workflow)
+        agentRole = agentResponse.agentsInvolved?.[agentResponse.agentsInvolved.length - 1];
+        
+        // Extract recommendations from final recommendations or agent analyses
+        if (agentResponse.finalRecommendations && agentResponse.finalRecommendations.length > 0) {
+          agentRecommendations = agentResponse.finalRecommendations;
+        } else if (agentResponse.agentAnalyses && agentResponse.agentAnalyses.length > 0) {
+          // Get recommendations from the latest agent analysis
+          const latestAnalysis = agentResponse.agentAnalyses[agentResponse.agentAnalyses.length - 1];
+          if (latestAnalysis.recommendedActions) {
+            agentRecommendations = latestAnalysis.recommendedActions;
+          }
+        }
+      }
+      
+      // Generate enhanced mention message with agent context
       const mentionMessage = formatMentionMessage(
         category,
         urgency,
-        context.ticket.id.toString()
+        context.ticket.id.toString(),
+        agentRole,
+        agentRecommendations,
+        ticketContent
       );
 
-      // Get team mentions
-      const mentionData = getMentionsForTicket(category, urgency);
+      // Get team mentions with agent context
+      const mentionData = getMentionsForTicket(category, urgency, agentRole, ticketContent);
       const mentions = [...mentionData.engineers, ...mentionData.projectManagers];
       
       // Send team mentions in thread
@@ -292,6 +317,14 @@ export class EnhancedWorkflowOrchestrator {
         urgency,
         this.generateNextSteps(aiAnalysis)
       );
+
+      console.log(`✅ Team mentions sent for ticket ${context.ticket.id}:`, {
+        agentRole,
+        category,
+        urgency,
+        mentionsCount: mentions.length,
+        recommendationsCount: agentRecommendations.length
+      });
 
       return {
         success: true,
