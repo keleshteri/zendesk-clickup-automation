@@ -32,12 +32,24 @@ export interface TeamAssignment {
   };
 }
 
+// Slack User ID Constants
+const SLACK_IDS = {
+  STEVE: "UGK1YA9EE",
+  TALHA: "UGJ9606V6", 
+  FRANCIS: "U07G3Q6DE1K",
+  MIKE: "U0570RF4CHG",
+  SAMUEL: "U03115JMADR",
+  DIMPLE: "U08TGG2RQPM",
+  PAT: "U08MCUF919T",
+  CAMILLE: "U0508K1V51P"
+} as const;
+
 // Team Members Configuration
 export const TEAM_MEMBERS: TeamMember[] = [
   // Owner/Founder
   {
     name: "Steve",
-    slackId: "UGK1YA9EE",
+    slackId: SLACK_IDS.STEVE,
     role: "owner",
     specialties: ["leadership", "strategy", "business_decisions"],
   },
@@ -45,7 +57,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
   // Project Managers
   {
     name: "Talha",
-    slackId: "UGJ9606V6",
+    slackId: SLACK_IDS.TALHA,
     role: "pm",
     specialties: [
       "leadership",
@@ -58,7 +70,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
   },
   {
     name: "Francis Sto. Tomas",
-    slackId: "U07G3Q6DE1K",
+    slackId: SLACK_IDS.FRANCIS,
     role: "pm",
     specialties: ["project_management", "technical_coordination", "planning"],
   },
@@ -66,7 +78,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
   // Engineers/Developers
   {
     name: "Mike Keleshetri",
-    slackId: "U0570RF4CHG",
+    slackId: SLACK_IDS.MIKE,
     role: "engineer",
     specialties: [
       "software_development",
@@ -81,7 +93,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
   },
   {
     name: "Samuel Sena",
-    slackId: "U03115JMADR",
+    slackId: SLACK_IDS.SAMUEL,
     role: "engineer",
     specialties: [
       "wordpress",
@@ -97,13 +109,13 @@ export const TEAM_MEMBERS: TeamMember[] = [
   // WordPress Specialists
   {
     name: "Dimple Rubiato",
-    slackId: "U08TGG2RQPM",
+    slackId: SLACK_IDS.DIMPLE,
     role: "wordpress",
     specialties: ["wordpress", "php", "woocommerce", "themes", "plugins"],
   },
   {
     name: "Pat Mayo",
-    slackId: "U08MCUF919T",
+    slackId: SLACK_IDS.PAT,
     role: "wordpress",
     specialties: ["wordpress", "php", "woocommerce", "themes", "plugins"],
   },
@@ -111,7 +123,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
   // HR/Executive Assistant
   {
     name: "Camille",
-    slackId: "U0508K1V51P",
+    slackId: SLACK_IDS.CAMILLE,
     role: "hr",
     specialties: ["hr", "executive_assistance", "administration"],
   },
@@ -128,22 +140,22 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
     // Bug-related tickets
     bug: {
       critical: {
-        engineers: ["@mike", "@samuel"],
-        projectManagers: ["@talha", "@francis"],
+        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "CRITICAL BUG - immediate attention required",
       },
       high: {
-        engineers: ["@mike", "@samuel"],
-        projectManagers: ["@talha"],
+        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
         message: "High priority bug - please review ASAP",
       },
       medium: {
-        engineers: ["@mike"],
-        projectManagers: ["@talha"],
+        engineers: [`<@${SLACK_IDS.MIKE}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
         message: "Bug reported - please investigate",
       },
       low: {
-        engineers: ["@samuel"],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`],
         projectManagers: [],
         message: "Low priority bug logged",
       },
@@ -152,23 +164,23 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
     // Feature requests
     feature: {
       critical: {
-        engineers: ["@mike", "@sam"],
-        projectManagers: ["@talha", "@francis"],
+        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Critical feature request - needs immediate planning",
       },
       high: {
-        engineers: ["@mike"],
-        projectManagers: ["@talha"],
+        engineers: [`<@${SLACK_IDS.MIKE}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
         message: "High priority feature - please review requirements",
       },
       medium: {
-        engineers: ["@mike"],
-        projectManagers: ["@talha"],
+        engineers: [`<@${SLACK_IDS.MIKE}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
         message: "Feature request for consideration",
       },
       low: {
         engineers: [],
-        projectManagers: ["@francis"],
+        projectManagers: [`<@${SLACK_IDS.FRANCIS}>`],
         message: "Feature request logged for future planning",
       },
     },
@@ -176,22 +188,22 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
     // WordPress-related tickets
     wordpress: {
       critical: {
-        engineers: ["@dimple", "@pat", "@samuel"],
-        projectManagers: ["@talha", "@francis"],
+        engineers: [`<@${SLACK_IDS.DIMPLE}>`, `<@${SLACK_IDS.PAT}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "CRITICAL WordPress issue - immediate attention needed",
       },
       high: {
-        engineers: ["@dimple", "@pat"],
-        projectManagers: ["@talha"],
+        engineers: [`<@${SLACK_IDS.DIMPLE}>`, `<@${SLACK_IDS.PAT}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
         message: "WordPress issue - please look at this ticket",
       },
       medium: {
-        engineers: ["@dimple"],
-        projectManagers: ["@talha"],
+        engineers: [`<@${SLACK_IDS.DIMPLE}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
         message: "WordPress ticket needs review",
       },
       low: {
-        engineers: ["@pat"],
+        engineers: [`<@${SLACK_IDS.PAT}>`],
         projectManagers: [],
         message: "WordPress maintenance item",
       },
@@ -200,22 +212,22 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
     // Deployment/Infrastructure
     deployment: {
       critical: {
-        engineers: ["@mike", "@samuel"],
-        projectManagers: ["@talha", "@francis"],
+        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "CRITICAL deployment issue - all hands on deck",
       },
       high: {
-        engineers: ["@mike", "@samuel"],
-        projectManagers: ["@talha"],
+        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
         message: "Deployment issue needs immediate attention",
       },
       medium: {
-        engineers: ["@samuel"],
-        projectManagers: ["@talha"],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
         message: "Infrastructure ticket for review",
       },
       low: {
-        engineers: ["@samuel"],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`],
         projectManagers: [],
         message: "Infrastructure maintenance",
       },
@@ -224,23 +236,23 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
     // General/Other tickets
     general: {
       critical: {
-        engineers: ["@mike", "@sam"],
-        projectManagers: ["@talha", "@francis"],
+        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Critical ticket - needs immediate triage",
       },
       high: {
-        engineers: ["@mike"],
-        projectManagers: ["@talha"],
+        engineers: [`<@${SLACK_IDS.MIKE}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
         message: "High priority ticket - please review",
       },
       medium: {
-        engineers: ["@mike"],
-        projectManagers: ["@talha"],
+        engineers: [`<@${SLACK_IDS.MIKE}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
         message: "Ticket needs review and assignment",
       },
       low: {
         engineers: [],
-        projectManagers: ["@francis"],
+        projectManagers: [`<@${SLACK_IDS.FRANCIS}>`],
         message: "General ticket logged",
       },
     },
@@ -262,10 +274,20 @@ export const getTeamMemberBySlackId = (
 
 export const getMentionsForTicket = (
   category: string,
-  urgency: string
+  urgency: string,
+  agentRole?: string,
+  ticketContent?: string
 ): { engineers: string[]; projectManagers: string[]; message: string } => {
   const normalizedCategory = category.toLowerCase();
   const normalizedUrgency = urgency.toLowerCase();
+
+  // Enhanced logic: Use agent role to determine specialized team members
+  if (agentRole && ticketContent) {
+    const specializedMentions = getSpecializedMentions(agentRole, normalizedCategory, normalizedUrgency, ticketContent);
+    if (specializedMentions) {
+      return specializedMentions;
+    }
+  }
 
   // Try exact match first
   if (TEAM_ASSIGNMENTS.mentions[normalizedCategory]?.[normalizedUrgency]) {
@@ -279,8 +301,8 @@ export const getMentionsForTicket = (
 
   // Final fallback
   return {
-    engineers: ["@mike"],
-    projectManagers: ["@talha"],
+    engineers: [`<@${SLACK_IDS.MIKE}>`],
+    projectManagers: [`<@${SLACK_IDS.TALHA}>`],
     message: "Ticket needs review and assignment",
   };
 };
@@ -288,13 +310,21 @@ export const getMentionsForTicket = (
 export const formatMentionMessage = (
   category: string,
   urgency: string,
-  ticketId?: string
+  ticketId?: string,
+  agentRole?: string,
+  agentRecommendations?: string[],
+  ticketContent?: string
 ): string => {
-  const mentions = getMentionsForTicket(category, urgency);
+  const mentions = getMentionsForTicket(category, urgency, agentRole, ticketContent);
   const engineerMentions = mentions.engineers.join(" ");
   const pmMentions = mentions.projectManagers.join(" ");
 
   let message = "";
+
+  // Add agent context if available
+  if (agentRole) {
+    message += `🤖 **${agentRole.replace('_', ' ')} Analysis Complete**\n`;
+  }
 
   if (engineerMentions) {
     message += `${engineerMentions} ${mentions.message}`;
@@ -305,11 +335,66 @@ export const formatMentionMessage = (
     message += `cc: ${pmMentions} please take note`;
   }
 
+  // Add agent recommendations if available
+  if (agentRecommendations && agentRecommendations.length > 0) {
+    message += "\n\n📋 **Key Recommendations:**";
+    agentRecommendations.slice(0, 3).forEach((rec, index) => {
+      message += `\n${index + 1}. ${rec}`;
+    });
+  }
+
   if (ticketId) {
-    message += ` (Ticket #${ticketId})`;
+    message += `\n\n🎫 Ticket #${ticketId}`;
   }
 
   return message;
+};
+
+/**
+ * Get specialized team mentions based on agent analysis
+ */
+export const getSpecializedMentions = (
+  agentRole: string,
+  category: string,
+  urgency: string,
+  ticketContent: string
+): { engineers: string[]; projectManagers: string[]; message: string } | null => {
+  const content = ticketContent.toLowerCase();
+  
+  // WordPress-specific logic
+  if (agentRole === 'WORDPRESS_DEVELOPER' || content.includes('wordpress') || content.includes('wp-')) {
+    const wpMentions = TEAM_ASSIGNMENTS.mentions.wordpress[urgency];
+    if (wpMentions) {
+      return {
+        ...wpMentions,
+        message: `WordPress specialist assigned - ${wpMentions.message}`
+      };
+    }
+  }
+  
+  // DevOps-specific logic
+  if (agentRole === 'DEVOPS' || content.includes('deployment') || content.includes('server') || content.includes('infrastructure')) {
+    const deployMentions = TEAM_ASSIGNMENTS.mentions.deployment[urgency];
+    if (deployMentions) {
+      return {
+        ...deployMentions,
+        message: `DevOps specialist assigned - ${deployMentions.message}`
+      };
+    }
+  }
+  
+  // Software Engineer for technical issues
+  if (agentRole === 'SOFTWARE_ENGINEER' || content.includes('500 error') || content.includes('api') || content.includes('bug')) {
+    const bugMentions = TEAM_ASSIGNMENTS.mentions.bug[urgency];
+    if (bugMentions) {
+      return {
+        ...bugMentions,
+        message: `Software Engineer assigned - ${bugMentions.message}`
+      };
+    }
+  }
+  
+  return null;
 };
 
 // Export default configuration
