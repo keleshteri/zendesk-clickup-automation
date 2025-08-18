@@ -62,87 +62,84 @@ export class SoftwareEngineerAgent extends BaseAgent {
     const content = `${ticket.subject} ${ticket.description}`.toLowerCase();
     const confidence = this.calculateConfidence(ticket);
     
-    let analysis = 'Technical Analysis:\n';
     let recommendedActions: string[] = [];
     let complexity: 'simple' | 'medium' | 'complex' = 'medium';
     let estimatedTime = '2-4 hours';
     let priority = ticket.priority;
     let nextAgent: AgentRole | undefined;
 
-    // Analyze for different technical issues
+    // Analyze for specific technical issues - max 3 bullet points
     if (this.containsKeywords(content, ['bug', 'error', 'exception', 'crash', 'broken'])) {
-      analysis += '• Bug/Error Analysis: Critical issue detected requiring immediate investigation\n';
-      analysis += `\n${SoftwareEngineerPrompts.debugging.bugInvestigationTemplate}\n`;
-      recommendedActions.push('Reproduce the issue in development environment');
-      recommendedActions.push('Analyze error logs and stack traces');
-      recommendedActions.push('Implement fix and create test cases');
+      recommendedActions = [
+        'Root cause likely: Application error or data corruption',
+        'Fix approach: Debug logs, reproduce issue, implement fix',
+        'Est. time: 3-6 hours including testing'
+      ];
       complexity = 'medium';
       estimatedTime = '3-6 hours';
-    }
-
-    if (this.containsKeywords(content, ['api', 'integration', 'webhook', 'endpoint'])) {
-      analysis += '• API Integration Issue: Requires API analysis and testing\n';
-      analysis += `\n${SoftwareEngineerPrompts.technicalSolutions.apiDesignTemplate}\n`;
-      recommendedActions.push('Test API endpoints and authentication');
-      recommendedActions.push('Review API documentation and rate limits');
-      recommendedActions.push('Implement proper error handling');
+    } else if (this.containsKeywords(content, ['api', 'integration', 'webhook', 'endpoint'])) {
+      recommendedActions = [
+        'Root cause likely: API authentication or rate limiting',
+        'Fix approach: Test endpoints, review docs, fix error handling',
+        'Est. time: 2-4 hours'
+      ];
       complexity = 'medium';
-    }
-
-    if (this.containsKeywords(content, ['performance', 'slow', 'timeout', 'optimization'])) {
-      analysis += '• Performance Issue: Requires optimization and monitoring\n';
-      analysis += `\n${SoftwareEngineerPrompts.codeAnalysis.performanceAnalysisTemplate}\n`;
-      recommendedActions.push('Profile application performance');
-      recommendedActions.push('Analyze database queries and indexes');
-      recommendedActions.push('Implement caching strategies');
+    } else if (this.containsKeywords(content, ['performance', 'slow', 'timeout', 'optimization'])) {
+      recommendedActions = [
+        'Root cause likely: Database queries or resource bottleneck',
+        'Fix approach: Profile performance, optimize queries, add caching',
+        'Est. time: 4-8 hours'
+      ];
       complexity = 'complex';
       estimatedTime = '4-8 hours';
-    }
-
-    if (this.containsKeywords(content, ['security', 'vulnerability', 'breach', 'unauthorized'])) {
-      analysis += '• Security Issue: Critical security assessment required\n';
-      recommendedActions.push('Conduct security audit');
-      recommendedActions.push('Review access controls and permissions');
-      recommendedActions.push('Implement security patches');
+    } else if (this.containsKeywords(content, ['security', 'vulnerability', 'breach', 'unauthorized'])) {
+      recommendedActions = [
+        'Root cause likely: Security vulnerability or access control issue',
+        'Fix approach: Security audit, patch vulnerabilities, review permissions',
+        'Est. time: 6-12 hours (URGENT)'
+      ];
       complexity = 'complex';
       priority = 'urgent';
       estimatedTime = '6-12 hours';
-    }
-
-    if (this.containsKeywords(content, ['database', 'sql', 'query', 'data'])) {
-      analysis += '• Database Issue: Requires database analysis and optimization\n';
-      recommendedActions.push('Analyze database schema and queries');
-      recommendedActions.push('Check data integrity and constraints');
-      recommendedActions.push('Optimize database performance');
-    }
-
-    if (this.containsKeywords(content, ['wordpress', 'plugin', 'theme'])) {
-      analysis += '• WordPress-related technical issue detected\n';
+    } else if (this.containsKeywords(content, ['database', 'sql', 'query', 'data'])) {
+      recommendedActions = [
+        'Root cause likely: Database schema or query optimization issue',
+        'Fix approach: Analyze queries, check data integrity, optimize indexes',
+        'Est. time: 3-5 hours'
+      ];
+    } else if (this.containsKeywords(content, ['wordpress', 'plugin', 'theme'])) {
+      recommendedActions = [
+        'WordPress-specific issue detected - requires specialist review'
+      ];
       nextAgent = 'WORDPRESS_DEVELOPER';
-      recommendedActions.push('Hand off to WordPress specialist for detailed analysis');
-    }
-
-    if (this.containsKeywords(content, ['deploy', 'deployment', 'server', 'infrastructure'])) {
-      analysis += '• Infrastructure/Deployment issue detected\n';
+    } else if (this.containsKeywords(content, ['deploy', 'deployment', 'server', 'infrastructure'])) {
+      recommendedActions = [
+        'Infrastructure issue detected - requires DevOps analysis'
+      ];
       nextAgent = 'DEVOPS';
-      recommendedActions.push('Coordinate with DevOps team for infrastructure analysis');
+    } else {
+      recommendedActions = [
+        'General technical issue requiring code review',
+        'Fix approach: Analyze codebase and implement solution',
+        'Est. time: 2-4 hours'
+      ];
     }
 
     // Store analysis in memory
-    this.storeMemory(ticket.id, 'technical_analysis', analysis, {
+    this.storeMemory(ticket.id, 'technical_analysis', recommendedActions.join('\n'), {
       complexity,
       estimatedTime,
       detectedIssues: this.extractTechnicalIssues(content)
     });
 
     return this.formatAnalysis(
-      analysis,
+      recommendedActions.join('\n'),
       confidence,
-      recommendedActions,
       nextAgent,
       priority as 'low' | 'normal' | 'high' | 'urgent',
       estimatedTime,
-      complexity
+      complexity,
+      recommendedActions
     );
   }
 

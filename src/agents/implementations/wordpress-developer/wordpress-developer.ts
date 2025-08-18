@@ -69,122 +69,104 @@ export class WordPressDeveloperAgent extends BaseAgent {
     const content = `${ticket.subject} ${ticket.description}`.toLowerCase();
     const confidence = this.calculateConfidence(ticket);
     
-    let analysis = 'WordPress Analysis:\n';
-    let recommendedActions: string[] = [];
     let complexity: 'simple' | 'medium' | 'complex' = 'medium';
     let estimatedTime = '1-3 hours';
     let priority = ticket.priority;
     let nextAgent: AgentRole | undefined;
+    let recommendedActions: string[] = [];
 
-    // Plugin-related issues
+    // Plugin/theme issues, performance impact, solutions - max 3 bullet points
     if (this.containsKeywords(content, ['plugin', 'wp-', 'activate', 'deactivate', 'conflict'])) {
-      analysis += '• Plugin Issue: Plugin conflict or compatibility problem detected\n';
-      recommendedActions.push('Identify conflicting plugins through systematic deactivation');
-      recommendedActions.push('Check plugin compatibility with current WordPress version');
-      recommendedActions.push('Review plugin error logs and debug information');
-      recommendedActions.push('Test in staging environment before applying fixes');
+      recommendedActions = [
+        'Plugin/theme issues: Plugin conflict detected, systematic deactivation needed',
+        'Performance impact: Site functionality disrupted, staging test required',
+        'Solutions: Check compatibility, review logs, est. time 2-4 hours'
+      ];
       complexity = 'medium';
       estimatedTime = '2-4 hours';
-    }
-
-    // Theme-related issues
-    if (this.containsKeywords(content, ['theme', 'styling', 'css', 'layout', 'design', 'appearance'])) {
-      analysis += '• Theme Issue: Theme-related styling or layout problem\n';
-      recommendedActions.push('Check theme compatibility with WordPress version');
-      recommendedActions.push('Review custom CSS and theme modifications');
-      recommendedActions.push('Test with default theme to isolate issue');
-      recommendedActions.push('Inspect browser console for JavaScript errors');
+    } else if (this.containsKeywords(content, ['theme', 'styling', 'css', 'layout', 'design', 'appearance'])) {
+      recommendedActions = [
+        'Plugin/theme issues: Theme styling/layout problem affecting appearance',
+        'Performance impact: Visual display issues, user experience degraded',
+        'Solutions: Test default theme, review CSS, est. time 1-2 hours'
+      ];
       complexity = 'simple';
       estimatedTime = '1-2 hours';
-    }
-
-    // Performance issues
-    if (this.containsKeywords(content, ['slow', 'performance', 'loading', 'speed', 'optimization'])) {
-      analysis += '• Performance Issue: WordPress site performance optimization needed\n';
-      recommendedActions.push('Analyze page load times and bottlenecks');
-      recommendedActions.push('Review and optimize plugins (deactivate unnecessary ones)');
-      recommendedActions.push('Implement caching solutions');
-      recommendedActions.push('Optimize images and database');
-      recommendedActions.push('Check hosting resources and configuration');
+    } else if (this.containsKeywords(content, ['slow', 'performance', 'loading', 'speed', 'optimization'])) {
+      recommendedActions = [
+        'Plugin/theme issues: Performance bottleneck from plugins/theme overhead',
+        'Performance impact: Slow loading affecting user engagement and SEO',
+        'Solutions: Optimize plugins, implement caching, est. time 3-6 hours'
+      ];
       complexity = 'complex';
       estimatedTime = '3-6 hours';
-    }
-
-    // Security issues
-    if (this.containsKeywords(content, ['security', 'hack', 'malware', 'vulnerability', 'breach', 'unauthorized'])) {
-      analysis += '• Security Issue: WordPress security vulnerability or breach detected\n';
-      recommendedActions.push('Perform immediate security scan');
-      recommendedActions.push('Update WordPress core, themes, and plugins');
-      recommendedActions.push('Change all passwords and security keys');
-      recommendedActions.push('Review user permissions and access logs');
-      recommendedActions.push('Implement security hardening measures');
+    } else if (this.containsKeywords(content, ['security', 'hack', 'malware', 'vulnerability', 'breach', 'unauthorized'])) {
+      recommendedActions = [
+        'Plugin/theme issues: Security vulnerability in WordPress components',
+        'Performance impact: Site compromised, immediate action required (URGENT)',
+        'Solutions: Security scan, updates, hardening, est. time 4-8 hours'
+      ];
       complexity = 'complex';
       priority = 'urgent';
       estimatedTime = '4-8 hours';
-    }
-
-    // WooCommerce issues
-    if (this.containsKeywords(content, ['woocommerce', 'woo', 'shop', 'cart', 'checkout', 'payment', 'order'])) {
-      analysis += '• WooCommerce Issue: E-commerce functionality problem\n';
-      recommendedActions.push('Check WooCommerce and WordPress compatibility');
-      recommendedActions.push('Review payment gateway configuration');
-      recommendedActions.push('Test checkout process and cart functionality');
-      recommendedActions.push('Verify shipping and tax settings');
-      recommendedActions.push('Check for conflicting plugins affecting WooCommerce');
+    } else if (this.containsKeywords(content, ['woocommerce', 'woo', 'shop', 'cart', 'checkout', 'payment', 'order'])) {
+      recommendedActions = [
+        'Plugin/theme issues: WooCommerce functionality disrupted by conflicts',
+        'Performance impact: E-commerce operations affected, revenue at risk',
+        'Solutions: Test checkout, verify gateways, est. time 2-4 hours'
+      ];
       complexity = 'medium';
       estimatedTime = '2-4 hours';
-    }
-
-    // Database/Migration issues
-    if (this.containsKeywords(content, ['migration', 'database', 'import', 'export', 'backup', 'restore'])) {
-      analysis += '• Migration/Database Issue: WordPress migration or database problem\n';
-      recommendedActions.push('Verify database integrity and structure');
-      recommendedActions.push('Check URL references and file paths');
-      recommendedActions.push('Review .htaccess and configuration files');
-      recommendedActions.push('Test all functionality after migration');
+    } else if (this.containsKeywords(content, ['migration', 'database', 'import', 'export', 'backup', 'restore'])) {
+      recommendedActions = [
+        'Plugin/theme issues: Migration affecting database and file references',
+        'Performance impact: Site functionality broken, data integrity at risk',
+        'Solutions: Verify database, check URLs, test functions, est. time 3-6 hours'
+      ];
       complexity = 'complex';
       estimatedTime = '3-6 hours';
-    }
-
-    // Update/Maintenance issues
-    if (this.containsKeywords(content, ['update', 'upgrade', 'maintenance', 'version', 'compatibility'])) {
-      analysis += '• Update/Maintenance Issue: WordPress update or maintenance problem\n';
-      recommendedActions.push('Create full backup before proceeding');
-      recommendedActions.push('Test updates in staging environment');
-      recommendedActions.push('Check theme and plugin compatibility');
-      recommendedActions.push('Review and update custom code if necessary');
+    } else if (this.containsKeywords(content, ['update', 'upgrade', 'maintenance', 'version', 'compatibility'])) {
+      recommendedActions = [
+        'Plugin/theme issues: WordPress update causing compatibility problems',
+        'Performance impact: Site functionality at risk during updates',
+        'Solutions: Backup, staging test, compatibility check, est. time 2-3 hours'
+      ];
       complexity = 'medium';
       estimatedTime = '2-3 hours';
     }
 
     // Check if technical backend work is needed
     if (this.containsKeywords(content, ['api', 'custom development', 'advanced functionality'])) {
-      analysis += '• Advanced Development: May require backend development expertise\n';
       nextAgent = 'SOFTWARE_ENGINEER';
-      recommendedActions.push('Collaborate with software engineer for custom development');
+      if (recommendedActions.length === 0) {
+        recommendedActions = [
+          'Plugin/theme issues: Advanced development beyond WordPress scope',
+          'Performance impact: Custom functionality requires backend expertise',
+          'Solutions: Collaborate with software engineer for development'
+        ];
+      }
     }
 
     // Check if testing is needed
     if (this.containsKeywords(content, ['testing', 'qa', 'quality assurance'])) {
       nextAgent = 'QA_TESTER';
-      recommendedActions.push('Coordinate with QA team for comprehensive testing');
     }
 
     // Store analysis in memory
-    this.storeMemory(ticket.id, 'wordpress_analysis', analysis, {
+    this.storeMemory(ticket.id, 'wordpress_analysis', '', {
       complexity,
       estimatedTime,
       wpIssueTypes: this.extractWordPressIssues(content)
     });
 
     return this.formatAnalysis(
-      analysis,
+      '',
       confidence,
-      recommendedActions,
       nextAgent,
       priority as 'low' | 'normal' | 'high' | 'urgent',
       estimatedTime,
-      complexity
+      complexity,
+      recommendedActions
     );
   }
 

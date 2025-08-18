@@ -417,7 +417,8 @@ export default {
                         ticket,
                         clickUpTaskUrl: oauthClickUpService.getTaskUrl(clickupTask.id),
                         initialSlackTs: slackThreadTs,
-                        channel: SLACK_DEFAULTS.CHANNEL
+                        channel: SLACK_DEFAULTS.CHANNEL,
+                        existingAiAnalysis: aiAnalysis // Pass existing analysis to avoid redundancy
                       }).then(result => {
                         if (result.success) {
                           console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Enhanced workflow completed successfully:`, {

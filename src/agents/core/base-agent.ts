@@ -217,17 +217,17 @@ export abstract class BaseAgent {
   protected formatAnalysis(
     analysis: string,
     confidence: number,
-    recommendedActions: string[],
     nextAgent?: AgentRole,
     priority?: 'low' | 'normal' | 'high' | 'urgent',
     estimatedTime?: string,
-    complexity?: 'simple' | 'medium' | 'complex'
+    complexity?: 'simple' | 'medium' | 'complex',
+    recommendedActions?: string[]
   ): AgentAnalysis {
     return {
       agentRole: this.role,
       analysis,
       confidence,
-      recommendedActions,
+      recommendedActions: recommendedActions || [],
       nextAgent,
       priority,
       estimatedTime,

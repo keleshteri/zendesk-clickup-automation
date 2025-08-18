@@ -78,73 +78,54 @@ export class DevOpsAgent extends BaseAgent {
     const content = `${ticket.subject} ${ticket.description}`.toLowerCase();
     const confidence = this.calculateConfidence(ticket);
     
-    let analysis = 'DevOps Infrastructure Analysis:\n';
     let recommendedActions: string[] = [];
     let complexity: 'simple' | 'medium' | 'complex' = 'medium';
     let estimatedTime = '2-4 hours';
     let priority = ticket.priority;
     let nextAgent: AgentRole | undefined;
+    let analysis = '';
 
-    // Server/Infrastructure issues
+    // Infrastructure impact analysis - max 3 bullet points
     if (this.containsKeywords(content, ['server', 'infrastructure', 'hosting', 'downtime', 'outage'])) {
-      analysis += '• Infrastructure Issue: Server or infrastructure problem detected\n';
-      analysis += `\n${DevOpsPrompts.infrastructureAnalysis.systemArchitectureReview}\n`;
-      recommendedActions.push('Perform immediate server health check');
-      recommendedActions.push('Review system logs and error messages');
-      recommendedActions.push('Check resource utilization (CPU, memory, disk)');
-      recommendedActions.push('Verify network connectivity and DNS resolution');
-      recommendedActions.push('Implement monitoring alerts for early detection');
+      recommendedActions = [
+        'Infrastructure impact: Server health check and resource monitoring needed',
+        'Deployment considerations: Immediate system logs review and failover prep',
+        'Monitoring: Set up alerts, est. time 1-6 hours (URGENT)'
+      ];
       complexity = 'complex';
       priority = 'urgent';
       estimatedTime = '1-6 hours';
-    }
-
-    // Deployment issues
-    if (this.containsKeywords(content, ['deployment', 'deploy', 'ci/cd', 'pipeline', 'build', 'release'])) {
-      analysis += '• Deployment Issue: CI/CD pipeline or deployment problem\n';
-      analysis += `\n${DevOpsPrompts.deploymentGuides.cicdPipeline}\n`;
-      recommendedActions.push('Review deployment logs and pipeline status');
-      recommendedActions.push('Check environment configuration and variables');
-      recommendedActions.push('Verify code repository and branch status');
-      recommendedActions.push('Test deployment in staging environment');
-      recommendedActions.push('Rollback to previous stable version if necessary');
+    } else if (this.containsKeywords(content, ['deployment', 'deploy', 'ci/cd', 'pipeline', 'build', 'release'])) {
+      recommendedActions = [
+        'Infrastructure impact: CI/CD pipeline disruption possible',
+        'Deployment considerations: Review logs, test staging, prepare rollback',
+        'Monitoring: Pipeline status tracking, est. time 2-4 hours'
+      ];
       complexity = 'medium';
       estimatedTime = '2-4 hours';
-    }
-
-    // Performance issues
-    if (this.containsKeywords(content, ['performance', 'slow', 'latency', 'response time', 'optimization'])) {
-      analysis += '• Performance Issue: System performance optimization needed\n';
-      recommendedActions.push('Analyze system performance metrics');
-      recommendedActions.push('Review resource allocation and scaling policies');
-      recommendedActions.push('Optimize database queries and connections');
-      recommendedActions.push('Implement caching strategies');
-      recommendedActions.push('Consider load balancing and auto-scaling');
+    } else if (this.containsKeywords(content, ['performance', 'slow', 'latency', 'response time', 'optimization'])) {
+      recommendedActions = [
+        'Infrastructure impact: Performance bottleneck affecting system resources',
+        'Deployment considerations: Scaling policies and load balancing review',
+        'Monitoring: Performance metrics analysis, est. time 4-8 hours'
+      ];
       complexity = 'complex';
       estimatedTime = '4-8 hours';
-    }
-
-    // Security issues
-    if (this.containsKeywords(content, ['security', 'vulnerability', 'breach', 'compliance', 'ssl', 'certificate'])) {
-      analysis += '• Security Issue: Security vulnerability or compliance concern\n';
-      recommendedActions.push('Conduct immediate security assessment');
-      recommendedActions.push('Review access controls and permissions');
-      recommendedActions.push('Update security patches and certificates');
-      recommendedActions.push('Implement security monitoring and logging');
-      recommendedActions.push('Perform compliance audit');
+    } else if (this.containsKeywords(content, ['security', 'vulnerability', 'breach', 'compliance', 'ssl', 'certificate'])) {
+      recommendedActions = [
+        'Infrastructure impact: Security vulnerability requires immediate assessment',
+        'Deployment considerations: Patch deployment and access control review',
+        'Monitoring: Security audit and compliance check, est. time 3-8 hours (URGENT)'
+      ];
       complexity = 'complex';
       priority = 'urgent';
       estimatedTime = '3-8 hours';
-    }
-
-    // Backup and recovery issues
-    if (this.containsKeywords(content, ['backup', 'recovery', 'disaster', 'restore', 'data loss'])) {
-      analysis += '• Backup/Recovery Issue: Data backup or disaster recovery problem\n';
-      recommendedActions.push('Verify backup integrity and completeness');
-      recommendedActions.push('Test recovery procedures and RTO/RPO');
-      recommendedActions.push('Review backup schedules and retention policies');
-      recommendedActions.push('Implement automated backup monitoring');
-      recommendedActions.push('Document disaster recovery procedures');
+    } else if (this.containsKeywords(content, ['backup', 'recovery', 'disaster', 'restore', 'data loss'])) {
+      recommendedActions = [
+        'Infrastructure impact: Data integrity and backup system verification needed',
+        'Deployment considerations: Recovery procedures and RTO/RPO testing',
+        'Monitoring: Backup monitoring setup, est. time 3-6 hours'
+      ];
       complexity = 'complex';
       priority = 'high';
       estimatedTime = '3-6 hours';
@@ -209,11 +190,11 @@ export class DevOpsAgent extends BaseAgent {
     return this.formatAnalysis(
       analysis,
       confidence,
-      recommendedActions,
       nextAgent,
       priority as 'low' | 'normal' | 'high' | 'urgent',
       estimatedTime,
-      complexity
+      complexity,
+      recommendedActions
     );
   }
 

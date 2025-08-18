@@ -15,6 +15,7 @@ export interface EnhancedWorkflowContext {
   clickUpTaskUrl?: string;
   initialSlackTs?: string; // Timestamp of initial Slack message for threading
   channel: string;
+  existingAiAnalysis?: TicketAnalysis; // Optional existing AI analysis to avoid redundancy
 }
 
 export interface WorkflowStepResult {
@@ -77,12 +78,18 @@ export class EnhancedWorkflowOrchestrator {
     console.log(`🚀 Starting enhanced workflow for ticket ${context.ticket.id}`);
 
     try {
-      // Step 4: AI Thread Continuation
-      const aiStep = await this.executeStep4_AIThreadContinuation(context);
-      this.addStepResult(result, aiStep);
+      // Step 4: AI Thread Continuation (skip if we have existing analysis)
+      let aiAnalysis = context.existingAiAnalysis;
+      if (!aiAnalysis) {
+        const aiStep = await this.executeStep4_AIThreadContinuation(context);
+        this.addStepResult(result, aiStep);
+        aiAnalysis = aiStep.data;
+      } else {
+        console.log('🔄 Reusing existing AI analysis from main workflow');
+      }
 
-      // Step 5: AI Ticket Analysis (enhanced)
-      const analysisStep = await this.executeStep5_AITicketAnalysis(context);
+      // Step 5: AI Ticket Analysis (enhanced) - use existing or generated analysis
+      const analysisStep = await this.executeStep5_AITicketAnalysis(context, aiAnalysis);
       this.addStepResult(result, analysisStep);
       if (analysisStep.success && analysisStep.data) {
         result.aiAnalysis = analysisStep.data;
@@ -174,16 +181,21 @@ export class EnhancedWorkflowOrchestrator {
    * Enhanced AI analysis for categorization and urgency
    */
   private async executeStep5_AITicketAnalysis(
-    context: EnhancedWorkflowContext
+    context: EnhancedWorkflowContext,
+    existingAnalysis?: TicketAnalysis
   ): Promise<WorkflowStepResult> {
     try {
       console.log(`🔍 Step 5: AI Ticket Analysis for ticket ${context.ticket.id}`);
 
-      // Get comprehensive AI analysis
-      const analysis = await this.aiService.analyzeTicket(`${context.ticket.subject} ${context.ticket.description}`);
-      
-      if (!analysis) {
-        throw new Error('Failed to get AI analysis');
+      // Use existing analysis from Step 4 if available, otherwise generate new one
+      let analysis: TicketAnalysis;
+      if (existingAnalysis) {
+        analysis = existingAnalysis;
+      } else {
+        analysis = await this.aiService.analyzeTicket(`${context.ticket.subject} ${context.ticket.description}`);
+        if (!analysis) {
+          throw new Error('Failed to get AI analysis');
+        }
       }
 
       // Enhance analysis with additional categorization
@@ -219,15 +231,16 @@ export class EnhancedWorkflowOrchestrator {
       // Get comprehensive multi-agent analysis
       const multiAgentResponse = await this.multiAgentService.processTicket(context.ticket.id.toString());
       
-      // Format enhanced analysis message
-      const analysisMessage = this.formatMultiAgentAnalysis(multiAgentResponse, aiAnalysis);
+      // Format enhanced analysis message with blocks
+      const analysisBlocks = this.formatMultiAgentAnalysis(multiAgentResponse, aiAnalysis);
       
-      // Send enhanced agent analysis in thread
-      await this.slackService.sendMessage({
-        channel: context.channel,
-        text: analysisMessage,
-        thread_ts: context.initialSlackTs // Thread to original message
-      });
+      // Send enhanced agent analysis in thread with block formatting
+      await this.slackService.sendThreadedMessage(
+        context.channel,
+        context.initialSlackTs, // Thread to original message
+        `Multi-Agent Analysis for Ticket #${multiAgentResponse.ticketId}`,
+        analysisBlocks
+      );
 
       return {
         success: true,
@@ -390,60 +403,84 @@ export class EnhancedWorkflowOrchestrator {
   }
 
   /**
-   * Format multi-agent analysis for Slack display
+   * Format multi-agent analysis for Slack display with block formatting
    */
-  private formatMultiAgentAnalysis(multiAgentResponse: MultiAgentResponse, aiAnalysis?: TicketAnalysis): string {
+  private formatMultiAgentAnalysis(multiAgentResponse: MultiAgentResponse, aiAnalysis?: TicketAnalysis): any[] {
     const confidence = Math.round(multiAgentResponse.confidence * 100);
     const agentsInvolved = multiAgentResponse.agentsInvolved.join(', ');
     
-    let message = `:mag: **Multi-Agent Analysis for Ticket #${multiAgentResponse.ticketId}**\n\n`;
-    message += `:chart_with_upwards_trend: **Confidence:** ${confidence}%\n`;
-    message += `:busts_in_silhouette: **Agents Involved:** ${agentsInvolved}\n`;
-    message += `:arrows_counterclockwise: **Handoffs:** ${multiAgentResponse.handoffCount}\n\n`;
-    
-    // Add individual agent analyses
+    const blocks = [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `🔍 *Multi-Agent Analysis for Ticket #${multiAgentResponse.ticketId}*`
+        }
+      },
+      {
+        type: 'section',
+        fields: [
+          {
+            type: 'mrkdwn',
+            text: `*Confidence:* ${confidence}%`
+          },
+          {
+            type: 'mrkdwn',
+            text: `*Handoffs:* ${multiAgentResponse.handoffCount}`
+          }
+        ]
+      }
+    ];
+
+    // Add individual agent analyses (limit to 3 most relevant)
     if (multiAgentResponse.agentAnalyses && multiAgentResponse.agentAnalyses.length > 0) {
-      message += `:clipboard: **Agent Analysis:**\n`;
-      multiAgentResponse.agentAnalyses.forEach((analysis, index) => {
+      const topAnalyses = multiAgentResponse.agentAnalyses.slice(0, 3);
+      
+      topAnalyses.forEach((analysis) => {
         const agentEmoji = this.getAgentEmoji(analysis.agentRole);
-        message += `${index + 1}. **${agentEmoji} ${analysis.agentRole}**: ${analysis.analysis}\n`;
+        let analysisText = `${agentEmoji} *${analysis.agentRole}*\n${analysis.analysis}`;
         
-        if (analysis.recommendedActions && analysis.recommendedActions.length > 0) {
-          message += `   • Actions: ${analysis.recommendedActions.join(', ')}\n`;
+        if (analysis.priority && analysis.estimatedTime) {
+          analysisText += `\n• *Priority:* ${analysis.priority} | *Est. Time:* ${analysis.estimatedTime}`;
         }
         
-        if (analysis.priority) {
-          message += `   • Priority: ${analysis.priority}\n`;
-        }
-        
-        if (analysis.estimatedTime) {
-          message += `   • Est. Time: ${analysis.estimatedTime}\n`;
-        }
-        
-        message += '\n';
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: analysisText
+          }
+        });
       });
     }
     
+    // Add final recommendations (limit to 3)
     if (multiAgentResponse.finalRecommendations && multiAgentResponse.finalRecommendations.length > 0) {
-      message += `:bulb: **Final Recommendations:**\n`;
-      multiAgentResponse.finalRecommendations.forEach(rec => {
-        message += `• ${rec}\n`;
+      const topRecommendations = multiAgentResponse.finalRecommendations.slice(0, 3);
+      const recommendationsText = topRecommendations.map(rec => `• ${rec}`).join('\n');
+      
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `💡 *Key Recommendations:*\n${recommendationsText}`
+        }
       });
-      message += '\n';
     }
     
-    // Add AI analysis summary if available
-    if (aiAnalysis?.summary && aiAnalysis.summary !== 'Automated analysis of ticket content') {
-      message += `:robot_face: **AI Summary:** ${aiAnalysis.summary}\n\n`;
-    }
-    
-    // Add processing time
+    // Add processing time footer
     if (multiAgentResponse.processingTimeMs) {
       const processingTime = Math.round(multiAgentResponse.processingTimeMs / 1000 * 100) / 100;
-      message += `:stopwatch: **Processing Time:** ${processingTime}s`;
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `⏱️ Processing time: ${processingTime}s | Agents: ${agentsInvolved}`
+        }
+      });
     }
     
-    return message;
+    return blocks;
   }
   
   /**

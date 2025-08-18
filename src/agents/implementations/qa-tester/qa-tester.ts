@@ -78,72 +78,52 @@ export class QATesterAgent extends BaseAgent {
     const content = `${ticket.subject} ${ticket.description}`.toLowerCase();
     const confidence = this.calculateConfidence(ticket);
     
-    let analysis = 'QA Testing Analysis:\n';
     let recommendedActions: string[] = [];
     let complexity: 'simple' | 'medium' | 'complex' = 'medium';
     let estimatedTime = '2-4 hours';
     let priority = ticket.priority;
     let nextAgent: AgentRole | undefined;
+    let analysis = '';
 
-    // Bug reports and validation
+    // Test scenarios, reproduction steps, validation approach - max 3 bullet points
     if (this.containsKeywords(content, ['bug', 'error', 'issue', 'problem', 'not working', 'broken'])) {
-      analysis += '• Bug Validation: Reported bug requires validation and reproduction\n';
-      analysis += `\n${QATesterPrompts.bugReporting.bugReportTemplate}\n`;
-      recommendedActions.push('Reproduce the bug following provided steps');
-      recommendedActions.push('Document exact reproduction steps and environment');
-      recommendedActions.push('Verify bug across different browsers/devices');
-      recommendedActions.push('Assess impact and severity of the bug');
-      recommendedActions.push('Create detailed bug report with screenshots/videos');
+      recommendedActions = [
+        'Test scenarios: Bug reproduction across browsers/devices required',
+        'Reproduction steps: Document exact steps, environment, and impact',
+        'Validation approach: Create detailed bug report, est. time 1-3 hours'
+      ];
       complexity = 'medium';
       estimatedTime = '1-3 hours';
-    }
-
-    // Feature testing requests
-    if (this.containsKeywords(content, ['test', 'testing', 'qa', 'quality', 'validation', 'verify'])) {
-      analysis += '• Feature Testing: New feature or functionality requires testing\n';
-      analysis += `\n${QATesterPrompts.testCases.functionalTestCase}\n`;
-      recommendedActions.push('Create comprehensive test plan and test cases');
-      recommendedActions.push('Perform functional testing of all features');
-      recommendedActions.push('Conduct edge case and boundary testing');
-      recommendedActions.push('Validate user workflows and scenarios');
-      recommendedActions.push('Document test results and findings');
+    } else if (this.containsKeywords(content, ['test', 'testing', 'qa', 'quality', 'validation', 'verify'])) {
+      recommendedActions = [
+        'Test scenarios: Comprehensive functional and edge case testing needed',
+        'Reproduction steps: Create test plan, validate user workflows',
+        'Validation approach: Document results and findings, est. time 4-8 hours'
+      ];
       complexity = 'complex';
       estimatedTime = '4-8 hours';
-    }
-
-    // Performance issues
-    if (this.containsKeywords(content, ['slow', 'performance', 'speed', 'loading', 'timeout', 'lag'])) {
-      analysis += '• Performance Testing: Performance issues require load and stress testing\n';
-      analysis += `\n${QATesterPrompts.testingStrategy.testPlanTemplate}\n`;
-      recommendedActions.push('Conduct performance baseline measurements');
-      recommendedActions.push('Perform load testing with realistic user scenarios');
-      recommendedActions.push('Test under various network conditions');
-      recommendedActions.push('Identify performance bottlenecks and limitations');
-      recommendedActions.push('Validate performance improvements after fixes');
+    } else if (this.containsKeywords(content, ['slow', 'performance', 'speed', 'loading', 'timeout', 'lag'])) {
+      recommendedActions = [
+        'Test scenarios: Performance baseline and load testing required',
+        'Reproduction steps: Test under various network conditions and loads',
+        'Validation approach: Identify bottlenecks, validate fixes, est. time 3-6 hours'
+      ];
       complexity = 'complex';
       estimatedTime = '3-6 hours';
-    }
-
-    // Usability and UX issues
-    if (this.containsKeywords(content, ['usability', 'user experience', 'ux', 'ui', 'confusing', 'difficult'])) {
-      analysis += '• Usability Testing: User experience issues require usability evaluation\n';
-      recommendedActions.push('Conduct user journey and workflow testing');
-      recommendedActions.push('Evaluate interface design and accessibility');
-      recommendedActions.push('Test with different user personas and scenarios');
-      recommendedActions.push('Identify usability pain points and improvements');
-      recommendedActions.push('Provide UX recommendations and best practices');
+    } else if (this.containsKeywords(content, ['usability', 'user experience', 'ux', 'ui', 'confusing', 'difficult'])) {
+      recommendedActions = [
+        'Test scenarios: User journey and workflow evaluation needed',
+        'Reproduction steps: Test with different personas and accessibility',
+        'Validation approach: Identify pain points, provide UX recommendations, est. time 2-4 hours'
+      ];
       complexity = 'medium';
       estimatedTime = '2-4 hours';
-    }
-
-    // Compatibility issues
-    if (this.containsKeywords(content, ['browser', 'compatibility', 'mobile', 'device', 'responsive', 'cross-platform'])) {
-      analysis += '• Compatibility Testing: Cross-browser/device compatibility issues\n';
-      recommendedActions.push('Test across major browsers (Chrome, Firefox, Safari, Edge)');
-      recommendedActions.push('Validate responsive design on different screen sizes');
-      recommendedActions.push('Test on various mobile devices and operating systems');
-      recommendedActions.push('Check for browser-specific bugs and inconsistencies');
-      recommendedActions.push('Ensure consistent functionality across platforms');
+    } else if (this.containsKeywords(content, ['browser', 'compatibility', 'mobile', 'device', 'responsive', 'cross-platform'])) {
+      recommendedActions = [
+        'Test scenarios: Cross-browser/device compatibility testing required',
+        'Reproduction steps: Test major browsers, mobile devices, screen sizes',
+        'Validation approach: Ensure consistent functionality, est. time 3-5 hours'
+      ];
       complexity = 'complex';
       estimatedTime = '3-5 hours';
     }
@@ -208,11 +188,11 @@ export class QATesterAgent extends BaseAgent {
     return this.formatAnalysis(
       analysis,
       confidence,
-      recommendedActions,
       nextAgent,
       priority as 'low' | 'normal' | 'high' | 'urgent',
       estimatedTime,
-      complexity
+      complexity,
+      recommendedActions
     );
   }
 

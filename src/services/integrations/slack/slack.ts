@@ -1446,27 +1446,10 @@ export class SlackService {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `🤖 *AI Analysis Complete*\n\n*Category:* ${this.getCategoryEmoji(analysis.category)} ${analysis.category}\n*Priority:* ${this.getPriorityEmoji(analysis.priority)} ${analysis.priority}\n*Summary:* ${analysis.summary}`
-          }
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*Summary:*\n${analysis.summary || 'AI analysis in progress...'}`
+            text: `🤖 *AI Analysis*\n📂 *Category*: ${this.getCategoryEmoji(analysis.category)} ${analysis.category}\n⚡ *Priority*: ${this.getPriorityEmoji(analysis.priority)} ${analysis.priority}\n📝 *Summary*: ${analysis.summary || 'Analysis in progress...'}`
           }
         }
       ];
-
-      if (analysis.urgency_indicators && analysis.urgency_indicators.length > 0) {
-        blocks.push({
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*Urgency Indicators:*\n${analysis.urgency_indicators.map(indicator => `• ${indicator}`).join('\n')}`
-          }
-        });
-      }
 
       const response = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
@@ -1499,14 +1482,42 @@ export class SlackService {
     threadTs: string,
     agentType: string,
     feedback: string,
-    recommendations?: string[]
+    recommendations?: string[],
+    timeEstimate?: string
   ): Promise<SlackApiResponse | null> {
     try {
       const agentEmoji = this.getAgentEmoji(agentType);
-      let text = `${agentEmoji} *${agentType} Analysis*\n\n${feedback}`;
+      
+      // Limit recommendations to max 3 bullet points
+      const limitedRecommendations = recommendations ? recommendations.slice(0, 3) : [];
+      
+      const blocks = [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `${agentEmoji} *${agentType} Analysis*`
+          }
+        }
+      ];
 
-      if (recommendations && recommendations.length > 0) {
-        text += `\n\n*Recommendations:*\n${recommendations.map(rec => `• ${rec}`).join('\n')}`;
+      // Add feedback as bullet points if it contains multiple items
+      if (limitedRecommendations.length > 0) {
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: limitedRecommendations.map(rec => `• ${rec}`).join('\n') + (timeEstimate ? `\n• *Est. time*: ${timeEstimate}` : '')
+          }
+        });
+      } else if (feedback) {
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: feedback + (timeEstimate ? `\n• *Est. time*: ${timeEstimate}` : '')
+          }
+        });
       }
 
       const response = await fetch('https://slack.com/api/chat.postMessage', {
@@ -1517,7 +1528,7 @@ export class SlackService {
         },
         body: JSON.stringify({
           channel,
-          text,
+          blocks,
           thread_ts: threadTs
         })
       });
@@ -1539,18 +1550,27 @@ export class SlackService {
     channel: string,
     threadTs: string,
     mentions: string[],
-    category: string,
-    urgency: string,
+    goal: string,
+    timeline?: string,
     nextSteps?: string[]
   ): Promise<SlackApiResponse | null> {
     try {
-      let text = `👥 *Team Assignment*\n\n${mentions.join(' ')}`;
-      
-      if (nextSteps && nextSteps.length > 0) {
-        text += `\n\n*Next Steps:*\n${nextSteps.map(step => `• ${step}`).join('\n')}`;
-      }
-
-      text += `\n\n_Category: ${category} | Urgency: ${urgency}_`;
+      const blocks = [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `👥 *Team Assignment*\n${mentions.join(' ')}`
+          }
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `🎯 *Goal*: ${goal}${timeline ? `\n⏰ *Timeline*: ${timeline}` : ''}`
+          }
+        }
+      ];
 
       const response = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
@@ -1560,7 +1580,7 @@ export class SlackService {
         },
         body: JSON.stringify({
           channel,
-          text,
+          blocks,
           thread_ts: threadTs
         })
       });

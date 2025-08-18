@@ -60,16 +60,12 @@ export class MultiAgentService {
   ): Promise<{
     agentResponse: MultiAgentResponse;
     clickUpTasks: ClickUpTask[];
-    aiAnalysis: TicketAnalysis;
   }> {
     // Get ticket from Zendesk
     const ticket = await this.zendeskService.getTicket(ticketId);
     
-    // Get multi-agent analysis
+    // Get multi-agent analysis (includes AI analysis internally)
     const agentResponse = await this.processTicket(ticketId);
-    
-    // Get traditional AI analysis for comparison
-    const aiAnalysis = await this.aiService.analyzeTicket(ticket);
     
     // Create ClickUp tasks based on agent recommendations
     const clickUpTasks = await this.createClickUpTasksFromAgentResponse(
@@ -79,8 +75,7 @@ export class MultiAgentService {
 
     return {
       agentResponse,
-      clickUpTasks,
-      aiAnalysis
+      clickUpTasks
     };
   }
 
@@ -351,59 +346,46 @@ export class MultiAgentService {
     aiAnalysis: TicketAnalysis,
     agentType: AgentRole
   ): Promise<string[]> {
-    const baseRecommendations = [
-      'Review ticket details thoroughly',
-      'Coordinate with relevant team members',
-      'Update ticket status regularly'
-    ];
+    const content = `${ticket.subject} ${ticket.description}`.toLowerCase();
     
     const agentSpecificRecs: { [key in AgentRole]: string[] } = {
       'SOFTWARE_ENGINEER': [
-        'Review codebase for related issues',
-        'Check API documentation and integration points',
-        'Verify database schema and queries',
-        'Test in development environment first'
+        content.includes('api') ? 'Review API integration and endpoints' : 'Analyze code structure and dependencies',
+        content.includes('database') ? 'Verify database schema and queries' : 'Test functionality in development environment',
+        aiAnalysis.priority === 'urgent' ? 'Deploy hotfix after testing' : 'Create comprehensive test suite'
       ],
       'WORDPRESS_DEVELOPER': [
-        'Check plugin and theme compatibility',
-        'Review WordPress version requirements',
-        'Test on staging environment',
-        'Backup site before making changes'
+        content.includes('plugin') ? 'Check plugin compatibility and conflicts' : 'Review theme and WordPress core compatibility',
+        content.includes('performance') ? 'Optimize site performance and caching' : 'Test changes on staging environment',
+        content.includes('security') ? 'Implement security hardening measures' : 'Backup site before deployment'
       ],
       'DEVOPS': [
-        'Check server logs and monitoring',
-        'Review deployment pipeline',
-        'Verify infrastructure capacity',
-        'Plan maintenance window if needed'
+        content.includes('deploy') ? 'Review deployment pipeline and rollback plan' : 'Check server logs and system monitoring',
+        content.includes('performance') ? 'Scale infrastructure and optimize resources' : 'Verify system capacity and health',
+        aiAnalysis.priority === 'urgent' ? 'Implement immediate infrastructure fix' : 'Schedule maintenance window'
       ],
       'QA_TESTER': [
-        'Create comprehensive test cases',
-        'Test across multiple browsers/devices',
-        'Verify user acceptance criteria',
-        'Document any edge cases found'
+        content.includes('mobile') ? 'Test across mobile devices and browsers' : 'Create comprehensive test scenarios',
+        content.includes('performance') ? 'Conduct load and performance testing' : 'Verify user acceptance criteria',
+        content.includes('regression') ? 'Execute full regression test suite' : 'Document edge cases and test results'
       ],
       'PROJECT_MANAGER': [
-        'Assess resource requirements',
-        'Communicate with stakeholders',
-        'Update project timeline',
-        'Coordinate cross-team dependencies'
+        aiAnalysis.priority === 'urgent' ? 'Coordinate immediate response team' : 'Assess resource and timeline requirements',
+        content.includes('stakeholder') ? 'Facilitate stakeholder communication' : 'Update project timeline and dependencies',
+        content.includes('budget') ? 'Review budget impact and approvals' : 'Monitor progress and deliverables'
       ],
       'BUSINESS_ANALYST': [
-        'Analyze business impact',
-        'Gather additional requirements',
-        'Review process workflows',
-        'Prepare impact assessment report'
+        content.includes('process') ? 'Map current vs desired process flow' : 'Analyze business impact and requirements',
+        content.includes('data') ? 'Review data requirements and analytics' : 'Gather stakeholder feedback and needs',
+        content.includes('compliance') ? 'Ensure regulatory compliance requirements' : 'Prepare impact assessment documentation'
       ]
     };
     
-    const specificRecs = agentSpecificRecs[agentType] || baseRecommendations;
-    
-    // Add urgency-based recommendations
-    if (aiAnalysis.priority === 'urgent' || aiAnalysis.priority === 'high') {
-      specificRecs.unshift('Prioritize this ticket for immediate attention');
-    }
-    
-    return specificRecs;
+    return agentSpecificRecs[agentType] || [
+      'Review ticket requirements and context',
+      'Coordinate with relevant team members',
+      'Provide status updates and documentation'
+    ];
   }
 
   /**

@@ -87,88 +87,49 @@ export class BusinessAnalystAgent extends BaseAgent {
 
     // Requirements and specifications
     if (this.containsKeywords(content, ['requirements', 'specification', 'acceptance criteria', 'user story', 'feature request'])) {
-      analysis += '• Requirements Analysis: Business requirements need analysis and documentation\n';
-      analysis += `\n${BusinessAnalystPrompts.requirementElicitation.functionalRequirements}\n`;
-      recommendedActions.push('Gather and document detailed business requirements');
-      recommendedActions.push('Define clear acceptance criteria and success metrics');
-      recommendedActions.push('Identify stakeholders and their needs');
-      recommendedActions.push('Create user stories and use cases');
-      recommendedActions.push('Validate requirements with stakeholders');
+      analysis = '• Gather and document detailed business requirements with stakeholders\n• Define clear acceptance criteria and success metrics\n• Create user stories and validate requirements with business users';
       complexity = 'complex';
       estimatedTime = '4-8 hours';
     }
 
     // Data analysis and reporting
     if (this.containsKeywords(content, ['data', 'analytics', 'report', 'dashboard', 'metrics', 'kpi', 'insights'])) {
-      analysis += '• Data Analysis: Data analysis and business intelligence needed\n';
-      analysis += `\n${BusinessAnalystPrompts.analysisTemplates.swotAnalysis}\n`;
-      recommendedActions.push('Identify relevant data sources and metrics');
-      recommendedActions.push('Perform comprehensive data analysis');
-      recommendedActions.push('Create visualizations and dashboards');
-      recommendedActions.push('Generate actionable business insights');
-      recommendedActions.push('Present findings to stakeholders');
+      analysis = '• Identify relevant data sources and define key metrics\n• Perform comprehensive analysis and create visualizations\n• Generate actionable insights and present findings to stakeholders';
       complexity = 'complex';
       estimatedTime = '3-6 hours';
     }
 
     // Process improvement
     if (this.containsKeywords(content, ['process', 'workflow', 'optimization', 'efficiency', 'improvement', 'automation'])) {
-      analysis += '• Process Optimization: Business process analysis and improvement\n';
-      analysis += `\nUsing template: ${BusinessAnalystPrompts.processAnalysis.currentStateAnalysis.split('\n')[0]}\n`;
-      recommendedActions.push('Map current business processes and workflows');
-      recommendedActions.push('Identify bottlenecks and inefficiencies');
-      recommendedActions.push('Design optimized process flows');
-      recommendedActions.push('Calculate potential time and cost savings');
-      recommendedActions.push('Create implementation roadmap');
+      analysis = '• Map current processes and identify bottlenecks and inefficiencies\n• Design optimized workflows and calculate potential savings\n• Create implementation roadmap with timeline and resource requirements';
       complexity = 'complex';
       estimatedTime = '4-8 hours';
     }
 
     // Cost-benefit and ROI analysis
     if (this.containsKeywords(content, ['cost', 'budget', 'roi', 'investment', 'benefit', 'financial', 'revenue'])) {
-      analysis += '• Financial Analysis: Cost-benefit and ROI analysis required\n';
-      recommendedActions.push('Calculate total cost of ownership (TCO)');
-      recommendedActions.push('Identify and quantify expected benefits');
-      recommendedActions.push('Perform ROI and payback period analysis');
-      recommendedActions.push('Assess financial risks and mitigation strategies');
-      recommendedActions.push('Create financial justification report');
+      analysis = '• Calculate total cost of ownership and quantify expected benefits\n• Perform ROI analysis and assess financial risks\n• Create financial justification report with payback period';
       complexity = 'medium';
       estimatedTime = '2-4 hours';
     }
 
     // Stakeholder management
     if (this.containsKeywords(content, ['stakeholder', 'user', 'customer', 'client', 'team', 'communication'])) {
-      analysis += '• Stakeholder Analysis: Stakeholder impact and communication planning\n';
-      analysis += `\nUsing template: ${BusinessAnalystPrompts.stakeholderInterviews.executiveInterview.split('\n')[0]}\n`;
-      recommendedActions.push('Identify all affected stakeholders');
-      recommendedActions.push('Assess impact levels for each stakeholder group');
-      recommendedActions.push('Develop stakeholder communication plan');
-      recommendedActions.push('Create change management strategy');
-      recommendedActions.push('Schedule stakeholder review sessions');
+      analysis = '• Identify affected stakeholders and assess impact levels\n• Develop communication plan and change management strategy\n• Schedule review sessions and gather stakeholder feedback';
       complexity = 'medium';
       estimatedTime = '2-3 hours';
     }
 
     // Project planning and management
     if (this.containsKeywords(content, ['project', 'timeline', 'milestone', 'deliverable', 'scope', 'planning'])) {
-      analysis += '• Project Analysis: Project planning and scope analysis needed\n';
-      recommendedActions.push('Define project scope and objectives');
-      recommendedActions.push('Create detailed project timeline and milestones');
-      recommendedActions.push('Identify project dependencies and risks');
-      recommendedActions.push('Allocate resources and assign responsibilities');
-      recommendedActions.push('Establish project monitoring and control mechanisms');
+      analysis = '• Define project scope, objectives, and detailed timeline\n• Identify dependencies, risks, and resource allocation needs\n• Establish monitoring mechanisms and control processes';
       complexity = 'complex';
       estimatedTime = '3-6 hours';
     }
 
     // Risk assessment
     if (this.containsKeywords(content, ['risk', 'compliance', 'audit', 'governance', 'security', 'regulation'])) {
-      analysis += '• Risk Assessment: Business risk analysis and compliance review\n';
-      recommendedActions.push('Identify potential business and technical risks');
-      recommendedActions.push('Assess risk probability and impact levels');
-      recommendedActions.push('Develop risk mitigation strategies');
-      recommendedActions.push('Review compliance and regulatory requirements');
-      recommendedActions.push('Create risk monitoring and reporting framework');
+      analysis = '• Identify business and technical risks with probability assessment\n• Develop mitigation strategies and compliance review\n• Create risk monitoring framework and reporting structure';
       complexity = 'complex';
       priority = 'high';
       estimatedTime = '3-5 hours';
@@ -176,24 +137,14 @@ export class BusinessAnalystAgent extends BaseAgent {
 
     // Integration and system analysis
     if (this.containsKeywords(content, ['integration', 'system', 'api', 'workflow', 'automation', 'zendesk', 'clickup'])) {
-      analysis += '• System Integration Analysis: Integration requirements and workflow analysis\n';
-      recommendedActions.push('Analyze current system integrations and workflows');
-      recommendedActions.push('Identify integration gaps and opportunities');
-      recommendedActions.push('Design optimal integration architecture');
-      recommendedActions.push('Define data flow and transformation requirements');
-      recommendedActions.push('Create integration testing and validation plan');
+      analysis = '• Analyze current integrations and identify gaps or opportunities\n• Design optimal architecture and define data flow requirements\n• Create integration testing and validation plan';
       complexity = 'complex';
       estimatedTime = '4-6 hours';
     }
 
     // Performance and quality metrics
     if (this.containsKeywords(content, ['performance', 'quality', 'sla', 'benchmark', 'measurement', 'monitoring'])) {
-      analysis += '• Performance Analysis: Performance metrics and quality assessment\n';
-      recommendedActions.push('Define key performance indicators (KPIs)');
-      recommendedActions.push('Establish baseline measurements and benchmarks');
-      recommendedActions.push('Create performance monitoring framework');
-      recommendedActions.push('Analyze current performance against targets');
-      recommendedActions.push('Recommend performance improvement strategies');
+      analysis = '• Define KPIs and establish baseline measurements and benchmarks\n• Create performance monitoring framework and analyze against targets\n• Recommend performance improvement strategies';
       complexity = 'medium';
       estimatedTime = '2-4 hours';
     }
@@ -221,7 +172,6 @@ export class BusinessAnalystAgent extends BaseAgent {
     return this.formatAnalysis(
       analysis,
       confidence,
-      recommendedActions,
       nextAgent,
       priority as 'low' | 'normal' | 'high' | 'urgent',
       estimatedTime,

@@ -88,38 +88,21 @@ export class ProjectManagerAgent extends BaseAgent {
 
     // Project planning and initiation
     if (this.containsKeywords(content, ['project', 'planning', 'initiation', 'scope', 'timeline', 'milestone'])) {
-      analysis += '• Project Planning: New project requires planning and coordination\n';
-      analysis += `\n${ProjectManagerPrompts.projectPlanning.projectInitiation}\n`;
-      recommendedActions.push('Define project scope, objectives, and success criteria');
-      recommendedActions.push('Create detailed project timeline with milestones');
-      recommendedActions.push('Identify required resources and team members');
-      recommendedActions.push('Establish project governance and communication plan');
-      recommendedActions.push('Set up project tracking and monitoring systems');
+      analysis = '• Define project scope, timeline, and resource requirements\n• Establish governance structure and communication plan\n• Set up tracking systems and milestone checkpoints';
       complexity = 'complex';
       estimatedTime = '4-8 hours';
     }
 
     // Resource and team management
     if (this.containsKeywords(content, ['resource', 'team', 'allocation', 'assignment', 'workload', 'capacity'])) {
-      analysis += '• Resource Management: Team resource allocation and management needed\n';
-      analysis += `\n${ProjectManagerPrompts.projectPlanning.resourcePlanning}\n`;
-      recommendedActions.push('Assess current team capacity and availability');
-      recommendedActions.push('Allocate resources based on skills and priorities');
-      recommendedActions.push('Balance workload across team members');
-      recommendedActions.push('Identify resource gaps and hiring needs');
-      recommendedActions.push('Create resource utilization reports');
+      analysis = '• Assess team capacity and skill alignment for optimal allocation\n• Balance workload distribution across available resources\n• Identify gaps and coordinate hiring or contractor needs';
       complexity = 'medium';
       estimatedTime = '2-4 hours';
     }
 
     // Timeline and scheduling issues
     if (this.containsKeywords(content, ['deadline', 'schedule', 'delay', 'timeline', 'urgent', 'priority'])) {
-      analysis += '• Timeline Management: Schedule optimization and deadline management\n';
-      recommendedActions.push('Review current project timelines and dependencies');
-      recommendedActions.push('Identify critical path and potential bottlenecks');
-      recommendedActions.push('Adjust schedules to accommodate urgent priorities');
-      recommendedActions.push('Communicate timeline changes to stakeholders');
-      recommendedActions.push('Implement schedule monitoring and early warning systems');
+      analysis = '• Analyze critical path and identify schedule bottlenecks\n• Adjust timeline priorities and communicate changes to stakeholders\n• Implement monitoring system for early deadline risk detection';
       complexity = 'medium';
       priority = 'high';
       estimatedTime = '1-3 hours';
@@ -127,13 +110,7 @@ export class ProjectManagerAgent extends BaseAgent {
 
     // Risk and issue management
     if (this.containsKeywords(content, ['risk', 'issue', 'problem', 'blocker', 'escalation', 'mitigation'])) {
-      analysis += '• Risk Management: Project risks and issues require management\n';
-      analysis += `\n${ProjectManagerPrompts.riskAssessment.riskIdentification}\n`;
-      recommendedActions.push('Identify and assess project risks and issues');
-      recommendedActions.push('Develop risk mitigation and contingency plans');
-      recommendedActions.push('Escalate critical issues to appropriate stakeholders');
-      recommendedActions.push('Implement risk monitoring and early detection');
-      recommendedActions.push('Update risk register and communication plans');
+      analysis = '• Assess risk impact and develop mitigation strategies\n• Escalate critical blockers to appropriate decision makers\n• Update risk register and implement monitoring protocols';
       complexity = 'complex';
       priority = 'high';
       estimatedTime = '2-5 hours';
@@ -141,84 +118,53 @@ export class ProjectManagerAgent extends BaseAgent {
 
     // Stakeholder communication and reporting
     if (this.containsKeywords(content, ['stakeholder', 'communication', 'report', 'update', 'meeting', 'status'])) {
-      analysis += '• Stakeholder Communication: Enhanced communication and reporting needed\n';
-      recommendedActions.push('Identify all project stakeholders and their needs');
-      recommendedActions.push('Create comprehensive communication plan');
-      recommendedActions.push('Establish regular reporting and update schedules');
-      recommendedActions.push('Prepare executive summaries and status reports');
-      recommendedActions.push('Schedule stakeholder meetings and reviews');
+      analysis = '• Map stakeholder needs and establish communication cadence\n• Create executive summaries and regular status reports\n• Schedule review meetings and feedback collection sessions';
       complexity = 'medium';
       estimatedTime = '2-3 hours';
     }
 
     // Quality and deliverable management
     if (this.containsKeywords(content, ['quality', 'deliverable', 'review', 'approval', 'standard', 'criteria'])) {
-      analysis += '• Quality Management: Quality assurance and deliverable review process\n';
-      recommendedActions.push('Define quality standards and acceptance criteria');
-      recommendedActions.push('Establish deliverable review and approval process');
-      recommendedActions.push('Coordinate quality reviews with relevant teams');
-      recommendedActions.push('Track quality metrics and improvement opportunities');
-      recommendedActions.push('Ensure compliance with organizational standards');
+      analysis = '• Define quality standards and acceptance criteria for deliverables\n• Establish review and approval workflow with relevant teams\n• Track quality metrics and ensure compliance standards';
       complexity = 'medium';
       estimatedTime = '2-4 hours';
     }
 
     // Budget and cost management
     if (this.containsKeywords(content, ['budget', 'cost', 'expense', 'financial', 'roi', 'investment'])) {
-      analysis += '• Budget Management: Project budget and cost control needed\n';
-      recommendedActions.push('Review project budget and cost allocations');
-      recommendedActions.push('Track actual expenses against planned budget');
-      recommendedActions.push('Identify cost optimization opportunities');
-      recommendedActions.push('Prepare budget variance reports');
-      recommendedActions.push('Coordinate with finance team for budget approvals');
+      analysis = '• Review budget allocations and track actual vs planned expenses\n• Identify cost optimization opportunities and variance causes\n• Coordinate with finance team for approvals and reporting';
       complexity = 'medium';
       estimatedTime = '2-3 hours';
     }
 
     // Integration and coordination
     if (this.containsKeywords(content, ['integration', 'coordination', 'dependency', 'workflow', 'process'])) {
-      analysis += '• Integration Management: Cross-team coordination and integration\n';
-      recommendedActions.push('Map project dependencies and integration points');
-      recommendedActions.push('Coordinate activities across multiple teams');
-      recommendedActions.push('Establish integration testing and validation processes');
-      recommendedActions.push('Manage change requests and scope modifications');
-      recommendedActions.push('Ensure seamless workflow between project phases');
+      analysis = '• Map dependencies and coordinate activities across teams\n• Establish integration testing and validation workflows\n• Manage change requests and ensure seamless phase transitions';
       complexity = 'complex';
       estimatedTime = '3-6 hours';
     }
 
     // Performance and metrics tracking
     if (this.containsKeywords(content, ['performance', 'metrics', 'kpi', 'tracking', 'monitoring', 'dashboard'])) {
-      analysis += '• Performance Monitoring: Project performance tracking and metrics\n';
-      recommendedActions.push('Define key performance indicators (KPIs)');
-      recommendedActions.push('Set up project monitoring dashboards');
-      recommendedActions.push('Track progress against planned milestones');
-      recommendedActions.push('Analyze performance trends and patterns');
-      recommendedActions.push('Implement corrective actions for performance gaps');
+      analysis = '• Define KPIs and set up monitoring dashboards\n• Track progress against milestones and analyze trends\n• Implement corrective actions for performance gaps';
       complexity = 'medium';
       estimatedTime = '2-4 hours';
     }
 
     // Determine next agent based on technical needs
     if (this.containsKeywords(content, ['technical', 'development', 'coding', 'api', 'database'])) {
-      analysis += '• Technical Coordination: Technical implementation coordination needed\n';
       nextAgent = 'SOFTWARE_ENGINEER';
-      recommendedActions.push('Coordinate with software engineering team for technical implementation');
     }
 
     // Check if specialized expertise is needed
     if (this.containsKeywords(content, ['wordpress', 'plugin', 'theme'])) {
       nextAgent = 'WORDPRESS_DEVELOPER';
-      recommendedActions.push('Coordinate with WordPress development team');
     } else if (this.containsKeywords(content, ['infrastructure', 'deployment', 'devops'])) {
       nextAgent = 'DEVOPS';
-      recommendedActions.push('Coordinate with DevOps team for infrastructure management');
     } else if (this.containsKeywords(content, ['testing', 'qa', 'quality assurance'])) {
       nextAgent = 'QA_TESTER';
-      recommendedActions.push('Coordinate with QA team for testing and validation');
     } else if (this.containsKeywords(content, ['business analysis', 'requirements', 'data analysis'])) {
       nextAgent = 'BUSINESS_ANALYST';
-      recommendedActions.push('Coordinate with business analyst for requirements and analysis');
     }
 
     // Store analysis in memory
@@ -231,11 +177,11 @@ export class ProjectManagerAgent extends BaseAgent {
     return this.formatAnalysis(
       analysis,
       confidence,
-      recommendedActions,
       nextAgent,
       priority as 'low' | 'normal' | 'high' | 'urgent',
       estimatedTime,
-      complexity
+      complexity,
+      []
     );
   }
 
