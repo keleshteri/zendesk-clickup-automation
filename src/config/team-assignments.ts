@@ -392,11 +392,19 @@ export const generateEnhancedTeamAssignmentMessage = (
   const specificGoal = generateSpecificGoal(specificIssue, ticketContent);
   const mentions = getMentionsForTicket(category, urgency, agentRole, ticketContent);
   
-  // Format engineer mentions (remove < > brackets for cleaner display)
-  const engineers = mentions.engineers.map(mention => mention.replace(/[<>]/g, '')).join(' ');
+  // Convert Slack IDs to readable names
+  const engineers = mentions.engineers.map(mention => {
+    const slackId = mention.replace(/[<>@]/g, '');
+    const member = TEAM_MEMBERS.find(m => m.slackId === slackId);
+    return member ? `@${member.name}` : mention.replace(/[<>]/g, '');
+  }).join(' ');
   
   // Format PM mentions for CC
-  const pms = mentions.projectManagers.map(mention => mention.replace(/[<>]/g, '')).join(' ');
+  const pms = mentions.projectManagers.map(mention => {
+    const slackId = mention.replace(/[<>@]/g, '');
+    const member = TEAM_MEMBERS.find(m => m.slackId === slackId);
+    return member ? `@${member.name}` : mention.replace(/[<>]/g, '');
+  }).join(' ');
   
   // Enhanced message structure with business awareness
   let message = `🎯 **Issue Identified:** ${specificIssue}\n\n`;
