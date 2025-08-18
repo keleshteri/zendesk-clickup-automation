@@ -8,7 +8,15 @@ import { MultiAgentService } from './multi-agent-service.js';
 import { AIService } from './ai/ai-service.js';
 import { ZendeskTicket, TicketAnalysis } from '../types/index.js';
 import { MultiAgentResponse, AgentRole } from '../agents/types/agent-types.js';
-import { getMentionsForTicket, formatMentionMessage } from '../config/team-assignments.js';
+import { 
+  getMentionsForTicket, 
+  formatMentionMessage,
+  generateEnhancedTeamAssignmentMessage,
+  generateSmartFooter,
+  generateProfessionalFooter,
+  generateMinimalFooter,
+  generateFeatureFooter
+} from '../config/team-assignments.js';
 
 export interface EnhancedWorkflowContext {
   ticket: ZendeskTicket;
@@ -35,6 +43,19 @@ export interface EnhancedWorkflowResult {
   aiAnalysis?: TicketAnalysis;
   agentResponse?: MultiAgentResponse;
   teamMentions?: string;
+  // Enhanced metrics for footer generation
+  confidence?: number;
+  processingTime?: number;
+  agentsInvolved?: string[];
+  category?: string;
+  urgency?: string;
+  teamMembers?: string[];
+  projectManagers?: string[];
+  ticketId?: string;
+  agentFeedback?: {
+    estimatedTime?: string;
+    businessImpact?: string;
+  };
 }
 
 /**
@@ -277,6 +298,7 @@ export class EnhancedWorkflowOrchestrator {
       // Extract agent role and recommendations from agent response
       let agentRole: string | undefined;
       let agentRecommendations: string[] = [];
+      let estimatedTime: string | undefined;
       
       if (agentResponse) {
         // Get the primary agent role (last agent in the workflow)
@@ -291,6 +313,7 @@ export class EnhancedWorkflowOrchestrator {
           if (latestAnalysis.recommendedActions) {
             agentRecommendations = latestAnalysis.recommendedActions;
           }
+          estimatedTime = latestAnalysis.estimatedTime;
         }
       }
       
