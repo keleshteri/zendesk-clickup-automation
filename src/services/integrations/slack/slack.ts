@@ -4,6 +4,7 @@ import { ZendeskService } from '../zendesk/zendesk.js';
 import { MultiAgentService } from '../../multi-agent-service.js';
 import { TaskGenie } from '../../task-genie.js';
 import { TokenCalculator } from '../../token-calculator.js';
+import packageJson from '../../../../package.json';
 
 interface SlackCommand {
   isCommand: boolean;
@@ -1076,6 +1077,17 @@ export class SlackService {
           text: `📋 *Action Items*:\n${actionItems.map(item => `• ${item}`).join('\n')}`
         }
       });
+      
+      // Add professional footer with version and team info
+      blocks.push({
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `🤖 TaskGenie v${packageJson.version} • Made by 2DC Team • Powered by AI`
+          }
+        ]
+      } as any);
       
       const message = {
         channel: teamChannel,
