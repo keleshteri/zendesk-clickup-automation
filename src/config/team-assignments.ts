@@ -151,22 +151,22 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
     // Bug-related tickets
     bug: {
       critical: {
-        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`, `<@${SLACK_IDS.PAT}>`],
         projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "CRITICAL BUG - immediate attention required",
       },
       high: {
-        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`, `<@${SLACK_IDS.PAT}>`],
         projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "High priority bug - please review ASAP",
       },
       medium: {
-        engineers: [`<@${SLACK_IDS.MIKE}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`, `<@${SLACK_IDS.PAT}>`],
         projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Bug reported - please investigate",
       },
       low: {
-        engineers: [`<@${SLACK_IDS.SAMUEL}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`, `<@${SLACK_IDS.PAT}>`],
         projectManagers: [],
         message: "Low priority bug logged",
       },
@@ -175,17 +175,17 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
     // Feature requests
     feature: {
       critical: {
-        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`, `<@${SLACK_IDS.PAT}>`],
         projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Critical feature request - needs immediate planning",
       },
       high: {
-        engineers: [`<@${SLACK_IDS.MIKE}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`],
         projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "High priority feature - please review requirements",
       },
       medium: {
-        engineers: [`<@${SLACK_IDS.MIKE}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`],
         projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Feature request for consideration",
       },
@@ -223,12 +223,12 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
     // Deployment/Infrastructure
     deployment: {
       critical: {
-        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`, `<@${SLACK_IDS.PAT}>`],
         projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "CRITICAL deployment issue - all hands on deck",
       },
       high: {
-        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`, `<@${SLACK_IDS.PAT}>`],
         projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Deployment issue needs immediate attention",
       },
@@ -247,17 +247,17 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
     // General/Other tickets
     general: {
       critical: {
-        engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`, `<@${SLACK_IDS.PAT}>`],
         projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Critical ticket - needs immediate triage",
       },
       high: {
-        engineers: [`<@${SLACK_IDS.MIKE}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`],
         projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "High priority ticket - please review",
       },
       medium: {
-        engineers: [`<@${SLACK_IDS.MIKE}>`],
+        engineers: [`<@${SLACK_IDS.SAMUEL}>`],
         projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Ticket needs review and assignment",
       },
@@ -312,7 +312,7 @@ export const getMentionsForTicket = (
 
   // Final fallback
   return {
-    engineers: [`<@${SLACK_IDS.MIKE}>`],
+    engineers: [`<@${SLACK_IDS.SAMUEL}>`],
     projectManagers: [`<@${SLACK_IDS.TALHA}>`],
     message: "Ticket needs review and assignment",
   };
