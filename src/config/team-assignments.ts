@@ -157,12 +157,12 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
       },
       high: {
         engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
-        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "High priority bug - please review ASAP",
       },
       medium: {
         engineers: [`<@${SLACK_IDS.MIKE}>`],
-        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Bug reported - please investigate",
       },
       low: {
@@ -181,12 +181,12 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
       },
       high: {
         engineers: [`<@${SLACK_IDS.MIKE}>`],
-        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "High priority feature - please review requirements",
       },
       medium: {
         engineers: [`<@${SLACK_IDS.MIKE}>`],
-        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Feature request for consideration",
       },
       low: {
@@ -205,12 +205,12 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
       },
       high: {
         engineers: [`<@${SLACK_IDS.DIMPLE}>`, `<@${SLACK_IDS.PAT}>`],
-        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "WordPress issue - please look at this ticket",
       },
       medium: {
         engineers: [`<@${SLACK_IDS.DIMPLE}>`],
-        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "WordPress ticket needs review",
       },
       low: {
@@ -229,12 +229,12 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
       },
       high: {
         engineers: [`<@${SLACK_IDS.MIKE}>`, `<@${SLACK_IDS.SAMUEL}>`],
-        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Deployment issue needs immediate attention",
       },
       medium: {
         engineers: [`<@${SLACK_IDS.SAMUEL}>`],
-        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Infrastructure ticket for review",
       },
       low: {
@@ -253,12 +253,12 @@ export const TEAM_ASSIGNMENTS: TeamAssignment = {
       },
       high: {
         engineers: [`<@${SLACK_IDS.MIKE}>`],
-        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "High priority ticket - please review",
       },
       medium: {
         engineers: [`<@${SLACK_IDS.MIKE}>`],
-        projectManagers: [`<@${SLACK_IDS.TALHA}>`],
+        projectManagers: [`<@${SLACK_IDS.TALHA}>`, `<@${SLACK_IDS.FRANCIS}>`],
         message: "Ticket needs review and assignment",
       },
       low: {
