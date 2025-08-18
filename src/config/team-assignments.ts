@@ -372,13 +372,25 @@ export const generateEnhancedTeamAssignmentMessage = (
   ticketDescription: string,
   agentRole?: string,
   agentRecommendations?: string[],
-  estimatedTime?: string
+  estimatedTime?: string,
+  agentFeedback?: any,
+  metrics?: {
+    confidence?: number;
+    processingTime?: number;
+    agentsInvolved?: string[];
+  }
 ): string => {
   const ticketContent = `${ticketSubject} ${ticketDescription}`;
-  const mentions = getMentionsForTicket(category, urgency, agentRole, ticketContent);
+  const ticket = { id: ticketId, subject: ticketSubject, description: ticketDescription };
   
-  // Extract specific issue from ticket
-  const issue = extractIssueDescription(ticketContent, category);
+  // Use new helper functions for enhanced analysis
+  const specificIssue = extractSpecificIssue(ticket);
+  const extractedTimeEstimate = extractTimeEstimate(agentFeedback) || estimatedTime;
+  const urgentTimeline = formatUrgentTimeline(urgency, extractedTimeEstimate);
+  const businessImpact = getBusinessImpactContext(ticketDescription);
+  const stakeholderContext = getStakeholderContext(businessImpact);
+  const specificGoal = generateSpecificGoal(specificIssue, ticketContent);
+  const mentions = getMentionsForTicket(category, urgency, agentRole, ticketContent);
   
   // Format engineer mentions (remove < > brackets for cleaner display)
   const engineers = mentions.engineers.map(mention => mention.replace(/[<>]/g, '')).join(' ');
@@ -386,68 +398,173 @@ export const generateEnhancedTeamAssignmentMessage = (
   // Format PM mentions for CC
   const pms = mentions.projectManagers.map(mention => mention.replace(/[<>]/g, '')).join(' ');
   
-  // Create timeline with context
-  const timeline = formatTimelineWithUrgency(urgency, estimatedTime);
+  // Enhanced message structure with business awareness
+  let message = `🎯 **Issue Identified:** ${specificIssue}\n\n`;
+  message += `📋 **Objective:** ${specificGoal}\n\n`;
+  message += `⏰ **Timeline:** ${urgentTimeline}\n\n`;
+  message += `💼 **Business Impact:** ${businessImpact}\n`;
+  message += `📊 **Stakeholder Action:** ${stakeholderContext}\n\n`;
+  message += `👥 **Team Assignment:**\n${engineers} investigate ${specificIssue} urgently\n\n`;
   
-  // Generate specific goal
-  const goal = generateSpecificGoal(issue, ticketContent);
-  
-  // Get business impact context
-  const businessImpact = getBusinessImpactContext(ticketContent);
-  
-  let message = `👥 **Team Assignment**\n`;
-  message += `${engineers} investigate ${issue} urgently\n`;
-  message += `🎯 **Goal**: ${goal}\n`;
-  message += `⏰ **Timeline**: ${timeline}`;
-  
-  if (pms && businessImpact) {
-    message += `\ncc: ${pms} - ${businessImpact}`;
-  } else if (pms) {
-    message += `\ncc: ${pms} - please monitor progress`;
+  if (pms) {
+    message += `cc: ${pms} - ${stakeholderContext}\n\n`;
   }
+  
+  // Generate contextual footer based on urgency and business impact
+  let footer = '';
+  if (urgency === 'critical' || businessImpact.includes('critical')) {
+    footer = generateSmartFooter(
+      metrics?.confidence || 0.8,
+      metrics?.processingTime || 500,
+      metrics?.agentsInvolved || [agentRole || 'AI'],
+      ticketId
+    );
+  } else if (urgency === 'high' || urgency === 'urgent' || businessImpact.includes('deadline')) {
+    footer = generateProfessionalFooter(
+      category,
+      urgency,
+      mentions.engineers,
+      mentions.projectManagers,
+      ticketId
+    );
+  } else {
+    footer = generateMinimalFooter(ticketId);
+  }
+  
+  message += footer;
   
   return message;
 };
 
 /**
- * Extract specific issue description from ticket content
+ * Extract issue description from ticket content with enhanced business awareness
  */
 export const extractIssueDescription = (ticketContent: string, category: string): string => {
   const content = ticketContent.toLowerCase();
   
-  // Analytics issues
-  if (content.includes('analytics') && content.includes('500')) return 'Analytics 500 error';
-  if (content.includes('analytics') && content.includes('error')) return 'Analytics error';
+  // Critical system errors with business impact
+  if (content.includes('analytics') && content.includes('500')) {
+    return 'Analytics Dashboard 500 Error - Quarterly Reports Blocked';
+  }
+  if (content.includes('database') && content.includes('connection')) {
+    return 'Database Connection Failure - Operations Impact';
+  }
+  if (content.includes('payment') && content.includes('error')) {
+    return 'Payment Processing Error - Revenue Impact';
+  }
   
-  // WordPress issues
-  if (content.includes('wordpress') && content.includes('crash')) return 'WordPress plugin crash';
-  if (content.includes('wordpress') && content.includes('plugin')) return 'WordPress plugin issue';
-  if (content.includes('wordpress') && content.includes('theme')) return 'WordPress theme issue';
+  // WordPress specific with business context
+  if (content.includes('wordpress') && content.includes('crash')) {
+    return 'WordPress Plugin Crash - Site Functionality Affected';
+  }
+  if (content.includes('wordpress') && content.includes('update')) {
+    return 'WordPress Update Issue - Compatibility Problems';
+  }
+  if (content.includes('wordpress') && content.includes('plugin')) {
+    return 'WordPress Plugin Issue - Site Impact';
+  }
+  if (content.includes('wordpress') && content.includes('theme')) {
+    return 'WordPress Theme Issue - Display Problems';
+  }
+  
+  // API and integration issues
+  if (content.includes('api') && content.includes('500')) {
+    return 'API 500 Error - System Integration Failure';
+  }
+  if (content.includes('api') && content.includes('timeout')) {
+    return 'API Timeout - Integration Performance Issue';
+  }
+  if (content.includes('api') && content.includes('error')) {
+    return 'API Error - Integration Disruption';
+  }
+  if (content.includes('webhook') && content.includes('fail')) {
+    return 'Webhook Failure - Automated Workflow Disruption';
+  }
   
   // Deployment issues
-  if (content.includes('deployment') && content.includes('fail')) return 'deployment failure';
-  if (content.includes('deploy') && content.includes('error')) return 'deployment error';
+  if (content.includes('deployment') && content.includes('fail')) {
+    return 'Deployment Failure - Release Blocked';
+  }
+  if (content.includes('deploy') && content.includes('error')) {
+    return 'Deployment Error - System Update Failed';
+  }
   
   // Database issues
-  if (content.includes('database') && content.includes('slow')) return 'database performance issue';
-  if (content.includes('database') && content.includes('error')) return 'database error';
+  if (content.includes('database') && content.includes('slow')) {
+    return 'Database Performance Issue - System Slowdown';
+  }
+  if (content.includes('database') && content.includes('error')) {
+    return 'Database Error - Data Access Problem';
+  }
   
-  // API issues
-  if (content.includes('api') && content.includes('500')) return 'API 500 error';
-  if (content.includes('api') && content.includes('error')) return 'API error';
+  // Performance and availability
+  if (content.includes('server') && content.includes('down')) {
+    return 'Server Outage - Customer Access Affected';
+  }
+  if (content.includes('server') && content.includes('error')) {
+    return 'Server Error - Service Disruption';
+  }
+  if (content.includes('slow') && content.includes('response')) {
+    return 'Performance Issue - User Experience Degraded';
+  }
+  if (content.includes('timeout')) {
+    return 'System Timeout - Service Availability Issue';
+  }
   
-  // Server issues
-  if (content.includes('server') && content.includes('down')) return 'server outage';
-  if (content.includes('server') && content.includes('error')) return 'server error';
+  // Security concerns
+  if (content.includes('security') && content.includes('breach')) {
+    return 'Security Breach - Immediate Attention Required';
+  }
+  if (content.includes('unauthorized') && content.includes('access')) {
+    return 'Unauthorized Access - Security Incident';
+  }
+  if (content.includes('security')) {
+    return 'Security Issue - Protocol Review Required';
+  }
+  
+  // Business-critical keywords
+  if (content.includes('checkout') && content.includes('error')) {
+    return 'Checkout Error - Revenue Loss Risk';
+  }
+  if (content.includes('login') && content.includes('fail')) {
+    return 'Login Failure - User Access Issue';
+  }
+  if (content.includes('email') && content.includes('not')) {
+    return 'Email Service Issue - Communication Disruption';
+  }
   
   // Performance issues
-  if (content.includes('slow') || content.includes('performance')) return 'performance issue';
+  if (content.includes('slow') || content.includes('performance')) {
+    return 'Performance Issue - System Optimization Needed';
+  }
   
-  // Security issues
-  if (content.includes('security') || content.includes('breach')) return 'security issue';
-  
-  // Fallback to category + issue
-  return `${category} issue`;
+  // Enhanced category-based fallbacks with business context
+  switch(category.toLowerCase()) {
+    case 'bug':
+      if (content.includes('critical') || content.includes('urgent')) {
+        return 'Critical System Bug - Business Impact';
+      }
+      return 'Application Bug - Functionality Issue';
+    case 'feature':
+      if (content.includes('deadline') || content.includes('urgent')) {
+        return 'Urgent Feature Implementation - Deadline Critical';
+      }
+      return 'Feature Development Request';
+    case 'support':
+      if (content.includes('customer') || content.includes('client')) {
+        return 'Customer Support Issue - Client Impact';
+      }
+      return 'Technical Support Request';
+    case 'security':
+      return 'Security Issue - Protocol Review Required';
+    case 'performance':
+      return 'Performance Issue - System Optimization Needed';
+    default:
+      if (content.includes('error') || content.includes('fail')) {
+        return 'System Error - Technical Investigation Required';
+      }
+      return `${category} issue - Analysis Needed`;
+  }
 };
 
 /**
@@ -536,6 +653,119 @@ export const getBusinessImpactContext = (ticketContent: string): string => {
   if (content.includes('outage') || content.includes('down')) return 'service outage, please coordinate response';
   
   return 'please take note and monitor progress';
+};
+
+/**
+ * Extract specific issue from ticket with enhanced business awareness
+ */
+export const extractSpecificIssue = (ticket: any): string => {
+  const content = `${ticket.subject || ''} ${ticket.description || ''}`.toLowerCase();
+  
+  // Critical system errors
+  if (content.includes('analytics') && content.includes('500')) return 'Analytics 500 error blocking quarterly reports';
+  if (content.includes('database') && content.includes('connection')) return 'Database connection failure affecting operations';
+  if (content.includes('payment') && content.includes('error')) return 'Payment processing error impacting revenue';
+  
+  // WordPress specific issues
+  if (content.includes('wordpress') && content.includes('crash')) return 'WordPress plugin crash affecting site functionality';
+  if (content.includes('wordpress') && content.includes('update')) return 'WordPress update causing compatibility issues';
+  
+  // API and integration issues
+  if (content.includes('api') && content.includes('timeout')) return 'API timeout affecting system integrations';
+  if (content.includes('webhook') && content.includes('fail')) return 'Webhook failure disrupting automated workflows';
+  
+  // Performance and availability
+  if (content.includes('server') && content.includes('down')) return 'Server outage affecting customer access';
+  if (content.includes('slow') && content.includes('response')) return 'Slow response times degrading user experience';
+  
+  // Security concerns
+  if (content.includes('security') && content.includes('breach')) return 'Security breach requiring immediate attention';
+  if (content.includes('unauthorized') && content.includes('access')) return 'Unauthorized access attempt detected';
+  
+  // Fallback to generic issue extraction
+  if (content.includes('error')) return 'System error requiring investigation';
+  if (content.includes('bug')) return 'Application bug affecting functionality';
+  if (content.includes('issue')) return 'Technical issue requiring resolution';
+  
+  return 'System issue requiring technical review';
+};
+
+/**
+ * Format urgent timeline with business context and escalation indicators
+ */
+export const formatUrgentTimeline = (urgency: string, timeEstimate: string): string => {
+  const estimate = timeEstimate || 'TBD';
+  
+  switch(urgency.toLowerCase()) {
+    case 'critical':
+      return `🚨 CRITICAL - ${estimate} (escalate if not resolved within 1 hour)`;
+    case 'urgent':
+    case 'high':
+      return `⚡ URGENT - ${estimate} (business deadline at risk)`;
+    case 'medium':
+      return `🔥 HIGH PRIORITY - ${estimate} (monitor progress closely)`;
+    case 'low':
+      return `📅 STANDARD - ${estimate} (complete within business hours)`;
+    default:
+      return `📅 ${estimate} (standard timeline)`;
+  }
+};
+
+/**
+ * Get stakeholder context for enhanced communication
+ */
+export const getStakeholderContext = (businessImpact: string): string => {
+  const impact = businessImpact.toLowerCase();
+  
+  if (impact.includes('deadline')) return 'deadline impact - coordinate with business stakeholders';
+  if (impact.includes('customer')) return 'customer impact - notify support team and track resolution';
+  if (impact.includes('revenue')) return 'revenue impact - escalate to leadership if needed';
+  if (impact.includes('critical')) return 'critical business impact - all hands on deck';
+  if (impact.includes('outage')) return 'service outage - coordinate incident response';
+  if (impact.includes('security')) return 'security concern - follow incident response protocol';
+  
+  return 'monitor progress and provide updates';
+};
+
+/**
+ * Extract time estimate from agent feedback with intelligent parsing
+ */
+export const extractTimeEstimate = (agentFeedback: any): string => {
+  if (!agentFeedback) return '2-4 hours';
+  
+  let feedback = '';
+  if (typeof agentFeedback === 'string') {
+    feedback = agentFeedback.toLowerCase();
+  } else if (Array.isArray(agentFeedback)) {
+    feedback = agentFeedback.join(' ').toLowerCase();
+  } else if (agentFeedback.estimatedTime) {
+    return agentFeedback.estimatedTime;
+  } else if (agentFeedback.analysis) {
+    feedback = agentFeedback.analysis.toLowerCase();
+  }
+  
+  // Extract time patterns from feedback
+  const timePatterns = [
+    /(?:est[.:]*\s*)?([0-9]+(?:-[0-9]+)?\s*(?:hour|hr)s?)/i,
+    /(?:est[.:]*\s*)?([0-9]+(?:-[0-9]+)?\s*(?:minute|min)s?)/i,
+    /(?:est[.:]*\s*)?([0-9]+(?:-[0-9]+)?\s*(?:day)s?)/i,
+    /(?:target[.:]*\s*)?([0-9]+(?:-[0-9]+)?\s*(?:hour|hr)s?)/i
+  ];
+  
+  for (const pattern of timePatterns) {
+    const match = feedback.match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+  
+  // Complexity-based estimates
+  if (feedback.includes('complex') || feedback.includes('difficult')) return '4-8 hours';
+  if (feedback.includes('simple') || feedback.includes('quick')) return '1-2 hours';
+  if (feedback.includes('critical') || feedback.includes('urgent')) return '1-3 hours';
+  if (feedback.includes('investigation') || feedback.includes('debug')) return '2-6 hours';
+  
+  return '2-4 hours';
 };
 
 /**

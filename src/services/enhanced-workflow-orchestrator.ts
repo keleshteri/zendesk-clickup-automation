@@ -317,14 +317,22 @@ export class EnhancedWorkflowOrchestrator {
         }
       }
       
-      // Generate enhanced mention message with agent context
-      const mentionMessage = formatMentionMessage(
+      // Generate enhanced team assignment message with business context
+      const mentionMessage = generateEnhancedTeamAssignmentMessage(
         category,
         urgency,
         context.ticket.id.toString(),
+        context.ticket.subject,
+        context.ticket.description,
         agentRole,
         agentRecommendations,
-        ticketContent
+        estimatedTime,
+        agentResponse,
+        {
+          confidence: agentResponse?.confidence || 0.8,
+          processingTime: agentResponse?.processingTimeMs || 1000,
+          agentsInvolved: agentResponse?.agentsInvolved || [agentRole || 'AI']
+        }
       );
 
       // Get team mentions with agent context
