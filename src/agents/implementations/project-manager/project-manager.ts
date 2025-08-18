@@ -79,109 +79,38 @@ export class ProjectManagerAgent extends BaseAgent {
     const content = `${ticket.subject} ${ticket.description}`.toLowerCase();
     const confidence = this.calculateConfidence(ticket);
     
-    let analysis = 'Project Management Analysis:\n';
-    let recommendedActions: string[] = [];
-    let complexity: 'simple' | 'medium' | 'complex' = 'medium';
-    let estimatedTime = '2-4 hours';
-    let priority = ticket.priority;
-    let nextAgent: AgentRole | undefined;
-
-    // Project planning and initiation
-    if (this.containsKeywords(content, ['project', 'planning', 'initiation', 'scope', 'timeline', 'milestone'])) {
-      analysis = '• Define project scope, timeline, and resource requirements\n• Establish governance structure and communication plan\n• Set up tracking systems and milestone checkpoints';
-      complexity = 'complex';
-      estimatedTime = '4-8 hours';
+    // Analyze business impact and coordination needs
+    const impactAnalysis = this.assessBusinessImpact(ticket, content);
+    const routingDecision = this.determineOptimalAgent(ticket, content);
+    
+    let analysis = `Business Impact Assessment:\n${impactAnalysis.impact}\n\nCoordination Plan:\n${impactAnalysis.coordination}`;
+    
+    if (routingDecision.agent) {
+      analysis += `\n\nRouting Decision:\n• Assigning to ${routingDecision.agent} for technical analysis\n• Reason: ${routingDecision.reasoning}`;
     }
-
-    // Resource and team management
-    if (this.containsKeywords(content, ['resource', 'team', 'allocation', 'assignment', 'workload', 'capacity'])) {
-      analysis = '• Assess team capacity and skill alignment for optimal allocation\n• Balance workload distribution across available resources\n• Identify gaps and coordinate hiring or contractor needs';
-      complexity = 'medium';
-      estimatedTime = '2-4 hours';
-    }
-
-    // Timeline and scheduling issues
-    if (this.containsKeywords(content, ['deadline', 'schedule', 'delay', 'timeline', 'urgent', 'priority'])) {
-      analysis = '• Analyze critical path and identify schedule bottlenecks\n• Adjust timeline priorities and communicate changes to stakeholders\n• Implement monitoring system for early deadline risk detection';
-      complexity = 'medium';
-      priority = 'high';
-      estimatedTime = '1-3 hours';
-    }
-
-    // Risk and issue management
-    if (this.containsKeywords(content, ['risk', 'issue', 'problem', 'blocker', 'escalation', 'mitigation'])) {
-      analysis = '• Assess risk impact and develop mitigation strategies\n• Escalate critical blockers to appropriate decision makers\n• Update risk register and implement monitoring protocols';
-      complexity = 'complex';
-      priority = 'high';
-      estimatedTime = '2-5 hours';
-    }
-
-    // Stakeholder communication and reporting
-    if (this.containsKeywords(content, ['stakeholder', 'communication', 'report', 'update', 'meeting', 'status'])) {
-      analysis = '• Map stakeholder needs and establish communication cadence\n• Create executive summaries and regular status reports\n• Schedule review meetings and feedback collection sessions';
-      complexity = 'medium';
-      estimatedTime = '2-3 hours';
-    }
-
-    // Quality and deliverable management
-    if (this.containsKeywords(content, ['quality', 'deliverable', 'review', 'approval', 'standard', 'criteria'])) {
-      analysis = '• Define quality standards and acceptance criteria for deliverables\n• Establish review and approval workflow with relevant teams\n• Track quality metrics and ensure compliance standards';
-      complexity = 'medium';
-      estimatedTime = '2-4 hours';
-    }
-
-    // Budget and cost management
-    if (this.containsKeywords(content, ['budget', 'cost', 'expense', 'financial', 'roi', 'investment'])) {
-      analysis = '• Review budget allocations and track actual vs planned expenses\n• Identify cost optimization opportunities and variance causes\n• Coordinate with finance team for approvals and reporting';
-      complexity = 'medium';
-      estimatedTime = '2-3 hours';
-    }
-
-    // Integration and coordination
-    if (this.containsKeywords(content, ['integration', 'coordination', 'dependency', 'workflow', 'process'])) {
-      analysis = '• Map dependencies and coordinate activities across teams\n• Establish integration testing and validation workflows\n• Manage change requests and ensure seamless phase transitions';
-      complexity = 'complex';
-      estimatedTime = '3-6 hours';
-    }
-
-    // Performance and metrics tracking
-    if (this.containsKeywords(content, ['performance', 'metrics', 'kpi', 'tracking', 'monitoring', 'dashboard'])) {
-      analysis = '• Define KPIs and set up monitoring dashboards\n• Track progress against milestones and analyze trends\n• Implement corrective actions for performance gaps';
-      complexity = 'medium';
-      estimatedTime = '2-4 hours';
-    }
-
-    // Determine next agent based on technical needs
-    if (this.containsKeywords(content, ['technical', 'development', 'coding', 'api', 'database'])) {
-      nextAgent = 'SOFTWARE_ENGINEER';
-    }
-
-    // Check if specialized expertise is needed
-    if (this.containsKeywords(content, ['wordpress', 'plugin', 'theme'])) {
-      nextAgent = 'WORDPRESS_DEVELOPER';
-    } else if (this.containsKeywords(content, ['infrastructure', 'deployment', 'devops'])) {
-      nextAgent = 'DEVOPS';
-    } else if (this.containsKeywords(content, ['testing', 'qa', 'quality assurance'])) {
-      nextAgent = 'QA_TESTER';
-    } else if (this.containsKeywords(content, ['business analysis', 'requirements', 'data analysis'])) {
-      nextAgent = 'BUSINESS_ANALYST';
-    }
+    
+    const recommendedActions = [
+      'Assess stakeholder impact and communication needs',
+      'Coordinate resource allocation for resolution',
+      'Monitor progress and escalate if needed'
+    ];
 
     // Store analysis in memory
     this.storeMemory(ticket.id, 'project_analysis', analysis, {
-      complexity,
-      estimatedTime,
-      managementAreas: this.extractManagementAreas(content)
+      complexity: impactAnalysis.complexity,
+      estimatedTime: impactAnalysis.estimatedTime,
+      businessImpact: impactAnalysis.impact,
+      routingAgent: routingDecision.agent
     });
 
     return this.formatAnalysis(
       analysis,
       confidence,
-      nextAgent,
-      priority as 'low' | 'normal' | 'high' | 'urgent',
-      estimatedTime,
-      complexity,
-      []
+      routingDecision.agent,
+      impactAnalysis.priority as 'low' | 'normal' | 'high' | 'urgent',
+      impactAnalysis.estimatedTime,
+      impactAnalysis.complexity,
+      recommendedActions
     );
   }
 
@@ -298,7 +227,7 @@ export class ProjectManagerAgent extends BaseAgent {
       },
       {
         agent: 'SOFTWARE_ENGINEER' as AgentRole,
-        keywords: ['api', 'code', 'programming', 'development', 'feature', 'function', 'integration', 'backend', 'frontend'],
+        keywords: ['api', 'code', 'programming', 'development', 'feature', 'function', 'integration', 'backend', 'frontend', 'error', '500', 'bug', 'crash', 'exception', 'server', 'database'],
         weight: 0.8
       },
       {
@@ -381,6 +310,69 @@ export class ProjectManagerAgent extends BaseAgent {
 
   private containsKeywords(content: string, keywords: string[]): boolean {
     return keywords.some(keyword => content.includes(keyword.toLowerCase()));
+  }
+
+  private assessBusinessImpact(ticket: ZendeskTicket, content: string): {
+    impact: string;
+    coordination: string;
+    complexity: 'simple' | 'medium' | 'complex';
+    estimatedTime: string;
+    priority: string;
+  } {
+    let impact = '';
+    let coordination = '';
+    let complexity: 'simple' | 'medium' | 'complex' = 'medium';
+    let estimatedTime = '2-4 hours';
+    let priority = ticket.priority || 'normal';
+
+    // Assess user impact
+    const userImpactMatch = content.match(/(\d+)\s+users?\s+(affected|impacted|blocked)/);
+    if (userImpactMatch) {
+      const userCount = userImpactMatch[1];
+      impact += `• ${userCount} users currently affected\n`;
+      if (parseInt(userCount) > 10) {
+        priority = 'high';
+        complexity = 'complex';
+      }
+    }
+
+    // Check for deadline/time sensitivity
+    if (content.includes('deadline') || content.includes('friday') || content.includes('urgent')) {
+      impact += '• Time-sensitive issue with approaching deadline\n';
+      priority = 'urgent';
+      estimatedTime = '1-2 hours';
+    }
+
+    // Assess system impact
+    if (content.includes('dashboard') || content.includes('analytics') || content.includes('reports')) {
+      impact += '• Critical business system affected (reporting/analytics)\n';
+      coordination += '• Coordinate with business stakeholders on report delays\n';
+    }
+
+    // Check for error severity
+    if (content.includes('500') || content.includes('error') || content.includes('crash')) {
+      impact += '• System error preventing normal operations\n';
+      coordination += '• Escalate to technical team for immediate investigation\n';
+      complexity = 'medium';
+    }
+
+    // Default impact if none detected
+    if (!impact) {
+      impact = '• Analyzing ticket content for business impact assessment\n';
+    }
+
+    // Default coordination if none detected
+    if (!coordination) {
+      coordination = '• Coordinate with appropriate technical team for resolution\n';
+    }
+
+    return {
+      impact: impact.trim(),
+      coordination: coordination.trim(),
+      complexity,
+      estimatedTime,
+      priority
+    };
   }
 
   private extractManagementAreas(content: string): string[] {

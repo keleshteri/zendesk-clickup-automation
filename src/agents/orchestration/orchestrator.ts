@@ -57,8 +57,7 @@ export class Orchestrator {
     this.workflowMetrics.totalWorkflows++;
 
     try {
-      // Initial routing - always start with Project Manager
-      const initialAgent = this.agents.get('PROJECT_MANAGER')!;
+      // Enhanced workflow - ensure both PM and technical agent provide analysis
       const workflowState: WorkflowState = {
         ticketId: ticket.id,
         currentAgent: 'PROJECT_MANAGER',
@@ -73,7 +72,8 @@ export class Orchestrator {
         handoffReason: ''
       };
 
-      const workflow = await this.executeWorkflow(workflowState);
+      // Execute enhanced workflow that guarantees both PM and technical analysis
+      const workflow = await this.executeEnhancedWorkflow(workflowState);
       const processingTime = Date.now() - startTime;
 
       // Update metrics
@@ -102,6 +102,64 @@ export class Orchestrator {
   /**
    * Execute the workflow by passing the ticket through agents
    */
+  /**
+   * Enhanced workflow that ensures both Project Manager and technical agent analysis
+   */
+  private async executeEnhancedWorkflow(state: WorkflowState): Promise<WorkflowState> {
+    console.log(`🚀 Starting enhanced workflow for ticket ${state.ticketId}`);
+    
+    // Step 1: Project Manager Analysis (always first)
+    const pmAgent = this.agents.get('PROJECT_MANAGER')!;
+    const pmAnalysis = await pmAgent.analyze(state.context.ticket);
+    state.context.insights.push(pmAnalysis);
+    
+    console.log(`📋 PM Analysis completed for ticket ${state.ticketId}`);
+    
+    // Step 2: Determine technical agent for handoff
+    const targetAgent = await pmAgent.shouldHandoff(state.context.ticket);
+    
+    if (targetAgent) {
+      console.log(`🔄 Handing off ticket ${state.ticketId} from PM to ${targetAgent}`);
+      
+      // Step 3: Technical Agent Analysis
+      const techAgent = this.agents.get(targetAgent);
+      if (techAgent) {
+        const techAnalysis = await techAgent.analyze(state.context.ticket);
+        state.context.insights.push(techAnalysis);
+        
+        // Execute technical agent tasks
+        const techExecution = await techAgent.execute(state.context.ticket);
+        if (techExecution && techExecution.recommendations && Array.isArray(techExecution.recommendations)) {
+          state.context.recommendations.push(...techExecution.recommendations);
+        }
+        
+        // Update state
+        state.previousAgents.push(state.currentAgent);
+        state.currentAgent = targetAgent;
+        state.handoffReason = `Handoff from PROJECT_MANAGER to ${targetAgent}`;
+        this.workflowMetrics.handoffCount++;
+        
+        console.log(`🔧 ${targetAgent} analysis completed for ticket ${state.ticketId}`);
+      }
+    } else {
+      console.log(`📋 PM will handle ticket ${state.ticketId} without technical handoff`);
+    }
+    
+    // Step 4: Execute PM tasks and add recommendations
+    const pmExecution = await pmAgent.execute(state.context.ticket);
+    if (pmExecution && pmExecution.recommendations && Array.isArray(pmExecution.recommendations)) {
+      state.context.recommendations.push(...pmExecution.recommendations);
+    }
+    
+    // Calculate final confidence and complete workflow
+    state.context.confidence = this.calculateCombinedConfidence(state.context.insights);
+    state.isComplete = true;
+    
+    console.log(`✅ Enhanced workflow completed for ticket ${state.ticketId} with ${state.context.insights.length} agent analyses`);
+    
+    return state;
+  }
+
   private async executeWorkflow(state: WorkflowState): Promise<WorkflowState> {
     const maxIterations = 10; // Prevent infinite loops
     let iterations = 0;

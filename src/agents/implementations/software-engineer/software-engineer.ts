@@ -60,7 +60,7 @@ export class SoftwareEngineerAgent extends BaseAgent {
 
   async analyze(ticket: ZendeskTicket, context?: any): Promise<AgentAnalysis> {
     const content = `${ticket.subject} ${ticket.description}`.toLowerCase();
-    const confidence = this.calculateConfidence(ticket);
+    let confidence = this.calculateConfidence(ticket);
     
     let recommendedActions: string[] = [];
     let complexity: 'simple' | 'medium' | 'complex' = 'medium';
@@ -68,68 +68,100 @@ export class SoftwareEngineerAgent extends BaseAgent {
     let priority = ticket.priority;
     let nextAgent: AgentRole | undefined;
 
-    // Analyze for specific technical issues - max 3 bullet points
-    if (this.containsKeywords(content, ['bug', 'error', 'exception', 'crash', 'broken'])) {
+    // Enhanced analysis for specific technical issues
+    if (this.containsKeywords(content, ['500', 'internal server error', 'server error', 'http 500'])) {
       recommendedActions = [
-        'Root cause likely: Application error or data corruption',
-        'Fix approach: Debug logs, reproduce issue, implement fix',
-        'Est. time: 3-6 hours including testing'
+        '🚨 CRITICAL: 500 Internal Server Error - immediate investigation required',
+        '🔍 Check server logs, database connections, and recent deployments',
+        '⚡ Implement error monitoring and rollback if needed (Est: 1-3 hours)'
+      ];
+      complexity = 'complex';
+      priority = 'urgent';
+      estimatedTime = '1-3 hours';
+      confidence = 0.95; // High confidence for 500 errors
+    } else if (this.containsKeywords(content, ['404', 'not found', 'page not found', 'missing'])) {
+      recommendedActions = [
+        '🔗 404 Error: Check routing configuration and URL patterns',
+        '📁 Verify file paths and ensure resources exist',
+        '🔧 Update redirects or restore missing content (Est: 1-2 hours)'
+      ];
+      complexity = 'simple';
+      estimatedTime = '1-2 hours';
+    } else if (this.containsKeywords(content, ['timeout', 'gateway timeout', '504', 'connection timeout'])) {
+      recommendedActions = [
+        '⏱️ Timeout Issue: Analyze slow queries and server response times',
+        '🔧 Optimize database queries and increase timeout limits',
+        '📊 Monitor server performance and scale if needed (Est: 2-4 hours)'
+      ];
+      complexity = 'medium';
+      estimatedTime = '2-4 hours';
+    } else if (this.containsKeywords(content, ['bug', 'error', 'exception', 'crash', 'broken'])) {
+      recommendedActions = [
+        '🐛 Application Error: Review error logs and stack traces',
+        '🔍 Reproduce issue in development environment',
+        '✅ Implement fix with comprehensive testing (Est: 3-6 hours)'
       ];
       complexity = 'medium';
       estimatedTime = '3-6 hours';
     } else if (this.containsKeywords(content, ['api', 'integration', 'webhook', 'endpoint'])) {
       recommendedActions = [
-        'Root cause likely: API authentication or rate limiting',
-        'Fix approach: Test endpoints, review docs, fix error handling',
-        'Est. time: 2-4 hours'
+        '🔌 API Issue: Test endpoint connectivity and authentication',
+        '📋 Review API documentation and rate limiting policies',
+        '🛠️ Fix integration and improve error handling (Est: 2-4 hours)'
       ];
       complexity = 'medium';
-    } else if (this.containsKeywords(content, ['performance', 'slow', 'timeout', 'optimization'])) {
+      estimatedTime = '2-4 hours';
+    } else if (this.containsKeywords(content, ['performance', 'slow', 'optimization', 'speed'])) {
       recommendedActions = [
-        'Root cause likely: Database queries or resource bottleneck',
-        'Fix approach: Profile performance, optimize queries, add caching',
-        'Est. time: 4-8 hours'
+        '🚀 Performance Issue: Profile application and identify bottlenecks',
+        '💾 Optimize database queries and implement caching strategies',
+        '📈 Monitor improvements and scale resources (Est: 4-8 hours)'
       ];
       complexity = 'complex';
       estimatedTime = '4-8 hours';
     } else if (this.containsKeywords(content, ['security', 'vulnerability', 'breach', 'unauthorized'])) {
       recommendedActions = [
-        'Root cause likely: Security vulnerability or access control issue',
-        'Fix approach: Security audit, patch vulnerabilities, review permissions',
-        'Est. time: 6-12 hours (URGENT)'
+        '🔒 SECURITY ALERT: Conduct immediate security audit',
+        '🛡️ Patch vulnerabilities and review access controls',
+        '📋 Document incident and implement monitoring (Est: 6-12 hours)'
       ];
       complexity = 'complex';
       priority = 'urgent';
       estimatedTime = '6-12 hours';
-    } else if (this.containsKeywords(content, ['database', 'sql', 'query', 'data'])) {
+    } else if (this.containsKeywords(content, ['database', 'sql', 'query', 'data', 'connection'])) {
       recommendedActions = [
-        'Root cause likely: Database schema or query optimization issue',
-        'Fix approach: Analyze queries, check data integrity, optimize indexes',
-        'Est. time: 3-5 hours'
+        '🗄️ Database Issue: Check connection pools and query performance',
+        '🔍 Analyze slow queries and optimize indexes',
+        '✅ Test data integrity and backup systems (Est: 3-5 hours)'
       ];
+      complexity = 'medium';
+      estimatedTime = '3-5 hours';
     } else if (this.containsKeywords(content, ['wordpress', 'plugin', 'theme'])) {
       recommendedActions = [
-        'WordPress-specific issue detected - requires specialist review'
+        '🔌 WordPress-specific issue detected - requires specialist review'
       ];
       nextAgent = 'WORDPRESS_DEVELOPER';
     } else if (this.containsKeywords(content, ['deploy', 'deployment', 'server', 'infrastructure'])) {
       recommendedActions = [
-        'Infrastructure issue detected - requires DevOps analysis'
+        '🏗️ Infrastructure issue detected - requires DevOps analysis'
       ];
       nextAgent = 'DEVOPS';
     } else {
       recommendedActions = [
-        'General technical issue requiring code review',
-        'Fix approach: Analyze codebase and implement solution',
-        'Est. time: 2-4 hours'
+        '🔧 General technical issue requiring code review',
+        '📝 Analyze codebase and implement appropriate solution',
+        '✅ Test thoroughly and document changes (Est: 2-4 hours)'
       ];
     }
 
-    // Store analysis in memory
+    // Store enhanced analysis in memory
     this.storeMemory(ticket.id, 'technical_analysis', recommendedActions.join('\n'), {
       complexity,
       estimatedTime,
-      detectedIssues: this.extractTechnicalIssues(content)
+      priority,
+      detectedIssues: this.extractTechnicalIssues(content),
+      analysisTimestamp: new Date().toISOString(),
+      criticalityLevel: this.assessCriticality(content)
     });
 
     return this.formatAnalysis(
@@ -272,5 +304,28 @@ export class SoftwareEngineerAgent extends BaseAgent {
     }
 
     return issues;
+  }
+
+  /**
+   * Assess the criticality level of a technical issue
+   */
+  private assessCriticality(content: string): 'low' | 'medium' | 'high' | 'critical' {
+    // Critical issues that require immediate attention
+    if (this.containsKeywords(content, ['500', 'internal server error', 'security', 'breach', 'vulnerability'])) {
+      return 'critical';
+    }
+    
+    // High priority issues that significantly impact users
+    if (this.containsKeywords(content, ['timeout', '504', 'performance', 'slow', 'crash', 'broken'])) {
+      return 'high';
+    }
+    
+    // Medium priority issues with moderate impact
+    if (this.containsKeywords(content, ['404', 'api', 'integration', 'bug', 'error'])) {
+      return 'medium';
+    }
+    
+    // Low priority issues or general requests
+    return 'low';
   }
 }

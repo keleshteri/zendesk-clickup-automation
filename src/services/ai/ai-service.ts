@@ -130,10 +130,13 @@ export class AIService {
     }
 
     try {
+      // Clean and validate ticket content
+      const cleanedContent = this.cleanTicketContent(ticketContent);
+      
       const prompt = `You are an expert technical support analyst. Analyze this support ticket and provide a detailed, structured JSON response.
 
 TICKET CONTENT:
-${ticketContent}
+${cleanedContent}
 
 METADATA:
 ${ticketMetadata ? JSON.stringify(ticketMetadata, null, 2) : 'None'}
@@ -168,14 +171,24 @@ Respond with ONLY the JSON object, no additional text.`;
       const response = await result.response;
       const analysisText = response.text();
       
+      // Clean and validate AI response
+      const cleanedResponse = this.cleanAIResponse(analysisText);
+      
       // Parse the JSON response
       try {
-        const analysis = JSON.parse(analysisText.trim());
-        return analysis as TicketAnalysis;
+        const analysis = JSON.parse(cleanedResponse);
+        
+        // Validate the parsed analysis
+        const validatedAnalysis = this.validateAnalysis(analysis, cleanedContent);
+        return validatedAnalysis;
       } catch (parseError) {
-        console.warn('Failed to parse AI analysis JSON, using fallback:', parseError);
+        console.warn('Failed to parse AI analysis JSON:', {
+          error: parseError,
+          rawResponse: analysisText.substring(0, 200) + '...',
+          cleanedResponse: cleanedResponse.substring(0, 200) + '...'
+        });
         // Fallback analysis
-        return this.createFallbackAnalysis(ticketContent);
+        return this.createFallbackAnalysis(cleanedContent);
       }
     } catch (error) {
       console.error('AI ticket analysis error:', error);
@@ -386,6 +399,93 @@ Respond with ONLY the JSON object.`;
       estimated_complexity: priority === 'urgent' ? 'complex' : 'medium',
       confidence_score: 0.6
     };
+  }
+
+  private cleanTicketContent(content: string): string {
+    if (!content || typeof content !== 'string') {
+      return 'No content provided';
+    }
+    
+    // Remove HTML tags if present
+    const htmlStripped = content.replace(/<[^>]*>/g, ' ');
+    
+    // Remove excessive whitespace and normalize
+    const normalized = htmlStripped.replace(/\s+/g, ' ').trim();
+    
+    // Limit length to prevent token overflow
+    const maxLength = 2000;
+    if (normalized.length > maxLength) {
+      return normalized.substring(0, maxLength) + '... [content truncated]';
+    }
+    
+    return normalized;
+  }
+
+  private cleanAIResponse(response: string): string {
+    if (!response || typeof response !== 'string') {
+      throw new Error('Invalid AI response');
+    }
+    
+    // Remove any markdown code blocks
+    let cleaned = response.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    
+    // Remove any leading/trailing text that's not JSON
+    const jsonStart = cleaned.indexOf('{');
+    const jsonEnd = cleaned.lastIndexOf('}');
+    
+    if (jsonStart === -1 || jsonEnd === -1 || jsonStart >= jsonEnd) {
+      throw new Error('No valid JSON found in AI response');
+    }
+    
+    cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+    
+    return cleaned.trim();
+  }
+
+  private validateAnalysis(analysis: any, originalContent: string): TicketAnalysis {
+    // Ensure all required fields exist with proper types
+    const validated: TicketAnalysis = {
+      summary: this.validateString(analysis.summary) || this.generateBasicSummary(originalContent, 'general', 'normal'),
+      priority: this.validatePriority(analysis.priority) || 'normal',
+      category: this.validateCategory(analysis.category) || 'general',
+      sentiment: this.validateSentiment(analysis.sentiment) || 'neutral',
+      urgency_indicators: Array.isArray(analysis.urgency_indicators) ? analysis.urgency_indicators : [],
+      suggested_team: this.validateSuggestedTeam(analysis.suggested_team) || 'support',
+      action_items: Array.isArray(analysis.action_items) ? analysis.action_items : ['Review ticket details'],
+      estimated_complexity: this.validateComplexity(analysis.estimated_complexity) || 'medium',
+      confidence_score: typeof analysis.confidence_score === 'number' ? Math.max(0, Math.min(1, analysis.confidence_score)) : 0.6
+    };
+    
+    return validated;
+  }
+
+  private validateString(value: any): string | null {
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  }
+
+  private validatePriority(value: any): 'low' | 'normal' | 'high' | 'urgent' | null {
+    const validPriorities = ['low', 'normal', 'high', 'urgent'];
+    return validPriorities.includes(value) ? value : null;
+  }
+
+  private validateCategory(value: any): 'technical' | 'billing' | 'general' | 'account' | 'bug' | 'feature' | null {
+    const validCategories = ['technical', 'billing', 'general', 'account', 'bug', 'feature'];
+    return validCategories.includes(value) ? value : null;
+  }
+
+  private validateSentiment(value: any): 'frustrated' | 'neutral' | 'happy' | 'angry' | null {
+    const validSentiments = ['frustrated', 'neutral', 'happy', 'angry'];
+    return validSentiments.includes(value) ? value : null;
+  }
+
+  private validateComplexity(value: any): 'simple' | 'medium' | 'complex' | null {
+    const validComplexities = ['simple', 'medium', 'complex'];
+    return validComplexities.includes(value) ? value : null;
+  }
+
+  private validateSuggestedTeam(value: any): 'development' | 'support' | 'billing' | 'management' | null {
+    const validTeams = ['development', 'support', 'billing', 'management'];
+    return validTeams.includes(value) ? value : null;
   }
 
   private generateBasicSummary(ticketContent: string, category: string, priority: string): string {
