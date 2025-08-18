@@ -997,7 +997,14 @@ export class SlackService {
           type: 'header',
           text: {
             type: 'plain_text',
-            text: `${urgencyEmoji} ${categoryEmoji} New ${analysis.category} ticket`
+            text: `🧞 TaskGenie`
+          }
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `${urgencyEmoji} *New general ticket*`
           }
         },
         {
@@ -1025,7 +1032,7 @@ export class SlackService {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*AI Summary*: ${analysis.summary}`
+            text: `*AI Summary*: ${analysis.summary || 'AI analysis in progress...'}`
           }
         }
       ];
@@ -1052,16 +1059,23 @@ export class SlackService {
         });
       }
       
-      // Add action items
-      if (analysis.action_items.length > 0) {
-        blocks.push({
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `📋 *Action Items*:\n${analysis.action_items.map(item => `• ${item}`).join('\n')}`
-          }
-        });
-      }
+      // Add enhanced action items with AI-driven suggestions
+      const actionItems = analysis.action_items && analysis.action_items.length > 0 
+        ? analysis.action_items 
+        : [
+            'Review ticket details and assess complexity',
+            `Assign to ${assignment?.team || 'appropriate team'} based on ticket category`,
+            'Set initial response timeline based on priority level',
+            'Gather additional information if needed'
+          ];
+      
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `📋 *Action Items*:\n${actionItems.map(item => `• ${item}`).join('\n')}`
+        }
+      });
       
       const message = {
         channel: teamChannel,

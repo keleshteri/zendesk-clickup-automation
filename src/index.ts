@@ -276,7 +276,9 @@ export default {
             id: typeof rawTicket.id === 'string' ? parseInt(rawTicket.id) : rawTicket.id,
             priority: mapPriority(rawTicket.priority || 'normal'),
             status: mapStatus(rawTicket.status || 'new'),
-            tags: rawTicket.tags || []
+            tags: rawTicket.tags || [],
+            // Ensure URL is properly set - generate it if missing
+            url: rawTicket.url || (zendeskService ? zendeskService.getTicketUrl(typeof rawTicket.id === 'string' ? parseInt(rawTicket.id) : rawTicket.id) : `https://${env.ZENDESK_DOMAIN}/agent/tickets/${rawTicket.id}`)
           } as ZendeskTicket : null;
           
           console.log('📧 Zendesk webhook received:', {
