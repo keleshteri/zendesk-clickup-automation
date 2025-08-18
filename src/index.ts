@@ -6,6 +6,7 @@ import { AIService } from './services/ai/ai-service.js';
 import { OAuthService } from './services/integrations/clickup/clickup_oauth.js';
 import { MultiAgentService } from './services/multi-agent-service.js';
 import { TaskGenie } from './services/task-genie.js';
+import { EnhancedWorkflowOrchestrator } from './services/enhanced-workflow-orchestrator.js';
 import { AgentRole } from './agents/types/agent-types.js';
 import { getCorsHeaders, formatErrorResponse, formatSuccessResponse } from './utils/index.js';
 import {
@@ -399,6 +400,46 @@ export default {
                 }
                 
                 console.log(`${LOG_CONFIG.PREFIXES.SLACK} Slack notification sent:`, slackThreadTs);
+                
+                // Execute enhanced workflow steps if we have a thread timestamp
+                if (slackThreadTs && aiAnalysis) {
+                  try {
+                    console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Starting enhanced workflow orchestration...`);
+                    const orchestrator = new EnhancedWorkflowOrchestrator(
+                      slackService,
+                      multiAgentService,
+                      aiService
+                    );
+                    
+                    // Execute enhanced workflow asynchronously to avoid blocking the response
+                    ctx.waitUntil(
+                      orchestrator.executeEnhancedWorkflow({
+                        ticket,
+                        clickUpTaskUrl: oauthClickUpService.getTaskUrl(clickupTask.id),
+                        initialSlackTs: slackThreadTs,
+                        channel: SLACK_DEFAULTS.CHANNEL
+                      }).then(result => {
+                        if (result.success) {
+                          console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Enhanced workflow completed successfully:`, {
+                            stepsCompleted: result.completedSteps,
+                            totalSteps: result.totalSteps
+                          });
+                        } else {
+                          console.warn(`${LOG_CONFIG.PREFIXES.WARNING} Enhanced workflow completed with errors:`, {
+                            stepsCompleted: result.completedSteps,
+                            totalSteps: result.totalSteps,
+                            errors: result.errors
+                          });
+                        }
+                      }).catch(error => {
+                        console.error(`${LOG_CONFIG.PREFIXES.ERROR} Enhanced workflow failed:`, error);
+                      })
+                    );
+                  } catch (orchestratorError) {
+                    console.error(`${LOG_CONFIG.PREFIXES.ERROR} Failed to start enhanced workflow:`, orchestratorError);
+                    // Don't fail the main process if enhanced workflow fails
+                  }
+                }
               } catch (slackError) {
                 console.error(`${LOG_CONFIG.PREFIXES.ERROR} Slack notification failed:`, slackError);
                 // Don't fail the whole process if Slack fails

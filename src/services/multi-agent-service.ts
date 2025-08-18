@@ -232,6 +232,181 @@ export class MultiAgentService {
   }
 
   /**
+   * Enhanced agent assignment with AI analysis integration
+   * Used by the enhanced workflow orchestrator
+   */
+  async getIntelligentAgentAssignment(
+    ticket: ZendeskTicket,
+    aiAnalysis: TicketAnalysis
+  ): Promise<{
+    recommendedAgent: AgentRole;
+    confidence: number;
+    reasoning: string;
+    feedback: string;
+    recommendations: string[];
+  }> {
+    try {
+      // Get basic agent routing
+      const routing = await this.routeTicketToAgent(ticket);
+      
+      // Enhance with AI analysis insights
+      let enhancedAgent = routing.recommendedAgent;
+      let enhancedConfidence = routing.confidence;
+      let enhancedReasoning = routing.reasoning;
+      
+      // Adjust agent assignment based on AI analysis
+      if (aiAnalysis.category) {
+        const category = aiAnalysis.category.toLowerCase();
+        
+        if (category.includes('wordpress') && routing.recommendedAgent !== 'WORDPRESS_DEVELOPER') {
+          enhancedAgent = 'WORDPRESS_DEVELOPER';
+          enhancedConfidence = Math.max(0.85, routing.confidence);
+          enhancedReasoning = `AI detected WordPress category, overriding to WordPress Developer`;
+        } else if (category.includes('bug') && routing.recommendedAgent !== 'QA_TESTER') {
+          enhancedAgent = 'QA_TESTER';
+          enhancedConfidence = Math.max(0.8, routing.confidence);
+          enhancedReasoning = `AI detected bug category, routing to QA Tester`;
+        } else if (category.includes('deployment') && routing.recommendedAgent !== 'DEVOPS') {
+          enhancedAgent = 'DEVOPS';
+          enhancedConfidence = Math.max(0.8, routing.confidence);
+          enhancedReasoning = `AI detected deployment category, routing to DevOps`;
+        } else if (category.includes('feature') && routing.recommendedAgent !== 'SOFTWARE_ENGINEER') {
+          enhancedAgent = 'SOFTWARE_ENGINEER';
+          enhancedConfidence = Math.max(0.8, routing.confidence);
+          enhancedReasoning = `AI detected feature category, routing to Software Engineer`;
+        }
+      }
+      
+      // Adjust confidence based on urgency
+      if (aiAnalysis.priority === 'urgent' || aiAnalysis.priority === 'high') {
+        enhancedConfidence = Math.min(1.0, enhancedConfidence + 0.1);
+      }
+      
+      // Generate agent-specific feedback
+      const feedback = await this.generateAgentFeedback(ticket, aiAnalysis, enhancedAgent);
+      
+      // Generate agent-specific recommendations
+      const recommendations = await this.generateAgentRecommendations(ticket, aiAnalysis, enhancedAgent);
+      
+      return {
+        recommendedAgent: enhancedAgent,
+        confidence: enhancedConfidence,
+        reasoning: enhancedReasoning,
+        feedback,
+        recommendations
+      };
+    } catch (error) {
+      console.error('Error in intelligent agent assignment:', error);
+      // Fallback to basic routing
+      const fallback = await this.routeTicketToAgent(ticket);
+      return {
+        ...fallback,
+        feedback: 'Agent assignment completed with basic routing due to analysis error.',
+        recommendations: ['Review ticket details', 'Coordinate with team lead', 'Follow standard procedures']
+      };
+    }
+  }
+  
+  /**
+   * Generate agent-specific feedback based on ticket and AI analysis
+   */
+  private async generateAgentFeedback(
+    ticket: ZendeskTicket,
+    aiAnalysis: TicketAnalysis,
+    agentType: AgentRole
+  ): Promise<string> {
+    const priority = aiAnalysis.priority || 'medium';
+    const category = aiAnalysis.category || 'general';
+    const summary = aiAnalysis.summary || 'No summary available';
+    
+    switch (agentType) {
+      case 'SOFTWARE_ENGINEER':
+        return `**Technical Analysis Required**\n\nThis ${priority} priority ${category} ticket requires software engineering expertise. ${summary}\n\nKey areas to investigate: code review, API integration, database optimization, and system architecture.`;
+        
+      case 'WORDPRESS_DEVELOPER':
+        return `**WordPress Expertise Needed**\n\nThis ${priority} priority WordPress-related ticket requires specialized knowledge. ${summary}\n\nFocus areas: plugin compatibility, theme customization, performance optimization, and security best practices.`;
+        
+      case 'DEVOPS':
+        return `**Infrastructure & Deployment**\n\nThis ${priority} priority ${category} ticket involves infrastructure concerns. ${summary}\n\nKey considerations: server configuration, deployment pipeline, monitoring, and scalability.`;
+        
+      case 'QA_TESTER':
+        return `**Quality Assurance Review**\n\nThis ${priority} priority ${category} ticket requires thorough testing. ${summary}\n\nTesting scope: functionality verification, regression testing, user experience validation, and bug reproduction.`;
+        
+      case 'PROJECT_MANAGER':
+        return `**Project Coordination Required**\n\nThis ${priority} priority ${category} ticket needs project management oversight. ${summary}\n\nCoordination areas: resource allocation, timeline planning, stakeholder communication, and progress tracking.`;
+        
+      case 'BUSINESS_ANALYST':
+        return `**Business Impact Analysis**\n\nThis ${priority} priority ${category} ticket requires business analysis. ${summary}\n\nAnalysis focus: business requirements, impact assessment, process optimization, and ROI evaluation.`;
+        
+      default:
+        return `**General Analysis**\n\nThis ${priority} priority ${category} ticket has been assigned for review. ${summary}\n\nPlease coordinate with the appropriate team members for resolution.`;
+    }
+  }
+  
+  /**
+   * Generate agent-specific recommendations
+   */
+  private async generateAgentRecommendations(
+    ticket: ZendeskTicket,
+    aiAnalysis: TicketAnalysis,
+    agentType: AgentRole
+  ): Promise<string[]> {
+    const baseRecommendations = [
+      'Review ticket details thoroughly',
+      'Coordinate with relevant team members',
+      'Update ticket status regularly'
+    ];
+    
+    const agentSpecificRecs: { [key in AgentRole]: string[] } = {
+      'SOFTWARE_ENGINEER': [
+        'Review codebase for related issues',
+        'Check API documentation and integration points',
+        'Verify database schema and queries',
+        'Test in development environment first'
+      ],
+      'WORDPRESS_DEVELOPER': [
+        'Check plugin and theme compatibility',
+        'Review WordPress version requirements',
+        'Test on staging environment',
+        'Backup site before making changes'
+      ],
+      'DEVOPS': [
+        'Check server logs and monitoring',
+        'Review deployment pipeline',
+        'Verify infrastructure capacity',
+        'Plan maintenance window if needed'
+      ],
+      'QA_TESTER': [
+        'Create comprehensive test cases',
+        'Test across multiple browsers/devices',
+        'Verify user acceptance criteria',
+        'Document any edge cases found'
+      ],
+      'PROJECT_MANAGER': [
+        'Assess resource requirements',
+        'Communicate with stakeholders',
+        'Update project timeline',
+        'Coordinate cross-team dependencies'
+      ],
+      'BUSINESS_ANALYST': [
+        'Analyze business impact',
+        'Gather additional requirements',
+        'Review process workflows',
+        'Prepare impact assessment report'
+      ]
+    };
+    
+    const specificRecs = agentSpecificRecs[agentType] || baseRecommendations;
+    
+    // Add urgency-based recommendations
+    if (aiAnalysis.priority === 'urgent' || aiAnalysis.priority === 'high') {
+      specificRecs.unshift('Prioritize this ticket for immediate attention');
+    }
+    
+    return specificRecs;
+  }
+
+  /**
    * Get workflow metrics and agent performance data
    */
   getWorkflowMetrics(): WorkflowMetrics {

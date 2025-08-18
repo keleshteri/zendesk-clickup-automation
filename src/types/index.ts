@@ -298,6 +298,19 @@ export interface SlackMessage {
   ts: string;
 }
 
+export interface SlackApiResponse {
+  ok: boolean;
+  error?: string;
+  channel?: string;
+  ts?: string;
+  message?: {
+    text: string;
+    user: string;
+    ts: string;
+    thread_ts?: string;
+  };
+}
+
 export interface TaskGenieContext {
   ticketId?: string;
   zendesk_ticket_id?: number;

@@ -1,4 +1,4 @@
-import { SlackMessage, SlackEvent, TaskGenieContext, Env, TicketAnalysis, ZendeskTicket, AssignmentRecommendation, AIInsights, TokenUsage } from '../../../types/index.js';
+import { SlackMessage, SlackEvent, TaskGenieContext, Env, TicketAnalysis, ZendeskTicket, AssignmentRecommendation, AIInsights, TokenUsage, SlackApiResponse } from '../../../types/index.js';
 import { AIService } from '../../ai/ai-service.js';
 import { ZendeskService } from '../zendesk/zendesk.js';
 import { MultiAgentService } from '../../multi-agent-service.js';
@@ -1432,6 +1432,212 @@ export class SlackService {
       });
     }
   }
+
+  // Enhanced workflow thread continuation methods
+  async sendThreadedAIAnalysis(
+    channel: string,
+    threadTs: string,
+    ticket: ZendeskTicket,
+    analysis: TicketAnalysis
+  ): Promise<SlackApiResponse | null> {
+    try {
+      const blocks = [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `🤖 *AI Analysis Complete*\n\n*Category:* ${this.getCategoryEmoji(analysis.category)} ${analysis.category}\n*Priority:* ${this.getPriorityEmoji(analysis.priority)} ${analysis.priority}\n*Summary:* ${analysis.summary}`
+          }
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Summary:*\n${analysis.summary || 'AI analysis in progress...'}`
+          }
+        }
+      ];
+
+      if (analysis.urgency_indicators && analysis.urgency_indicators.length > 0) {
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Urgency Indicators:*\n${analysis.urgency_indicators.map(indicator => `• ${indicator}`).join('\n')}`
+          }
+        });
+      }
+
+      const response = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          channel,
+          blocks,
+          thread_ts: threadTs
+        })
+      });
+
+      const result = await response.json() as SlackApiResponse;
+      if (!result.ok) {
+        console.error('Failed to send threaded AI analysis:', result.error);
+        return null;
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error sending threaded AI analysis:', error);
+      return null;
+    }
+  }
+
+  async sendThreadedAgentFeedback(
+    channel: string,
+    threadTs: string,
+    agentType: string,
+    feedback: string,
+    recommendations?: string[]
+  ): Promise<SlackApiResponse | null> {
+    try {
+      const agentEmoji = this.getAgentEmoji(agentType);
+      let text = `${agentEmoji} *${agentType} Analysis*\n\n${feedback}`;
+
+      if (recommendations && recommendations.length > 0) {
+        text += `\n\n*Recommendations:*\n${recommendations.map(rec => `• ${rec}`).join('\n')}`;
+      }
+
+      const response = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          channel,
+          text,
+          thread_ts: threadTs
+        })
+      });
+
+      const result = await response.json() as SlackApiResponse;
+      if (!result.ok) {
+        console.error('Failed to send threaded agent feedback:', result.error);
+        return null;
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error sending threaded agent feedback:', error);
+      return null;
+    }
+  }
+
+  async sendThreadedTeamMentions(
+    channel: string,
+    threadTs: string,
+    mentions: string[],
+    category: string,
+    urgency: string,
+    nextSteps?: string[]
+  ): Promise<SlackApiResponse | null> {
+    try {
+      let text = `👥 *Team Assignment*\n\n${mentions.join(' ')}`;
+      
+      if (nextSteps && nextSteps.length > 0) {
+        text += `\n\n*Next Steps:*\n${nextSteps.map(step => `• ${step}`).join('\n')}`;
+      }
+
+      text += `\n\n_Category: ${category} | Urgency: ${urgency}_`;
+
+      const response = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          channel,
+          text,
+          thread_ts: threadTs
+        })
+      });
+
+      const result = await response.json() as SlackApiResponse;
+      if (!result.ok) {
+        console.error('Failed to send threaded team mentions:', result.error);
+        return null;
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error sending threaded team mentions:', error);
+      return null;
+    }
+  }
+
+  async sendThreadedMessage(
+    channel: string,
+    threadTs: string,
+    text: string,
+    blocks?: any[]
+  ): Promise<SlackApiResponse | null> {
+    try {
+      const payload: any = {
+        channel,
+        thread_ts: threadTs
+      };
+
+      if (blocks) {
+        payload.blocks = blocks;
+      } else {
+        payload.text = text;
+      }
+
+      const response = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json() as SlackApiResponse;
+      if (!result.ok) {
+        console.error('Failed to send threaded message:', result.error);
+        return null;
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error sending threaded message:', error);
+      return null;
+    }
+  }
+
+  // Helper methods for enhanced workflow
+  private getAgentEmoji(agentType: string): string {
+    const emojiMap: { [key: string]: string } = {
+      'Software Engineer': '💻',
+      'WordPress Developer': '🌐',
+      'DevOps Engineer': '⚙️',
+      'QA Tester': '🧪',
+      'Project Manager': '📋',
+      'Business Analyst': '📊'
+    };
+    return emojiMap[agentType] || '🤖';
+  }
+
+  private getConfidenceBar(confidence: number): string {
+    const percentage = Math.round(confidence * 100);
+    const filledBars = Math.round(confidence * 10);
+    const emptyBars = 10 - filledBars;
+    return `${'█'.repeat(filledBars)}${'░'.repeat(emptyBars)} ${percentage}%`;
+  }
+
   async verifyRequest(body: string, timestamp: string, signature: string): Promise<boolean> {
     try {
       // Slack request verification using signing secret
