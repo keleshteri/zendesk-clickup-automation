@@ -230,8 +230,8 @@ export class ProjectManagerAgent extends BaseAgent {
     const ticket = context.ticket || context;
     const content = `${ticket.subject} ${ticket.description}`.toLowerCase();
     
-    console.log(`🔀 PM Agent Routing Decision for Ticket #${ticket.id}:`);
-    console.log(`📄 Content keywords: ${content.substring(0, 100)}...`);
+    console.log(`🤖 AI-Powered Agent Routing for Ticket #${ticket.id}:`);
+    console.log(`📄 Analyzing content: ${content.substring(0, 100)}...`);
     
     // FIRST: Filter out simple inquiries that don't need technical analysis
     if (this.isSimpleInquiry(content)) {
@@ -239,87 +239,161 @@ export class ProjectManagerAgent extends BaseAgent {
       return null; // Complete workflow without technical agents
     }
     
-    // PRIORITY 1: WordPress Issues (Check first to handle WordPress crashes properly)
-    if (content.includes('wordpress') || 
-        content.includes('wp-') || 
-        content.includes('plugin') ||
-        content.includes('theme') ||
-        content.includes('woocommerce') ||
-        content.includes('wp_')) {
-      console.log(`✅ Routing to WORDPRESS_DEVELOPER (WordPress issue detected)`);
+    try {
+      // Use AI to analyze the ticket and determine the best agent
+      const aiRoutingDecision = await this.getAIRoutingDecision(ticket);
+      
+      if (aiRoutingDecision.agent) {
+        console.log(`🎯 AI Routing Decision: ${aiRoutingDecision.agent}`);
+        console.log(`📊 Confidence: ${Math.round(aiRoutingDecision.confidence * 100)}%`);
+        console.log(`💭 Reasoning: ${aiRoutingDecision.reasoning}`);
+        return aiRoutingDecision.agent;
+      }
+      
+      console.log(`⚠️ AI recommends PM-only handling`);
+      return null;
+      
+    } catch (error) {
+      console.error(`❌ AI routing failed, falling back to rule-based routing:`, error);
+      
+      // Fallback to rule-based routing if AI fails
+      return this.getFallbackRoutingDecision(content);
+    }
+  }
+
+  /**
+   * Use AI to determine the best agent for handling this ticket
+   */
+  private async getAIRoutingDecision(ticket: ZendeskTicket): Promise<{
+    agent: AgentRole | null;
+    confidence: number;
+    reasoning: string;
+  }> {
+    // Create a prompt for AI to analyze the ticket and recommend the best agent
+    const agentDescriptions = {
+      'SOFTWARE_ENGINEER': 'Handles API errors, database issues, code bugs, 500 errors, system crashes, integration problems, and technical development work',
+      'WORDPRESS_DEVELOPER': 'Specializes in WordPress plugins, themes, WooCommerce, WordPress core issues, site performance, and WordPress-specific problems', 
+      'DEVOPS': 'Manages infrastructure, deployments, server configuration, hosting issues, SSL, DNS, cloud services, and system administration',
+      'QA_TESTER': 'Handles testing, bug validation, quality assurance, user acceptance testing, and defect management',
+      'BUSINESS_ANALYST': 'Manages requirements gathering, process analysis, business logic, project planning, and non-technical planning work'
+    };
+
+    const analysisPrompt = `
+Analyze this support ticket and determine which technical specialist should handle it.
+
+TICKET DETAILS:
+Subject: ${ticket.subject}
+Description: ${ticket.description}
+Priority: ${ticket.priority || 'normal'}
+
+AVAILABLE SPECIALISTS:
+${Object.entries(agentDescriptions).map(([role, desc]) => `- ${role}: ${desc}`).join('\n')}
+
+ROUTING RULES:
+1. If this is a simple inquiry (pricing, contact info, general questions), return null
+2. If technical expertise is needed, choose the MOST SPECIFIC specialist
+3. WordPress issues ALWAYS go to WORDPRESS_DEVELOPER (even if they involve errors)
+4. Server/API errors go to SOFTWARE_ENGINEER
+5. Infrastructure/hosting go to DEVOPS  
+6. Testing/validation go to QA_TESTER
+7. Planning/requirements go to BUSINESS_ANALYST
+
+Respond ONLY with JSON in this exact format:
+{
+  "agent": "AGENT_NAME_OR_NULL",
+  "confidence": 0.85,
+  "reasoning": "Explanation of why this agent was chosen"
+}
+
+Examples:
+- WordPress plugin error → {"agent": "WORDPRESS_DEVELOPER", "confidence": 0.95, "reasoning": "WordPress plugin issue"}
+- 500 API error → {"agent": "SOFTWARE_ENGINEER", "confidence": 0.9, "reasoning": "Server error requires technical debugging"}
+- General pricing question → {"agent": null, "confidence": 0.95, "reasoning": "Simple inquiry, no technical specialist needed"}
+`;
+
+    try {
+      // Call AI service to get routing decision
+      const aiService = this.getAIService();
+      if (!aiService) {
+        throw new Error('AI service not available');
+      }
+      
+      const response = await aiService.generateResponse(analysisPrompt);
+      
+      // Parse AI response
+      const cleanResponse = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const decision = JSON.parse(cleanResponse);
+      
+      // Validate the decision
+      if (decision.agent && !Object.keys(agentDescriptions).includes(decision.agent)) {
+        throw new Error(`Invalid agent recommended: ${decision.agent}`);
+      }
+      
+      return {
+        agent: decision.agent as AgentRole | null,
+        confidence: Math.min(Math.max(decision.confidence || 0.5, 0), 1),
+        reasoning: decision.reasoning || 'AI analysis completed'
+      };
+      
+    } catch (error) {
+      console.error('AI routing analysis failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get AI service instance (you'll need to inject this)
+   */
+  /**
+   * Get AI service instance (gets it from context or memory)
+   */
+  private getAIService(): any {
+    // Try to get from context/memory - this will be injected by the orchestrator
+    const aiServiceData = this.memory.get(-1); // Use -1 as special key for AI service
+    if (aiServiceData && aiServiceData.context && typeof aiServiceData.context.generateResponse === 'function') {
+      return aiServiceData.context;
+    }
+    
+    // Return null to trigger fallback
+    return null;
+  }
+
+  /**
+   * Set AI service instance (to be called by orchestrator)
+   */
+  public setAIService(aiService: any): void {
+    this.storeMemory(-1, 'ai_service', 'AI Service instance', aiService);
+  }
+
+  /**
+   * Fallback rule-based routing when AI is unavailable
+   */
+  private getFallbackRoutingDecision(content: string): AgentRole | null {
+    console.log(`🔄 Using fallback rule-based routing`);
+    
+    // Simplified priority-based rules as backup
+    if (content.includes('wordpress') || content.includes('wp-') || content.includes('plugin')) {
+      console.log(`✅ Fallback: WORDPRESS_DEVELOPER (WordPress keywords)`);
       return 'WORDPRESS_DEVELOPER';
     }
     
-    // PRIORITY 2: Technical Issues (Override everything else except WordPress)
-    if (content.includes('500 error') || 
-        content.includes('server error') || 
-        content.includes('internal server error') ||
-        content.includes('database error') ||
-        content.includes('api error') ||
-        content.includes('timeout') ||
-        content.includes('fatal error') ||
-        content.includes('500') ||
-        content.includes('crash') ||
-        content.includes('exception')) {
-      console.log(`✅ Routing to SOFTWARE_ENGINEER (Technical error detected)`);
+    if (content.includes('500') || content.includes('error') || content.includes('crash')) {
+      console.log(`✅ Fallback: SOFTWARE_ENGINEER (Error keywords)`);
       return 'SOFTWARE_ENGINEER';
     }
     
-    // PRIORITY 3: Infrastructure/Deployment
-    if (content.includes('deployment') || 
-        content.includes('server down') ||
-        content.includes('infrastructure') ||
-        content.includes('hosting') ||
-        content.includes('docker') ||
-        content.includes('kubernetes') ||
-        content.includes('aws') ||
-        content.includes('cloud') ||
-        content.includes('ssl') ||
-        content.includes('domain') ||
-        content.includes('dns')) {
-      console.log(`✅ Routing to DEVOPS (Infrastructure issue detected)`);
+    if (content.includes('deployment') || content.includes('server') || content.includes('hosting')) {
+      console.log(`✅ Fallback: DEVOPS (Infrastructure keywords)`);
       return 'DEVOPS';
     }
     
-    // PRIORITY 4: Testing and QA
-    if (content.includes('test') || 
-        content.includes('testing') ||
-        content.includes('qa') ||
-        content.includes('quality') ||
-        content.includes('defect') ||
-        content.includes('validation') ||
-        content.includes('verification')) {
-      console.log(`✅ Routing to QA_TESTER (Testing issue detected)`);
+    if (content.includes('test') || content.includes('bug') || content.includes('qa')) {
+      console.log(`✅ Fallback: QA_TESTER (Testing keywords)`);
       return 'QA_TESTER';
     }
     
-    // PRIORITY 5: Business Analysis (Only for non-technical issues)
-    if ((content.includes('timeline') || 
-         content.includes('project plan') ||
-         content.includes('requirements') ||
-         content.includes('business process') ||
-         content.includes('specification') ||
-         content.includes('documentation')) &&
-        !content.includes('error') && 
-        !content.includes('500') &&
-        !content.includes('bug') &&
-        !content.includes('crash')) {
-      console.log(`✅ Routing to BUSINESS_ANALYST (Business planning)`);
-      return 'BUSINESS_ANALYST';
-    }
-    
-    // Default: For analytics/dashboard issues that are NOT technical errors
-    if (content.includes('analytics') && 
-        !content.includes('error') && 
-        !content.includes('500') &&
-        !content.includes('bug') &&
-        !content.includes('crash')) {
-      console.log(`✅ Routing to BUSINESS_ANALYST (Analytics planning)`);
-      return 'BUSINESS_ANALYST';
-    }
-    
-    console.log(`⚠️ No routing match found, completing workflow`);
-    return null; // Workflow complete
+    console.log(`⚠️ Fallback: No routing needed`);
+    return null;
   }
   
   /**

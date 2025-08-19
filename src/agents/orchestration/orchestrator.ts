@@ -15,9 +15,11 @@ import { BaseAgent } from '../core/base-agent.js';
 export class Orchestrator {
   private agents: Map<AgentRole, BaseAgent>;
   private workflowMetrics: WorkflowMetrics;
+  private aiService: any;
 
-  constructor() {
+  constructor(aiService?: any) {
     this.agents = new Map();
+    this.aiService = aiService;
     this.workflowMetrics = {
       totalWorkflows: 0,
       successfulWorkflows: 0,
@@ -31,7 +33,14 @@ export class Orchestrator {
   }
 
   private initializeAgents(): void {
-    this.agents.set('PROJECT_MANAGER', new ProjectManagerAgent());
+    const pmAgent = new ProjectManagerAgent();
+    
+    // Inject AI service into Project Manager if available
+    if (this.aiService && typeof (pmAgent as any).setAIService === 'function') {
+      (pmAgent as any).setAIService(this.aiService);
+    }
+    
+    this.agents.set('PROJECT_MANAGER', pmAgent);
     this.agents.set('SOFTWARE_ENGINEER', new SoftwareEngineerAgent());
     this.agents.set('WORDPRESS_DEVELOPER', new WordPressDeveloperAgent());
     this.agents.set('DEVOPS', new DevOpsAgent());
@@ -48,6 +57,7 @@ export class Orchestrator {
       });
     }
   }
+
 
   /**
    * Process a Zendesk ticket through the multi-agent workflow
@@ -100,9 +110,6 @@ export class Orchestrator {
   }
 
   /**
-   * Execute the workflow by passing the ticket through agents
-   */
-  /**
    * Enhanced workflow that ensures both Project Manager and technical agent analysis
    */
   private async executeEnhancedWorkflow(state: WorkflowState): Promise<WorkflowState> {
@@ -121,11 +128,11 @@ export class Orchestrator {
       state.context.recommendations.push(...pmExecution.recommendations);
     }
     
-    // Step 3: Determine technical agent for handoff
+    // Step 3: Determine technical agent for handoff using NEW AI-POWERED ROUTING
     const targetAgent = await pmAgent.shouldHandoff(state.context.ticket);
     
     if (targetAgent) {
-      console.log(`🔄 Handing off ticket ${state.ticketId} from PM to ${targetAgent}`);
+      console.log(`🔄 AI-powered handoff: ticket ${state.ticketId} from PM to ${targetAgent}`);
       
       // Step 4: Technical Agent Analysis and Execution
       const techAgent = this.agents.get(targetAgent);
@@ -143,85 +150,26 @@ export class Orchestrator {
         // Update state to reflect handoff
         state.previousAgents.push(state.currentAgent);
         state.currentAgent = targetAgent;
-        state.handoffReason = `Handoff from PROJECT_MANAGER to ${targetAgent}`;
+        state.handoffReason = `AI-powered handoff from PROJECT_MANAGER to ${targetAgent}`;
         this.workflowMetrics.handoffCount++;
         
         // Update agent utilization metrics
         this.updateAgentUtilization(targetAgent);
         
-        console.log(`🔧 ${targetAgent} analysis and execution completed for ticket ${state.ticketId}`);
+        console.log(`🤖 ${targetAgent} AI-routed analysis completed for ticket ${state.ticketId}`);
       } else {
         console.warn(`⚠️ Target agent ${targetAgent} not found, continuing with PM only`);
       }
     } else {
-      console.log(`📋 PM will handle ticket ${state.ticketId} without technical handoff`);
+      console.log(`📋 AI determined PM should handle ticket ${state.ticketId} without technical handoff`);
     }
     
     // Calculate final confidence and complete workflow
     state.context.confidence = this.calculateCombinedConfidence(state.context.insights);
     state.isComplete = true;
     
-    console.log(`✅ Enhanced workflow completed for ticket ${state.ticketId} with ${state.context.insights.length} agent analyses`);
+    console.log(`✅ AI-enhanced workflow completed for ticket ${state.ticketId} with ${state.context.insights.length} agent analyses`);
     
-    return state;
-  }
-
-  private async executeWorkflow(state: WorkflowState): Promise<WorkflowState> {
-    const maxIterations = 10; // Prevent infinite loops
-    let iterations = 0;
-
-    while (!state.isComplete && iterations < maxIterations) {
-      iterations++;
-      
-      const currentAgent = this.agents.get(state.currentAgent);
-      if (!currentAgent) {
-        throw new Error(`Agent ${state.currentAgent} not found`);
-      }
-
-      // Agent analyzes the ticket
-      const analysis = await currentAgent.analyze(state.context.ticket);
-      state.context.insights.push(analysis);
-
-      // Agent executes its tasks
-      const execution = await currentAgent.execute(state.context.ticket);
-      
-      // Safely add recommendations if they exist
-      if (execution && execution.recommendations && Array.isArray(execution.recommendations)) {
-        state.context.recommendations.push(...execution.recommendations);
-      } else if (execution && execution.status === 'completed' && execution.details) {
-        // If no recommendations but task completed, add a generic recommendation
-        state.context.recommendations.push(execution.details);
-      }
-      
-      state.context.confidence = this.calculateCombinedConfidence(state.context.insights);
-
-      // Check if agent should hand off to another agent
-      const targetAgent = await currentAgent.shouldHandoff(state.context.ticket);
-      
-      if (targetAgent) {
-        // Perform handoff
-        const previousAgent = state.currentAgent;
-        state.previousAgents.push(state.currentAgent);
-        state.currentAgent = targetAgent;
-        state.handoffReason = `Handoff from ${previousAgent} to ${targetAgent}`;
-        this.workflowMetrics.handoffCount++;
-        
-        // Update agent utilization metrics
-        this.updateAgentUtilization(targetAgent);
-        
-        console.log(`🔄 Handoff executed: ${previousAgent} → ${targetAgent} for ticket ${state.ticketId}`);
-      } else {
-        // Workflow is complete
-        state.isComplete = true;
-        console.log(`✅ Workflow completed by ${state.currentAgent} for ticket ${state.ticketId}`);
-      }
-    }
-
-    if (iterations >= maxIterations) {
-      console.warn(`Workflow reached maximum iterations (${maxIterations}) for ticket ${state.ticketId}`);
-      state.isComplete = true;
-    }
-
     return state;
   }
 
@@ -240,20 +188,6 @@ export class Orchestrator {
     }
 
     return await agent.analyze(ticket);
-  }
-
-  /**
-   * Process ticket with specific agent
-   */
-  private async processWithAgent(agent: BaseAgent, ticket: ZendeskTicket): Promise<any> {
-    const analysis = await agent.analyze(ticket);
-    const execution = await agent.execute(ticket);
-    
-    return {
-      ...analysis,
-      recommendations: execution.recommendations,
-      executionResult: execution
-    };
   }
 
   /**
@@ -321,24 +255,6 @@ export class Orchestrator {
         averageProcessingTime: 0
       });
     }
-  }
-
-  /**
-   * Get status of all agents (legacy method)
-   */
-  getAllAgentsStatus(): any[] {
-    return Array.from(this.agents.entries()).map(([role, agent]) => ({
-      agentId: agent.id || role,
-      role,
-      status: 'active',
-      tasksProcessed: agent.getMetrics().tasksProcessed || 0,
-      successRate: agent.getMetrics().successRate || 0,
-      averageProcessingTime: agent.getMetrics().averageProcessingTime || 0,
-      lastActive: new Date().toISOString(),
-      capabilities: agent.getCapabilities(),
-      currentLoad: 0,
-      maxConcurrency: 1
-    }));
   }
 
   /**

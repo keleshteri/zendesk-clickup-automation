@@ -18,7 +18,7 @@ export class MultiAgentService {
     this.aiService = aiService;
     this.zendeskService = zendeskService;
     this.clickupService = clickupService;
-    this.orchestrator = new Orchestrator();
+    this.orchestrator = new Orchestrator(aiService); // Pass AI service to orchestrator
     this.isInitialized = true;
   }
 
