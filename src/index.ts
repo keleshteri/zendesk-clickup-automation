@@ -203,6 +203,44 @@ export default {
         });
       }
 
+      // Route: Test Slack service statuses (for debugging)
+      if (url.pathname === '/test/slack-statuses' && method === 'GET') {
+        if (!slackService) {
+          return new Response(JSON.stringify({
+            error: 'Slack service not available'
+          }), {
+            status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+            headers: corsHeaders
+          });
+        }
+        
+        try {
+          // Set the ClickUp service so Slack can test it
+          slackService.setClickUpService(clickupService);
+          
+          // Get service statuses using the same method Slack bot uses
+          const statuses = await (slackService as any).getServiceStatuses();
+          
+          return new Response(JSON.stringify({
+            status: 'ok',
+            message: 'Slack Service Status Test',
+            serviceStatuses: statuses,
+            timestamp: new Date().toISOString()
+          }), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({
+            error: 'Failed to get service statuses',
+            details: error instanceof Error ? error.message : 'Unknown error'
+          }), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
       // Route: Environment test
       if (url.pathname === '/test' && method === 'GET') {
         return new Response(JSON.stringify({

@@ -417,18 +417,38 @@ export class SlackService {
 
   private async testClickUpConnection(): Promise<boolean> {
     try {
-      if (!this.env.CLICKUP_TOKEN) {
-        console.log('❌ ClickUp token not configured');
-        return false;
-      }
-      
       console.log('📋 Testing ClickUp connection...');
       
-      // Use existing ClickUp service if available, otherwise create one
+      // Use existing ClickUp service if available, otherwise create one with OAuth support
       let clickupService = this.clickupService;
       if (!clickupService) {
         const { ClickUpService } = await import('../clickup/clickup.js');
-        clickupService = new ClickUpService(this.env, this.aiService);
+        
+        // Try to get OAuth data for enhanced authentication
+        let oauthData = null;
+        if (this.env.TASK_MAPPING) {
+          try {
+            const { OAuthService } = await import('../clickup/clickup_oauth.js');
+            const oauthService = new OAuthService(this.env);
+            const defaultUserId = 'default'; // Use default user for status check
+            oauthData = await oauthService.getUserOAuth(defaultUserId);
+            
+            if (oauthData && !oauthService.isTokenValid(oauthData)) {
+              console.log('🔍 OAuth token found but invalid, falling back to API token');
+              oauthData = null;
+            }
+          } catch (oauthError) {
+            console.log('🔍 OAuth check failed, falling back to API token:', oauthError);
+          }
+        }
+        
+        clickupService = new ClickUpService(this.env, this.aiService, oauthData);
+      }
+      
+      // Check if service has valid authentication (OAuth or API token)
+      if (!clickupService.hasValidAuth()) {
+        console.log('❌ ClickUp authentication not configured (no OAuth or API token)');
+        return false;
       }
       
       const testResult = await clickupService.testConnection();
