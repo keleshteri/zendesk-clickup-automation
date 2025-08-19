@@ -106,6 +106,30 @@ export class ZendeskService {
     return `https://${this.env.ZENDESK_DOMAIN}/agent/tickets/${ticketId}`;
   }
 
+  /**
+   * Test connectivity to the Zendesk API
+   * 
+   * Performs a simple API call to verify that authentication is working and the
+   * Zendesk API is accessible. This is useful for debugging connection issues.
+   * 
+   * @returns Promise resolving to boolean indicating if the connection test passed
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      console.log('🎫 Testing Zendesk API connection...');
+      
+      // Test with a simple API call that should work with basic permissions
+      await this.getTicketDetails('1'); // Test with ticket ID 1
+      console.log('✅ Zendesk API connection successful');
+      return true;
+    } catch (error) {
+      // If error is 404, it means connection works but ticket doesn't exist
+      const is404 = error instanceof Error && error.message.includes('404');
+      console.log(`${is404 ? '✅' : '❌'} Zendesk connection test: ${is404 ? 'Connected (404 expected)' : 'Failed'}`);
+      return is404;
+    }
+  }
+
   async addComment(ticketId: number, comment: string, isPublic: boolean = false): Promise<boolean> {
     try {
       const response = await fetch(`${this.baseUrl}/tickets/${ticketId}.json`, {

@@ -19,6 +19,7 @@ export class SlackService {
   private zendeskService: ZendeskService;
   private multiAgentService: MultiAgentService | null = null;
   private taskGenie: TaskGenie | null = null;
+  private clickupService: any = null; // Will be set when needed
 
   constructor(env: Env, multiAgentService?: MultiAgentService, taskGenie?: TaskGenie) {
     this.env = env;
@@ -26,6 +27,13 @@ export class SlackService {
     this.zendeskService = new ZendeskService(env);
     this.multiAgentService = multiAgentService || null;
     this.taskGenie = taskGenie || null;
+  }
+
+  /**
+   * Set ClickUp service instance to reuse existing connection
+   */
+  setClickUpService(clickupService: any): void {
+    this.clickupService = clickupService;
   }
 
   /**
@@ -355,47 +363,33 @@ export class SlackService {
     zendeskDomain?: string;
   }> {
     try {
-      // Check Zendesk connection
-      let zendeskStatus = false;
+      console.log('🔍 Checking service statuses...');
+      
       let zendeskDomain = '';
-      try {
-        if (this.env.ZENDESK_DOMAIN) {
-          zendeskDomain = `${this.env.ZENDESK_DOMAIN}.zendesk.com`;
-          // Simple API test to check if Zendesk is accessible
-          const zendeskTest = await this.zendeskService.getTicketDetails('1'); // Test with ticket ID 1
-          zendeskStatus = true; // If no error thrown, connection works
-        }
-      } catch (error) {
-        // If error is 404, it means connection works but ticket doesn't exist
-        zendeskStatus = error instanceof Error && error.message.includes('404');
+      if (this.env.ZENDESK_DOMAIN) {
+        zendeskDomain = `${this.env.ZENDESK_DOMAIN}.zendesk.com`;
       }
 
-      // Check ClickUp connection
-      let clickupStatus = false;
-      try {
-        if (this.env.CLICKUP_TOKEN) {
-          // Test ClickUp API with a simple request
-          const response = await fetch('https://api.clickup.com/api/v2/user', {
-            headers: {
-              'Authorization': this.env.CLICKUP_TOKEN,
-              'Content-Type': 'application/json'
-            }
-          });
-          clickupStatus = response.ok;
-        }
-      } catch (error) {
-        clickupStatus = false;
-      }
+      // Use proper service test methods instead of duplicating logic
+      const [zendeskResult, clickupResult, aiStatus] = await Promise.allSettled([
+        this.testZendeskConnection(),
+        this.testClickUpConnection(), 
+        this.aiService.testConnection()
+      ]);
 
-      // Check AI service
-      const aiStatus = this.aiService.isAvailable();
+      const zendeskStatus = zendeskResult.status === 'fulfilled' ? zendeskResult.value : false;
+       const clickupStatus = clickupResult.status === 'fulfilled' ? clickupResult.value : false;
+       const aiConnectionStatus = aiStatus.status === 'fulfilled' ? aiStatus.value : false;
 
-      return {
+      const result = {
         zendesk: zendeskStatus,
         clickup: clickupStatus,
-        ai: aiStatus,
+        ai: aiConnectionStatus,
         zendeskDomain
       };
+      
+      console.log('📊 Service status summary:', result);
+      return result;
     } catch (error) {
       console.error('Error checking service statuses:', error);
       return {
@@ -403,6 +397,46 @@ export class SlackService {
         clickup: false,
         ai: false
       };
+    }
+  }
+
+  private async testZendeskConnection(): Promise<boolean> {
+    try {
+      if (!this.env.ZENDESK_DOMAIN) {
+        console.log('❌ Zendesk domain not configured');
+        return false;
+      }
+      
+      // Use ZendeskService's dedicated test method
+      return await this.zendeskService.testConnection();
+    } catch (error) {
+      console.log('❌ Zendesk connection test failed:', error);
+      return false;
+    }
+  }
+
+  private async testClickUpConnection(): Promise<boolean> {
+    try {
+      if (!this.env.CLICKUP_TOKEN) {
+        console.log('❌ ClickUp token not configured');
+        return false;
+      }
+      
+      console.log('📋 Testing ClickUp connection...');
+      
+      // Use existing ClickUp service if available, otherwise create one
+      let clickupService = this.clickupService;
+      if (!clickupService) {
+        const { ClickUpService } = await import('../clickup/clickup.js');
+        clickupService = new ClickUpService(this.env, this.aiService);
+      }
+      
+      const testResult = await clickupService.testConnection();
+      console.log(`${testResult.success ? '✅' : '❌'} ClickUp connection: ${testResult.success ? 'Connected' : testResult.error}`);
+      return testResult.success;
+    } catch (error) {
+      console.log('❌ ClickUp connection failed:', error);
+      return false;
     }
   }
 
