@@ -173,7 +173,7 @@ export class SlackService {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: `🧞 *TaskGenie*\n\nHi ${assigneeName || 'there'}! 👋\n\nI've created a task for this Zendesk ticket.`
+              text: `🧞 *TaskGenie*\n\nHi @here! 👋\n\nI've created a task for this Zendesk ticket.`
             }
           },
           {
