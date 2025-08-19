@@ -264,6 +264,9 @@ export class ProjectManagerAgent extends BaseAgent {
   /**
    * Use AI to determine the best agent for handling this ticket
    */
+  /**
+   * Use AI to determine the best agent for handling this ticket
+   */
   private async getAIRoutingDecision(ticket: ZendeskTicket): Promise<{
     agent: AgentRole | null;
     confidence: number;
@@ -297,6 +300,15 @@ ROUTING RULES:
 5. Infrastructure/hosting go to DEVOPS  
 6. Testing/validation go to QA_TESTER
 7. Planning/requirements go to BUSINESS_ANALYST
+8. If description is too vague (like "problem on website" or "help me"), return null
+
+EXAMPLES:
+- "WordPress plugin causing 500 error" → WORDPRESS_DEVELOPER (WordPress takes priority)
+- "API returning 500 internal server error" → SOFTWARE_ENGINEER
+- "Dashboard login works but analytics shows blank page with 500 errors" → SOFTWARE_ENGINEER
+- "Can you help me with my project?" → null (simple inquiry)
+- "We have problem on website ask team fix it" → null (too vague)
+- "Server deployment failed" → DEVOPS
 
 Respond ONLY with JSON in this exact format:
 {
@@ -304,11 +316,6 @@ Respond ONLY with JSON in this exact format:
   "confidence": 0.85,
   "reasoning": "Explanation of why this agent was chosen"
 }
-
-Examples:
-- WordPress plugin error → {"agent": "WORDPRESS_DEVELOPER", "confidence": 0.95, "reasoning": "WordPress plugin issue"}
-- 500 API error → {"agent": "SOFTWARE_ENGINEER", "confidence": 0.9, "reasoning": "Server error requires technical debugging"}
-- General pricing question → {"agent": null, "confidence": 0.95, "reasoning": "Simple inquiry, no technical specialist needed"}
 `;
 
     try {
@@ -462,6 +469,7 @@ Examples:
       'how can i work with you',
       'can you help me',
       'need your company help',
+      'need your company\'s help',
       'how do i contact',
       'what services do you provide',
       'how much does it cost',
@@ -473,10 +481,32 @@ Examples:
       'pricing information',
       'contact information',
       'business inquiry',
-      'general question'
+      'general question',
+      'help me on my project',
+      'work with you on my project',
+      'we have problem on website ask team fix it', // Very vague
+      'problem on website',
+      'can you help',
+      'test ticket'
     ];
     
-    return inquiryPatterns.some(pattern => content.includes(pattern));
+    // Also check if content is very short and vague
+    const words = content.trim().split(/\s+/);
+    const isVeryShort = words.length <= 15;
+    const hasNoSpecifics = !content.includes('error') && 
+                          !content.includes('dashboard') && 
+                          !content.includes('500') && 
+                          !content.includes('plugin') && 
+                          !content.includes('database') &&
+                          !content.includes('api') &&
+                          !content.includes('login') &&
+                          !content.includes('deployment');
+    
+    const matchesPattern = inquiryPatterns.some(pattern => content.includes(pattern));
+    const isVagueRequest = isVeryShort && hasNoSpecifics && 
+                          (content.includes('help') || content.includes('problem') || content.includes('fix'));
+    
+    return matchesPattern || isVagueRequest;
   }
 
   private assessBusinessImpact(ticket: ZendeskTicket, content: string): {

@@ -184,70 +184,104 @@ export class SoftwareEngineerAgent extends BaseAgent {
 
   async execute(task: string | ZendeskTicket, context?: any): Promise<any> {
     const taskLower = (typeof task === 'string' ? task : task.description || '').toLowerCase();
+    const content = typeof task === 'object' ? `${task.subject} ${task.description}` : task;
     let result: any = { status: 'completed', details: '' };
 
     try {
-      if (taskLower.includes('code analysis')) {
-        result = await this.executeTool('analyze_code', {
-          code: context.code || 'No code provided',
-          language: context.language || 'unknown'
-        });
-      } else if (taskLower.includes('api')) {
-        result = await this.executeTool('check_api_integration', {
-          endpoint: context.endpoint || 'unknown',
-          method: context.method || 'GET',
-          error: context.error || 'No error details'
-        });
-      } else if (taskLower.includes('database')) {
-        result = await this.executeTool('database_query_analysis', {
-          query: context.query || 'No query provided',
-          performance_metrics: context.metrics || {}
-        });
-      } else if (taskLower.includes('security')) {
-        result = await this.executeTool('security_assessment', {
-          vulnerability_type: context.vulnerability || 'unknown',
-          severity: context.severity || 'medium'
-        });
-      } else {
-        // Provide specific analysis based on ticket content
-        const ticketContent = typeof task === 'object' ? `${task.subject} ${task.description}` : task;
-        const content = ticketContent.toLowerCase();
+      // Analyze specific technical issues and provide targeted recommendations
+      if (this.containsKeywords(content.toLowerCase(), ['500', 'internal server error', 'server error'])) {
+        const isAnalytics = this.containsKeywords(content.toLowerCase(), ['analytics', 'dashboard', 'reports']);
+        const isWordPress = this.containsKeywords(content.toLowerCase(), ['wordpress', 'wp-', 'plugin']);
         
-        if (this.containsKeywords(content, ['500', 'internal server error'])) {
+        if (isAnalytics) {
           result = {
             status: 'completed',
-            details: 'Server error analysis completed',
+            details: 'CRITICAL: 500 Internal Server Error in Analytics Module - immediate investigation required',
             recommendations: [
-              'Server logs reviewed for error patterns',
-              'Database connectivity verified',
-              'Recent deployments analyzed for potential causes'
+              'Check server logs for specific error messages and stack traces',
+              'Verify database connections and query performance for analytics queries', 
+              'Review recent code deployments that may have affected analytics module',
+              'Test analytics API endpoints manually to isolate the failing component',
+              'Implement immediate rollback if recent deployment is the cause'
             ]
           };
-        } else if (this.containsKeywords(content, ['database', 'connection']) && this.containsKeywords(content, ['error', 'fail'])) {
+        } else if (isWordPress) {
           result = {
-            status: 'completed',
-            details: 'Database connectivity issue resolved',
+            status: 'completed', 
+            details: 'WordPress 500 Error Detected - plugin or theme conflict likely',
             recommendations: [
-              'Database connection pool optimized',
-              'Connection string configuration verified',
-              'Database performance metrics reviewed'
+              'Disable recently activated plugins one by one to identify the culprit',
+              'Check WordPress error logs for fatal PHP errors',
+              'Verify PHP memory limits and execution time settings',
+              'Test in WordPress safe mode (all plugins disabled)',
+              'Review .htaccess file for configuration issues'
             ]
           };
         } else {
           result = {
             status: 'completed',
-            details: `Technical analysis completed for: ${typeof task === 'object' ? task.subject : task}`,
+            details: '500 Internal Server Error Analysis - server-side investigation needed',
             recommendations: [
-              'System functionality verified',
-              'Error patterns analyzed',
-              'Performance metrics reviewed'
+              'Check server error logs for specific error messages and stack traces',
+              'Verify database connectivity and query performance',
+              'Review recent deployments and configuration changes',
+              'Test API endpoints manually to isolate failing components',
+              'Monitor server resources (CPU, memory, disk space)'
             ]
           };
         }
+      } else if (this.containsKeywords(content.toLowerCase(), ['api', 'integration']) && this.containsKeywords(content.toLowerCase(), ['error', 'fail'])) {
+        result = {
+          status: 'completed',
+          details: 'API Integration Issue - endpoint connectivity and data flow analysis needed',
+          recommendations: [
+            'Test API endpoints manually with tools like Postman or curl',
+            'Verify API authentication tokens and permissions',
+            'Check API rate limits and quota usage',
+            'Review request/response logs for malformed data',
+            'Validate API endpoint URLs and network connectivity'
+          ]
+        };
+      } else if (this.containsKeywords(content.toLowerCase(), ['database', 'connection']) && this.containsKeywords(content.toLowerCase(), ['error', 'fail'])) {
+        result = {
+          status: 'completed',
+          details: 'Database Connectivity Issue - connection pool and query optimization needed',
+          recommendations: [
+            'Check database connection pool configuration and limits',
+            'Verify database server status and resource usage',
+            'Review slow query logs for performance bottlenecks',
+            'Test database connectivity from application server',
+            'Validate database credentials and network security groups'
+          ]
+        };
+      } else if (this.containsKeywords(content.toLowerCase(), ['blank', 'white page', 'empty']) && this.containsKeywords(content.toLowerCase(), ['dashboard', 'page'])) {
+        result = {
+          status: 'completed',
+          details: 'Frontend Loading Issue - JavaScript errors or API connectivity problems',
+          recommendations: [
+            'Check browser console for JavaScript errors and network failures',
+            'Verify frontend API calls are receiving valid responses',
+            'Test browser caching by hard refresh (Ctrl+F5)',
+            'Review frontend build process and asset loading',
+            'Validate CORS configuration for cross-origin requests'
+          ]
+        };
+      } else {
+        // Generic technical analysis
+        result = {
+          status: 'completed',
+          details: `Technical analysis completed for: ${typeof task === 'object' ? task.subject : task}`,
+          recommendations: [
+            'Review system logs for error patterns and anomalies',
+            'Verify component functionality and integration points',
+            'Test system performance under current load conditions',
+            'Check recent changes and deployments for potential issues'
+          ]
+        };
       }
 
       // Store execution result
-      this.storeMemory(context.ticketId || 0, 'task_execution', JSON.stringify(result));
+      this.storeMemory(context?.ticketId || 0, 'task_execution', JSON.stringify(result));
       
       return result;
     } catch (error) {
