@@ -385,6 +385,15 @@ export class SlackService {
               type: 'mrkdwn',
               text: '🚀 *Ready to boost your productivity?* Just mention @TaskGenie and I\'ll assist!'
             }
+          },
+          {
+            type: 'context',
+            elements: [
+              {
+                type: 'mrkdwn',
+                text: `🤖 TaskGenie v${packageJson.version} • Made by 2DC Team • Powered by AI`
+              }
+            ]
           }
         ]
       };
@@ -442,6 +451,15 @@ export class SlackService {
               type: 'mrkdwn',
               text: '🚀 *Ready to get started?* Just mention @TaskGenie and I\'ll assist!'
             }
+          },
+          {
+            type: 'context',
+            elements: [
+              {
+                type: 'mrkdwn',
+                text: `🤖 TaskGenie v${packageJson.version} • Made by 2DC Team • Powered by AI`
+              }
+            ]
           }
         ]
       };
