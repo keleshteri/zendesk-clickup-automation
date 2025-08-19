@@ -195,6 +195,15 @@ export class SlackService {
               type: 'mrkdwn',
               text: `Need a summary of this ticket? Just reply to this thread and ask for \"summarize\" - I can help with that! 🤖`
             }
+          },
+          {
+            type: 'context',
+            elements: [
+              {
+                type: 'mrkdwn',
+                text: `${this.aiService.isAvailable() ? '🟢 AI Working' : '🔴 AI Offline'} | TaskGenie v${packageJson.version} | ${new Date().toLocaleString()}`
+              }
+            ]
           }
         ]
       };
