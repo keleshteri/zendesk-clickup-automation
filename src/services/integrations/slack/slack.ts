@@ -345,8 +345,71 @@ export class SlackService {
 
 
 
+  /**
+   * Check service connection statuses
+   */
+  private async getServiceStatuses(): Promise<{
+    zendesk: boolean;
+    clickup: boolean;
+    ai: boolean;
+    zendeskDomain?: string;
+  }> {
+    try {
+      // Check Zendesk connection
+      let zendeskStatus = false;
+      let zendeskDomain = '';
+      try {
+        if (this.env.ZENDESK_DOMAIN) {
+          zendeskDomain = `${this.env.ZENDESK_DOMAIN}.zendesk.com`;
+          // Simple API test to check if Zendesk is accessible
+          const zendeskTest = await this.zendeskService.getTicketDetails('1'); // Test with ticket ID 1
+          zendeskStatus = true; // If no error thrown, connection works
+        }
+      } catch (error) {
+        // If error is 404, it means connection works but ticket doesn't exist
+        zendeskStatus = error instanceof Error && error.message.includes('404');
+      }
+
+      // Check ClickUp connection
+      let clickupStatus = false;
+      try {
+        if (this.env.CLICKUP_TOKEN) {
+          // Test ClickUp API with a simple request
+          const response = await fetch('https://api.clickup.com/api/v2/user', {
+            headers: {
+              'Authorization': this.env.CLICKUP_TOKEN,
+              'Content-Type': 'application/json'
+            }
+          });
+          clickupStatus = response.ok;
+        }
+      } catch (error) {
+        clickupStatus = false;
+      }
+
+      // Check AI service
+      const aiStatus = this.aiService.isAvailable();
+
+      return {
+        zendesk: zendeskStatus,
+        clickup: clickupStatus,
+        ai: aiStatus,
+        zendeskDomain
+      };
+    } catch (error) {
+      console.error('Error checking service statuses:', error);
+      return {
+        zendesk: false,
+        clickup: false,
+        ai: false
+      };
+    }
+  }
+
   async sendTaskGenieIntroMessage(channel: string): Promise<void> {
     try {
+      const serviceStatuses = await this.getServiceStatuses();
+      
       const message = {
         channel,
         text: `🧞 TaskGenie has joined the channel!`,
@@ -394,6 +457,15 @@ export class SlackService {
                 text: `🤖 TaskGenie v${packageJson.version} • Made by 2DC Team • Powered by AI`
               }
             ]
+          },
+          {
+            type: 'context',
+            elements: [
+              {
+                type: 'mrkdwn',
+                text: `${serviceStatuses.zendesk ? '🟢' : '🔴'} Zendesk${serviceStatuses.zendeskDomain ? ` (${serviceStatuses.zendeskDomain})` : ''} | ${serviceStatuses.clickup ? '🟢' : '🔴'} ClickUp | ${serviceStatuses.ai ? '🟢' : '🔴'} AI Provider`
+              }
+            ]
           }
         ]
       };
@@ -413,6 +485,8 @@ export class SlackService {
 
   async sendUserWelcomeMessage(channel: string, user: string): Promise<void> {
     try {
+      const serviceStatuses = await this.getServiceStatuses();
+      
       const message = {
         channel,
         text: `🧞 Welcome to TaskGenie!`,
@@ -458,6 +532,15 @@ export class SlackService {
               {
                 type: 'mrkdwn',
                 text: `🤖 TaskGenie v${packageJson.version} • Made by 2DC Team • Powered by AI`
+              }
+            ]
+          },
+          {
+            type: 'context',
+            elements: [
+              {
+                type: 'mrkdwn',
+                text: `${serviceStatuses.zendesk ? '🟢' : '🔴'} Zendesk${serviceStatuses.zendeskDomain ? ` (${serviceStatuses.zendeskDomain})` : ''} | ${serviceStatuses.clickup ? '🟢' : '🔴'} ClickUp | ${serviceStatuses.ai ? '🟢' : '🔴'} AI Provider`
               }
             ]
           }
