@@ -1,6 +1,6 @@
 {
   "name": "zendesk-clickup-automation",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "AI-powered multi-agent automation for Zendesk tickets with ClickUp task creation and Slack notifications",
   "private": true,
   "keywords": [
