@@ -88,7 +88,14 @@ export default {
 
     try {
       aiService = new AIService(env);
+      
+      // Test AI service immediately after creation
+      const aiWorking = await aiService.testConnection();
+      if (!aiWorking) {
+        console.error('🚨 AI Service test failed - enhanced workflow will not work properly');
+      }
     } catch (error) {
+      console.error('❌ AI Service initialization failed completely:', error);
       logError('AI', error);
     }
 
@@ -405,6 +412,10 @@ export default {
                 if (slackThreadTs && aiAnalysis) {
                   try {
                     console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Starting enhanced workflow orchestration...`);
+                    console.log(`🤖 AI Service available: ${aiService ? 'YES' : 'NO'}`);
+                    console.log(`🎯 Multi-agent service available: ${multiAgentService ? 'YES' : 'NO'}`);
+                    console.log(`💬 Slack service available: ${slackService ? 'YES' : 'NO'}`);
+                    
                     const orchestrator = new EnhancedWorkflowOrchestrator(
                       slackService,
                       multiAgentService,
@@ -421,25 +432,38 @@ export default {
                         existingAiAnalysis: aiAnalysis // Pass existing analysis to avoid redundancy
                       }).then(result => {
                         if (result.success) {
-                          console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Enhanced workflow completed successfully:`, {
-                            stepsCompleted: result.completedSteps,
-                            totalSteps: result.totalSteps
+                          console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} ✅ Enhanced workflow completed successfully:`, {
+                            stepsCompleted: result.completedSteps.length,
+                            totalSteps: result.totalSteps,
+                            stepNames: result.completedSteps.map(s => s.stepName)
                           });
                         } else {
-                          console.warn(`${LOG_CONFIG.PREFIXES.WARNING} Enhanced workflow completed with errors:`, {
-                            stepsCompleted: result.completedSteps,
+                          console.error(`${LOG_CONFIG.PREFIXES.ERROR} ❌ Enhanced workflow failed:`, {
+                            stepsCompleted: result.completedSteps.length,
                             totalSteps: result.totalSteps,
+                            stepNames: result.completedSteps.map(s => s.stepName),
+                            failedSteps: result.failedSteps.map(s => `${s.stepName}: ${s.error}`),
                             errors: result.errors
                           });
+                          console.error(`🚨 This is why you're seeing "Hi Here!" instead of enhanced workflow!`);
                         }
                       }).catch(error => {
-                        console.error(`${LOG_CONFIG.PREFIXES.ERROR} Enhanced workflow failed:`, error);
+                        console.error(`${LOG_CONFIG.PREFIXES.ERROR} 💥 Enhanced workflow crashed completely:`, error);
+                        console.error(`🚨 This is why you're seeing "Hi here!" instead of enhanced workflow!`);
+                        console.error(`🔧 Check AI service, multi-agent service, and Slack service initialization`);
                       })
                     );
                   } catch (orchestratorError) {
-                    console.error(`${LOG_CONFIG.PREFIXES.ERROR} Failed to start enhanced workflow:`, orchestratorError);
+                    console.error(`${LOG_CONFIG.PREFIXES.ERROR} 💥 Failed to start enhanced workflow:`, orchestratorError);
+                    console.error(`🚨 This is why you're seeing "Hi here!" instead of enhanced workflow!`);
+                    console.error(`🔧 Check service initialization and environment variables`);
                     // Don't fail the main process if enhanced workflow fails
                   }
+                } else {
+                  console.error(`${LOG_CONFIG.PREFIXES.ERROR} ❌ Enhanced workflow conditions not met:`);
+                  console.error(`📍 Slack thread TS: ${slackThreadTs ? 'PRESENT' : 'MISSING'}`);
+                  console.error(`🤖 AI Analysis: ${aiAnalysis ? 'PRESENT' : 'MISSING'}`);
+                  console.error(`🚨 This is why you're seeing "Hi here!" instead of enhanced workflow!`);
                 }
               } catch (slackError) {
                 console.error(`${LOG_CONFIG.PREFIXES.ERROR} Slack notification failed:`, slackError);

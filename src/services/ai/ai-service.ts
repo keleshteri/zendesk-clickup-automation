@@ -10,15 +10,52 @@ export class AIService {
 
   constructor(env: Env) {
     this.env = env;
+    
+    console.log('🤖 Initializing AI Service...');
+    console.log(`🔑 AI Provider: ${env.AI_PROVIDER || 'NOT_SET'}`);
+    console.log(`🔑 Gemini API Key: ${env.GOOGLE_GEMINI_API_KEY ? 'PRESENT' : 'MISSING'}`);
+    
     try {
       this.provider = this.createProvider();
       if (this.provider && this.provider.name === 'googlegemini') {
         const genAI = new GoogleGenerativeAI(this.env.GOOGLE_GEMINI_API_KEY!);
         this.model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        console.log('✅ AI Service initialized successfully with Gemini 1.5 Flash');
       }
     } catch (error) {
-      console.warn('AI provider not configured:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('❌ AI provider initialization failed:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('🚨 This will cause enhanced workflow to fail and fall back to basic notifications');
       this.provider = null;
+    }
+  }
+
+  /**
+   * Check if AI service is properly initialized and working
+   */
+  isAvailable(): boolean {
+    const available = this.provider !== null && this.model !== null;
+    if (!available) {
+      console.log('⚠️ AI Service not available - this will cause fallback to basic workflow');
+    }
+    return available;
+  }
+
+  /**
+   * Test AI service with a simple prompt
+   */
+  async testConnection(): Promise<boolean> {
+    if (!this.isAvailable()) {
+      return false;
+    }
+    
+    try {
+      const testResponse = await this.generateResponse('Say "test successful"');
+      const success = testResponse.toLowerCase().includes('test successful');
+      console.log(`🧪 AI Service test: ${success ? 'PASSED' : 'FAILED'}`);
+      return success;
+    } catch (error) {
+      console.error('🧪 AI Service test FAILED:', error);
+      return false;
     }
   }
 
@@ -82,16 +119,41 @@ export class AIService {
   // Generate general AI responses for enhanced Q&A
   async generateResponse(prompt: string): Promise<string> {
     if (!this.provider || !this.model) {
-      throw new Error('AI provider is not configured');
+      console.error('❌ AI Service not properly initialized');
+      throw new Error('AI service not properly initialized - check GOOGLE_GEMINI_API_KEY');
     }
 
     try {
+      console.log('🤖 Generating AI response...');
+      console.log(`📝 Prompt length: ${prompt.length} characters`);
+      
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
-      return response.text();
+      const text = response.text();
+      
+      console.log('✅ AI response generated successfully');
+      console.log(`📝 Response length: ${text.length} characters`);
+      
+      return text;
     } catch (error) {
-      console.error('AI response generation error:', error);
-      throw error;
+      console.error('❌ AI response generation failed:');
+      console.error('Error details:', error);
+      
+      // Check for specific Google AI errors
+      if (error instanceof Error) {
+        if (error.message.includes('API_KEY')) {
+          console.error('🔑 API Key issue detected - check GOOGLE_GEMINI_API_KEY environment variable');
+          throw new Error('Google Gemini API key is invalid or missing');
+        } else if (error.message.includes('RATE_LIMIT')) {
+          console.error('⏰ Rate limit hit - too many requests to Google AI');
+          throw new Error('Google Gemini API rate limit exceeded');
+        } else if (error.message.includes('QUOTA')) {
+          console.error('💰 Quota exceeded - check Google AI billing');
+          throw new Error('Google Gemini API quota exceeded');
+        }
+      }
+      
+      throw new Error(`AI response generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
