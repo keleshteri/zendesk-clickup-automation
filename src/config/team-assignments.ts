@@ -1,7 +1,15 @@
 /**
  * Team Assignment Configuration
  * Maps ticket categories and urgency levels to appropriate team members
+ * Enhanced with project-aware team assignment capabilities
  */
+
+import { 
+  getProjectAwareTeamAssignment, 
+  logProjectDetection, 
+  TicketData, 
+  ProjectDetectionResult 
+} from './project-mappings';
 
 export interface TeamMember {
   name: string;
@@ -32,17 +40,7 @@ export interface TeamAssignment {
   };
 }
 
-// Slack User ID Constants
-const SLACK_IDS = {
-  STEVE: "UGK1YA9EE",
-  TALHA: "UGJ9606V6", 
-  FRANCIS: "U07G3Q6DE1K",
-  MIKE: "U0570RF4CHG",
-  SAMUEL: "U03115JMADR",
-  DIMPLE: "U08TGG2RQPM",
-  PAT: "U08MCUF919T",
-  CAMILLE: "U0508K1V51P"
-} as const;
+import { SLACK_IDS } from './slack-ids';
 
 // Team Members Configuration
 export const TEAM_MEMBERS: TeamMember[] = [
@@ -287,10 +285,33 @@ export const getMentionsForTicket = (
   category: string,
   urgency: string,
   agentRole?: string,
-  ticketContent?: string
-): { engineers: string[]; projectManagers: string[]; message: string } => {
+  ticketContent?: string,
+  ticketData?: TicketData
+): { engineers: string[]; projectManagers: string[]; message: string; projectInfo?: any } => {
   const normalizedCategory = category.toLowerCase();
   const normalizedUrgency = urgency.toLowerCase();
+
+  // NEW: Project-aware team assignment
+  if (ticketData) {
+    const projectAssignment = getProjectAwareTeamAssignment(ticketData);
+    logProjectDetection(ticketData, projectAssignment.detection);
+    
+    if (projectAssignment.detection.projectId) {
+      const engineers = projectAssignment.engineers.map(id => `<@${id}>`);
+      const projectManager = `<@${projectAssignment.projectManager}>`;
+      
+      return {
+        engineers,
+        projectManagers: [projectManager],
+        message: `${projectAssignment.project.client} project assignment (${projectAssignment.detection.confidence.toFixed(1)}% confidence)`,
+        projectInfo: {
+          ...projectAssignment.project,
+          detection: projectAssignment.detection,
+          businessContext: projectAssignment.businessContext
+        }
+      };
+    }
+  }
 
   // Enhanced logic: Use agent role to determine specialized team members
   if (agentRole && ticketContent) {
@@ -324,26 +345,38 @@ export const formatMentionMessage = (
   ticketId?: string,
   agentRole?: string,
   agentRecommendations?: string[],
-  ticketContent?: string
+  ticketContent?: string,
+  ticketData?: TicketData
 ): string => {
-  const mentions = getMentionsForTicket(category, urgency, agentRole, ticketContent);
+  const mentions = getMentionsForTicket(category, urgency, agentRole, ticketContent, ticketData);
   const engineerMentions = mentions.engineers.join(" ");
   const pmMentions = mentions.projectManagers.join(" ");
 
   let message = "";
 
-  // Add agent context if available
-  if (agentRole) {
-    message += `🤖 **${agentRole.replace('_', ' ')} Analysis Complete**\n`;
-  }
+  // Add project context if available
+  if (mentions.projectInfo) {
+    message += `👥 **Team Assignment**\n`;
+    message += `${engineerMentions} investigate ${category} issue (Client: ${mentions.projectInfo.client}, Project: ${mentions.projectInfo.name})\n`;
+    message += `📋 **Detection:** ${mentions.projectInfo.detection.reasoning}\n\n`;
+  } else {
+    // Add agent context if available
+    if (agentRole) {
+      message += `🤖 **${agentRole.replace('_', ' ')} Analysis Complete**\n`;
+    }
 
-  if (engineerMentions) {
-    message += `${engineerMentions} ${mentions.message}`;
+    if (engineerMentions) {
+      message += `${engineerMentions} ${mentions.message}`;
+    }
   }
 
   if (pmMentions) {
-    if (message) message += "\n";
-    message += `cc: ${pmMentions} please take note`;
+    if (message && !mentions.projectInfo) message += "\n";
+    if (mentions.projectInfo) {
+      message += `cc: ${pmMentions} - monitor ${mentions.projectInfo.client} project progress and coordinate with client\n\n`;
+    } else {
+      message += `cc: ${pmMentions} please take note`;
+    }
   }
 
   // Add agent recommendations if available
@@ -378,10 +411,17 @@ export const generateEnhancedTeamAssignmentMessage = (
     confidence?: number;
     processingTime?: number;
     agentsInvolved?: string[];
-  }
+  },
+  ticketData?: TicketData
 ): string => {
   const ticketContent = `${ticketSubject} ${ticketDescription}`;
   const ticket = { id: ticketId, subject: ticketSubject, description: ticketDescription };
+  
+  // Create ticket data for project detection if not provided
+  const detectionData: TicketData = ticketData || {
+    subject: ticketSubject,
+    description: ticketDescription
+  };
   
   // Use new helper functions for enhanced analysis
   const specificIssue = extractSpecificIssue(ticket);
@@ -390,7 +430,7 @@ export const generateEnhancedTeamAssignmentMessage = (
   const businessImpact = getBusinessImpactContext(ticketDescription);
   const stakeholderContext = getStakeholderContext(businessImpact);
   const specificGoal = generateSpecificGoal(specificIssue, ticketContent);
-  const mentions = getMentionsForTicket(category, urgency, agentRole, ticketContent);
+  const mentions = getMentionsForTicket(category, urgency, agentRole, ticketContent, detectionData);
   
   // Keep Slack mentions in proper format for actual mentions
   const engineers = mentions.engineers.join(' ');
@@ -398,16 +438,37 @@ export const generateEnhancedTeamAssignmentMessage = (
   // Format PM mentions for CC - keep proper Slack format
   const pms = mentions.projectManagers.join(' ');
   
-  // Enhanced message structure with business awareness
-  let message = `🎯 **Issue Identified:** ${specificIssue}\n\n`;
-  message += `📋 **Objective:** ${specificGoal}\n\n`;
-  message += `⏰ **Timeline:** ${urgentTimeline}\n\n`;
-  message += `💼 **Business Impact:** ${businessImpact}\n`;
-  message += `📊 **Stakeholder Action:** ${stakeholderContext}\n\n`;
-  message += `👥 **Team Assignment:**\n${engineers} investigate ${specificIssue} urgently\n\n`;
+  // Enhanced message structure with project awareness
+  let message = '';
   
-  if (pms) {
-    message += `cc: ${pms} - ${stakeholderContext}\n\n`;
+  if (mentions.projectInfo) {
+    // Project-aware message format
+    message += `🎯 **Issue Identified:** ${specificIssue}\n\n`;
+    message += `📋 **Objective:** ${specificGoal}\n\n`;
+    message += `⏰ **Timeline:** ${urgentTimeline}\n\n`;
+    message += `💼 **Business Impact:** ${businessImpact}\n`;
+    message += `📊 **Stakeholder Action:** ${stakeholderContext}\n\n`;
+    message += `👥 **Team Assignment:**\n${engineers} investigate ${specificIssue} urgently\n`;
+    message += `(Client: ${mentions.projectInfo.client}, Project: ${mentions.projectInfo.name})\n\n`;
+    
+    if (pms) {
+      message += `cc: ${pms} - monitor ${mentions.projectInfo.client} project progress and coordinate with client\n\n`;
+    }
+    
+    // Add project detection details
+    message += `📋 **Detection:** ${mentions.projectInfo.detection.reasoning}\n\n`;
+  } else {
+    // Fallback to original format for unknown projects
+    message += `🎯 **Issue Identified:** ${specificIssue}\n\n`;
+    message += `📋 **Objective:** ${specificGoal}\n\n`;
+    message += `⏰ **Timeline:** ${urgentTimeline}\n\n`;
+    message += `💼 **Business Impact:** ${businessImpact}\n`;
+    message += `📊 **Stakeholder Action:** ${stakeholderContext}\n\n`;
+    message += `👥 **Team Assignment:**\n${engineers} investigate ${specificIssue} urgently\n\n`;
+    
+    if (pms) {
+      message += `cc: ${pms} - ${stakeholderContext}\n\n`;
+    }
   }
   
   // Generate contextual footer based on urgency and business impact
@@ -641,6 +702,70 @@ export const formatTimelineWithUrgency = (urgency: string, estimatedTime?: strin
 };
 
 /**
+ * Create TicketData from Zendesk webhook payload
+ */
+export const createTicketDataFromZendesk = (zendeskTicket: any): TicketData => {
+  return {
+    organization: zendeskTicket.organization?.name || zendeskTicket.organization_id?.toString(),
+    requesterEmail: zendeskTicket.requester?.email || zendeskTicket.requester_email,
+    tags: zendeskTicket.tags || [],
+    subject: zendeskTicket.subject,
+    description: zendeskTicket.description,
+    customFields: zendeskTicket.custom_fields || {}
+  };
+};
+
+/**
+ * Enhanced team assignment with project detection for external use
+ */
+export const getProjectAwareTeamMentions = (
+  category: string,
+  urgency: string,
+  zendeskTicket: any,
+  agentRole?: string,
+  ticketContent?: string
+) => {
+  const ticketData = createTicketDataFromZendesk(zendeskTicket);
+  return getMentionsForTicket(category, urgency, agentRole, ticketContent, ticketData);
+};
+
+/**
+ * Generate project-aware enhanced message for external use
+ */
+export const generateProjectAwareMessage = (
+  category: string,
+  urgency: string,
+  ticketId: string,
+  ticketSubject: string,
+  ticketDescription: string,
+  zendeskTicket: any,
+  agentRole?: string,
+  agentRecommendations?: string[],
+  estimatedTime?: string,
+  agentFeedback?: any,
+  metrics?: {
+    confidence?: number;
+    processingTime?: number;
+    agentsInvolved?: string[];
+  }
+): string => {
+  const ticketData = createTicketDataFromZendesk(zendeskTicket);
+  return generateEnhancedTeamAssignmentMessage(
+    category,
+    urgency,
+    ticketId,
+    ticketSubject,
+    ticketDescription,
+    agentRole,
+    agentRecommendations,
+    estimatedTime,
+    agentFeedback,
+    metrics,
+    ticketData
+  );
+};
+
+/**
  * Get business impact context for PM CC messages
  */
 export const getBusinessImpactContext = (ticketContent: string): string => {
@@ -649,10 +774,15 @@ export const getBusinessImpactContext = (ticketContent: string): string => {
   if (content.includes('deadline')) return 'deadline at risk, please monitor progress';
   if (content.includes('customer')) return 'customer impact, please track resolution';
   if (content.includes('revenue') || content.includes('sales')) return 'revenue impact, escalate if needed';
-  if (content.includes('critical') || content.includes('urgent')) return 'critical issue, please monitor closely';
-  if (content.includes('outage') || content.includes('down')) return 'service outage, please coordinate response';
+  if (content.includes('critical')) return 'critical system issue, immediate attention required';
+  if (content.includes('outage') || content.includes('down')) return 'service outage, restore ASAP';
+  if (content.includes('security')) return 'security concern, follow incident protocol';
+  if (content.includes('data') && content.includes('loss')) return 'potential data loss, investigate urgently';
+  if (content.includes('payment') || content.includes('checkout')) return 'payment system affected, revenue at risk';
+  if (content.includes('login') || content.includes('access')) return 'user access issue, restore functionality';
+  if (content.includes('performance') || content.includes('slow')) return 'performance degradation, optimize system';
   
-  return 'please take note and monitor progress';
+  return 'standard support issue, monitor resolution';
 };
 
 /**
