@@ -91,12 +91,15 @@ export const AGENT_CAPABILITIES: Record<AgentRole, AgentCapability> = {
   'PROJECT_MANAGER': {
     role: 'PROJECT_MANAGER',
     name: 'Project Manager',
-    description: 'Manages project coordination, timelines, and stakeholder communication',
+    description: 'Manages project coordination, timelines, stakeholder communication, and client relationships',
     keywords: [
       'project', 'timeline', 'deadline', 'milestone', 'planning', 'coordination',
       'stakeholder', 'communication', 'meeting', 'status', 'progress',
       'resource', 'allocation', 'budget', 'scope', 'requirement', 'priority',
-      'risk', 'issue', 'escalation', 'delivery', 'release', 'sprint'
+      'risk', 'issue', 'escalation', 'delivery', 'release', 'sprint',
+      'monitor', 'monitoring', 'client', 'coordinate', 'coordination',
+      'track', 'tracking', 'blocker', 'blockers', 'deliverable', 'deliverables',
+      'expectation', 'expectations', 'follow-up', 'followup', 'action items'
     ],
     specialties: [
       'Project planning and scheduling',
@@ -105,7 +108,9 @@ export const AGENT_CAPABILITIES: Record<AgentRole, AgentCapability> = {
       'Risk assessment and mitigation',
       'Progress tracking and reporting',
       'Team coordination and leadership',
-      'Scope and requirement management'
+      'Scope and requirement management',
+      'Project monitoring and oversight',
+      'Client coordination and relationship management'
     ],
     confidenceThreshold: 0.65,
     maxProcessingTime: 30000,

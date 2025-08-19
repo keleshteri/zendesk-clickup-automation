@@ -40,6 +40,22 @@ export class ProjectManagerAgent extends BaseAgent {
         }
       },
       {
+        name: 'project_monitoring',
+        description: 'Monitor ongoing project progress, identify blockers, and track deliverables',
+        parameters: { project: 'string', status: 'string', blockers: 'array', next_actions: 'array', timeline_status: 'string' },
+        execute: async (params) => {
+          return `Project monitoring for ${params.project}: Status: ${params.status}, Timeline: ${params.timeline_status}, Blockers: ${params.blockers.join(', ')}, Next actions: ${params.next_actions.join(', ')}`;
+        }
+      },
+      {
+         name: 'client_coordination',
+         description: 'Coordinate with clients, manage expectations, and facilitate communication',
+         parameters: { client: 'string', communication_type: 'string', topics: 'array', action_items: 'array', follow_up: 'string' },
+         execute: async (params) => {
+           return `Client coordination with ${params.client}: ${params.communication_type} regarding ${params.topics.join(', ')}, Action items: ${params.action_items.join(', ')}, Follow-up: ${params.follow_up}`;
+         }
+       },
+       {
         name: 'stakeholder_communication',
         description: 'Manage stakeholder communication and reporting',
         parameters: { stakeholders: 'array', communication_type: 'string', frequency: 'string', updates: 'array' },
@@ -68,7 +84,9 @@ export class ProjectManagerAgent extends BaseAgent {
         'quality_assurance',
         'budget_management',
         'team_coordination',
-        'progress_monitoring'
+        'progress_monitoring',
+        'project_monitoring',
+        'client_coordination'
       ],
       tools,
       10 // Highest capacity for coordination tasks
@@ -83,7 +101,19 @@ export class ProjectManagerAgent extends BaseAgent {
     const impactAnalysis = this.assessBusinessImpact(ticket, content);
     const routingDecision = await this.determineOptimalAgent(ticket, content);
     
+    // Add project monitoring and client coordination analysis
+    const monitoringNeeds = this.assessMonitoringNeeds(content, impactAnalysis);
+    const clientCoordinationNeeds = this.assessClientCoordinationNeeds(content, impactAnalysis);
+    
     let analysis = `Business Impact Assessment:\n${impactAnalysis.impact}\n\nCoordination Plan:\n${impactAnalysis.coordination}`;
+    
+    if (monitoringNeeds.required) {
+      analysis += `\n\nProject Monitoring Plan:\n${monitoringNeeds.plan}`;
+    }
+    
+    if (clientCoordinationNeeds.required) {
+      analysis += `\n\nClient Coordination Strategy:\n${clientCoordinationNeeds.strategy}`;
+    }
     
     if (routingDecision.agent) {
       analysis += `\n\nRouting Decision:\n• Assigning to ${routingDecision.agent} for technical analysis\n• Reason: ${routingDecision.reasoning}`;
@@ -92,7 +122,10 @@ export class ProjectManagerAgent extends BaseAgent {
     const recommendedActions = [
       'Assess stakeholder impact and communication needs',
       'Coordinate resource allocation for resolution',
-      'Monitor progress and escalate if needed'
+      'Monitor project progress and identify blockers',
+      'Coordinate with client and manage expectations',
+      'Track deliverables and milestone completion',
+      'Escalate issues and provide regular status updates'
     ];
 
     // Store analysis in memory
@@ -436,5 +469,69 @@ export class ProjectManagerAgent extends BaseAgent {
     }
 
     return areas;
+  }
+
+  private assessMonitoringNeeds(content: string, impactAnalysis: any): {
+    required: boolean;
+    plan: string;
+  } {
+    const monitoringKeywords = ['monitor', 'track', 'progress', 'status', 'blocker', 'deliverable', 'milestone', 'deadline'];
+    const hasMonitoringNeeds = this.containsKeywords(content, monitoringKeywords) || 
+                              impactAnalysis.complexity !== 'simple' ||
+                              impactAnalysis.priority === 'high' || impactAnalysis.priority === 'urgent';
+    
+    if (!hasMonitoringNeeds) {
+      return { required: false, plan: '' };
+    }
+    
+    let plan = '• Establish regular progress check-ins and status reporting\n';
+    plan += '• Identify and track key milestones and deliverables\n';
+    plan += '• Monitor for blockers and dependencies\n';
+    
+    if (impactAnalysis.complexity === 'complex') {
+      plan += '• Implement detailed project tracking with daily standups\n';
+      plan += '• Create risk monitoring dashboard for early warning\n';
+    }
+    
+    if (impactAnalysis.priority === 'urgent' || impactAnalysis.priority === 'high') {
+      plan += '• Escalate immediately if progress deviates from plan\n';
+      plan += '• Provide real-time updates to stakeholders\n';
+    }
+    
+    return { required: true, plan };
+  }
+
+  private assessClientCoordinationNeeds(content: string, impactAnalysis: any): {
+    required: boolean;
+    strategy: string;
+  } {
+    const clientKeywords = ['client', 'customer', 'stakeholder', 'expectation', 'communication', 'coordinate', 'follow-up'];
+    const hasClientNeeds = this.containsKeywords(content, clientKeywords) ||
+                          impactAnalysis.priority === 'high' || impactAnalysis.priority === 'urgent' ||
+                          impactAnalysis.complexity !== 'simple';
+    
+    if (!hasClientNeeds) {
+      return { required: false, strategy: '' };
+    }
+    
+    let strategy = '• Establish clear communication channels with client\n';
+    strategy += '• Set and manage client expectations regarding timeline and deliverables\n';
+    strategy += '• Provide regular status updates and progress reports\n';
+    
+    if (this.containsKeywords(content, ['urgent', 'critical', 'emergency'])) {
+      strategy += '• Implement immediate escalation protocol for urgent issues\n';
+      strategy += '• Ensure 24/7 communication availability during critical periods\n';
+    }
+    
+    if (impactAnalysis.complexity === 'complex') {
+      strategy += '• Schedule weekly client review meetings\n';
+      strategy += '• Create detailed project documentation for client visibility\n';
+      strategy += '• Establish change management process for scope adjustments\n';
+    }
+    
+    strategy += '• Document all client interactions and decisions\n';
+    strategy += '• Coordinate follow-up actions and ensure accountability\n';
+    
+    return { required: true, strategy };
   }
 }
