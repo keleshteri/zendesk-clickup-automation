@@ -239,6 +239,13 @@ export class ProjectManagerAgent extends BaseAgent {
       return null; // Complete workflow without technical agents
     }
     
+    // Check if AI service is available
+    const aiService = this.getAIService();
+    if (!aiService) {
+      console.log(`⚠️ AI service not available, using fallback routing`);
+      return this.getFallbackRoutingDecision(content);
+    }
+    
     try {
       // Use AI to analyze the ticket and determine the best agent
       const aiRoutingDecision = await this.getAIRoutingDecision(ticket);
@@ -375,28 +382,46 @@ Respond ONLY with JSON in this exact format:
   /**
    * Fallback rule-based routing when AI is unavailable
    */
+  /**
+   * Fallback rule-based routing when AI is unavailable
+   */
   private getFallbackRoutingDecision(content: string): AgentRole | null {
     console.log(`🔄 Using fallback rule-based routing`);
     
-    // Simplified priority-based rules as backup
-    if (content.includes('wordpress') || content.includes('wp-') || content.includes('plugin')) {
+    // PRIORITY 1: WordPress Issues (highest priority)
+    if (content.includes('wordpress') || content.includes('wp-') || content.includes('plugin') || content.includes('woocommerce')) {
       console.log(`✅ Fallback: WORDPRESS_DEVELOPER (WordPress keywords)`);
       return 'WORDPRESS_DEVELOPER';
     }
     
-    if (content.includes('500') || content.includes('error') || content.includes('crash')) {
-      console.log(`✅ Fallback: SOFTWARE_ENGINEER (Error keywords)`);
-      return 'SOFTWARE_ENGINEER';
-    }
-    
-    if (content.includes('deployment') || content.includes('server') || content.includes('hosting')) {
+    // PRIORITY 2: Infrastructure/DevOps (before general errors)
+    if (content.includes('deployment') || content.includes('docker') || content.includes('aws') || 
+        content.includes('ecs') || content.includes('infrastructure') || content.includes('server down') ||
+        content.includes('hosting') || content.includes('502 bad gateway') || content.includes('load balancer')) {
       console.log(`✅ Fallback: DEVOPS (Infrastructure keywords)`);
       return 'DEVOPS';
     }
     
-    if (content.includes('test') || content.includes('bug') || content.includes('qa')) {
+    // PRIORITY 3: QA Testing
+    if (content.includes('testing') || content.includes('qa') || content.includes('regression') ||
+        content.includes('mobile app') || content.includes('bugs found') || content.includes('test suite')) {
       console.log(`✅ Fallback: QA_TESTER (Testing keywords)`);
       return 'QA_TESTER';
+    }
+    
+    // PRIORITY 4: Business Analysis  
+    if ((content.includes('business') && content.includes('analysis')) || 
+        content.includes('requirements') || content.includes('strategy') || content.includes('planning') ||
+        content.includes('roi analysis') || content.includes('stakeholder')) {
+      console.log(`✅ Fallback: BUSINESS_ANALYST (Business planning keywords)`);
+      return 'BUSINESS_ANALYST';
+    }
+    
+    // PRIORITY 5: Technical Errors (last priority)
+    if (content.includes('500') || content.includes('error') || content.includes('crash') ||
+        content.includes('api') || content.includes('database')) {
+      console.log(`✅ Fallback: SOFTWARE_ENGINEER (Error keywords)`);
+      return 'SOFTWARE_ENGINEER';
     }
     
     console.log(`⚠️ Fallback: No routing needed`);
@@ -487,26 +512,39 @@ Respond ONLY with JSON in this exact format:
       'we have problem on website ask team fix it', // Very vague
       'problem on website',
       'can you help',
-      'test ticket'
+      'test ticket',
+      'pricing and services', // From test ticket
+      'schedule a call to discuss',
+      'development work cost'
     ];
     
-    // Also check if content is very short and vague
-    const words = content.trim().split(/\s+/);
-    const isVeryShort = words.length <= 15;
-    const hasNoSpecifics = !content.includes('error') && 
-                          !content.includes('dashboard') && 
-                          !content.includes('500') && 
-                          !content.includes('plugin') && 
-                          !content.includes('database') &&
-                          !content.includes('api') &&
-                          !content.includes('login') &&
-                          !content.includes('deployment');
-    
+    // Check for inquiry patterns
     const matchesPattern = inquiryPatterns.some(pattern => content.includes(pattern));
-    const isVagueRequest = isVeryShort && hasNoSpecifics && 
-                          (content.includes('help') || content.includes('problem') || content.includes('fix'));
+    if (matchesPattern) {
+      console.log(`📝 Simple inquiry pattern detected: matches pricing/help request`);
+      return true;
+    }
     
-    return matchesPattern || isVagueRequest;
+    // Check if content is very short and vague
+    const words = content.trim().split(/\s+/);
+    const isVeryShort = words.length <= 20; // Increased from 15
+    
+    // Check for vague help requests
+    const hasVagueHelp = content.includes('help') && !content.includes('error') && 
+                        !content.includes('500') && !content.includes('bug') &&
+                        !content.includes('crash') && !content.includes('failed');
+    
+    // Check for project inquiry without technical details
+    const hasProjectInquiry = (content.includes('project') || content.includes('work with you')) &&
+                             !content.includes('error') && !content.includes('500') &&
+                             !content.includes('database') && !content.includes('api');
+    
+    if (isVeryShort && (hasVagueHelp || hasProjectInquiry)) {
+      console.log(`📝 Simple inquiry detected: short vague request (${words.length} words)`);
+      return true;
+    }
+    
+    return false;
   }
 
   private assessBusinessImpact(ticket: ZendeskTicket, content: string): {
