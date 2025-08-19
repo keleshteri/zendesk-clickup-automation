@@ -81,7 +81,7 @@ export class ProjectManagerAgent extends BaseAgent {
     
     // Analyze business impact and coordination needs
     const impactAnalysis = this.assessBusinessImpact(ticket, content);
-    const routingDecision = this.determineOptimalAgent(ticket, content);
+    const routingDecision = await this.determineOptimalAgent(ticket, content);
     
     let analysis = `Business Impact Assessment:\n${impactAnalysis.impact}\n\nCoordination Plan:\n${impactAnalysis.coordination}`;
     
@@ -197,99 +197,117 @@ export class ProjectManagerAgent extends BaseAgent {
     const ticket = context.ticket || context;
     const content = `${ticket.subject} ${ticket.description}`.toLowerCase();
     
-    // Enhanced PM coordination logic
-    const agentAssignment = this.determineOptimalAgent(ticket, content);
+    console.log(`🔀 PM Agent Routing Decision for Ticket #${ticket.id}:`);
+    console.log(`📄 Content keywords: ${content.substring(0, 100)}...`);
     
-    // Log PM decision making
-    console.log(`🎯 PM Agent Decision for ticket ${ticket.id}:`, {
-      ticketSubject: ticket.subject,
-      recommendedAgent: agentAssignment.agent,
-      confidence: agentAssignment.confidence,
-      reasoning: agentAssignment.reasoning
-    });
+    // PRIORITY 1: WordPress Issues (Check first to handle WordPress crashes properly)
+    if (content.includes('wordpress') || 
+        content.includes('wp-') || 
+        content.includes('plugin') ||
+        content.includes('theme') ||
+        content.includes('woocommerce') ||
+        content.includes('wp_')) {
+      console.log(`✅ Routing to WORDPRESS_DEVELOPER (WordPress issue detected)`);
+      return 'WORDPRESS_DEVELOPER';
+    }
     
-    return agentAssignment.agent;
+    // PRIORITY 2: Technical Issues (Override everything else except WordPress)
+    if (content.includes('500 error') || 
+        content.includes('server error') || 
+        content.includes('internal server error') ||
+        content.includes('database error') ||
+        content.includes('api error') ||
+        content.includes('timeout') ||
+        content.includes('fatal error') ||
+        content.includes('500') ||
+        content.includes('crash') ||
+        content.includes('exception')) {
+      console.log(`✅ Routing to SOFTWARE_ENGINEER (Technical error detected)`);
+      return 'SOFTWARE_ENGINEER';
+    }
+    
+    // PRIORITY 3: Infrastructure/Deployment
+    if (content.includes('deployment') || 
+        content.includes('server down') ||
+        content.includes('infrastructure') ||
+        content.includes('hosting') ||
+        content.includes('docker') ||
+        content.includes('kubernetes') ||
+        content.includes('aws') ||
+        content.includes('cloud') ||
+        content.includes('ssl') ||
+        content.includes('domain') ||
+        content.includes('dns')) {
+      console.log(`✅ Routing to DEVOPS (Infrastructure issue detected)`);
+      return 'DEVOPS';
+    }
+    
+    // PRIORITY 4: Testing and QA
+    if (content.includes('test') || 
+        content.includes('testing') ||
+        content.includes('qa') ||
+        content.includes('quality') ||
+        content.includes('defect') ||
+        content.includes('validation') ||
+        content.includes('verification')) {
+      console.log(`✅ Routing to QA_TESTER (Testing issue detected)`);
+      return 'QA_TESTER';
+    }
+    
+    // PRIORITY 5: Business Analysis (Only for non-technical issues)
+    if ((content.includes('timeline') || 
+         content.includes('project plan') ||
+         content.includes('requirements') ||
+         content.includes('business process') ||
+         content.includes('specification') ||
+         content.includes('documentation')) &&
+        !content.includes('error') && 
+        !content.includes('500') &&
+        !content.includes('bug') &&
+        !content.includes('crash')) {
+      console.log(`✅ Routing to BUSINESS_ANALYST (Business planning)`);
+      return 'BUSINESS_ANALYST';
+    }
+    
+    // Default: For analytics/dashboard issues that are NOT technical errors
+    if (content.includes('analytics') && 
+        !content.includes('error') && 
+        !content.includes('500') &&
+        !content.includes('bug') &&
+        !content.includes('crash')) {
+      console.log(`✅ Routing to BUSINESS_ANALYST (Analytics planning)`);
+      return 'BUSINESS_ANALYST';
+    }
+    
+    console.log(`⚠️ No routing match found, completing workflow`);
+    return null; // Workflow complete
   }
   
   /**
-   * Enhanced agent assignment logic with confidence scoring
+   * Enhanced agent assignment logic with correct priority matrix
+   * @deprecated - Use shouldHandoff() method instead for proper priority handling
    */
-  private determineOptimalAgent(ticket: any, content: string): {
+  private async determineOptimalAgent(ticket: any, content: string): Promise<{
     agent: AgentRole | null;
     confidence: number;
     reasoning: string;
-  } {
-    const assignments = [
-      {
-        agent: 'SOFTWARE_ENGINEER' as AgentRole,
-        keywords: ['500 error', 'server error', 'api', 'code', 'programming', 'development', 'feature', 'function', 'integration', 'backend', 'frontend', 'error', '500', 'bug', 'crash', 'exception', 'database error', 'application'],
-        weight: 0.9
-      },
-      {
-        agent: 'WORDPRESS_DEVELOPER' as AgentRole,
-        keywords: ['wordpress', 'wp-', 'plugin', 'theme', 'cms', 'gutenberg', 'woocommerce', 'wp_'],
-        weight: 0.95
-      },
-      {
-        agent: 'DEVOPS' as AgentRole,
-        keywords: ['deployment', 'infrastructure', 'docker', 'kubernetes', 'aws', 'cloud', 'server', 'hosting', 'performance', 'monitoring', 'ssl', 'domain', 'dns'],
-        weight: 0.85
-      },
-      {
-        agent: 'QA_TESTER' as AgentRole,
-        keywords: ['test', 'testing', 'qa', 'quality', 'defect', 'validation', 'verification', 'automation'],
-        weight: 0.8
-      },
-      {
-        agent: 'BUSINESS_ANALYST' as AgentRole,
-        keywords: ['requirements', 'analysis', 'business', 'process', 'workflow', 'specification', 'documentation', 'metrics', 'reporting'],
-        weight: 0.7
-      }
-    ];
+  }> {
+    // This method is kept for backward compatibility but shouldHandoff() now handles routing directly
+    const result = await this.shouldHandoff(ticket);
     
-    let bestMatch = { agent: null as AgentRole | null, score: 0, reasoning: '' };
-    
-    for (const assignment of assignments) {
-      const matchCount = assignment.keywords.filter(keyword => content.includes(keyword)).length;
-      const score = (matchCount / assignment.keywords.length) * assignment.weight;
-      
-      // Lower threshold to ensure more handoffs occur
-      if (score > bestMatch.score && score > 0.1) {
-        bestMatch = {
-          agent: assignment.agent,
-          score,
-          reasoning: `Matched ${matchCount}/${assignment.keywords.length} keywords for ${assignment.agent}`
-        };
-      }
+    if (result === 'SOFTWARE_ENGINEER') {
+      return { agent: result, confidence: 0.9, reasoning: 'Technical issue priority routing' };
+    } else if (result === 'WORDPRESS_DEVELOPER') {
+      return { agent: result, confidence: 0.95, reasoning: 'WordPress issue priority routing' };
+    } else if (result === 'DEVOPS') {
+      return { agent: result, confidence: 0.85, reasoning: 'Infrastructure issue priority routing' };
+    } else if (result === 'QA_TESTER') {
+      return { agent: result, confidence: 0.8, reasoning: 'Testing issue priority routing' };
+    } else if (result === 'BUSINESS_ANALYST') {
+      return { agent: result, confidence: 0.7, reasoning: 'Business analysis priority routing' };
+    } else {
+      return { agent: null, confidence: 1.0, reasoning: 'No specialization needed - PM coordination' };
     }
-    
-    // More aggressive routing - only return null if absolutely no technical keywords found
-    if (bestMatch.score < 0.15) {
-      // Check for any technical indicators that should trigger handoff
-      const technicalKeywords = ['error', 'bug', 'issue', 'problem', 'fix', 'broken', 'not working', 'fail'];
-      const hasTechnicalContent = technicalKeywords.some(keyword => content.includes(keyword));
-      
-      if (hasTechnicalContent) {
-        // Default to SOFTWARE_ENGINEER for technical issues
-        bestMatch = {
-          agent: 'SOFTWARE_ENGINEER',
-          score: 0.6,
-          reasoning: 'Technical issue detected - routing to Software Engineer'
-        };
-      } else {
-        bestMatch = {
-          agent: null,
-          score: 1.0,
-          reasoning: 'No technical specialization needed - PM will coordinate'
-        };
-      }
-    }
-    
-    return {
-      agent: bestMatch.agent,
-      confidence: bestMatch.score,
-      reasoning: bestMatch.reasoning
-    };
   }
 
   async canHandle(ticket: ZendeskTicket): Promise<boolean> {
