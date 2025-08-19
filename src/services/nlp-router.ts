@@ -345,17 +345,54 @@ Extract relevant entities like:
     const status = intent.entities.status || 'open';
     const limit = intent.parameters.limit || 100;
     
-    const tickets = await this.zendeskService.getTicketsByStatus([status], limit);
-    
-    return {
-      message: `📊 Found **${tickets.length}** ${status} tickets`,
-      data: {
-        count: tickets.length,
-        status,
-        tickets: tickets.slice(0, 5) // Return first 5 for preview
-      },
-      executedTools
-    };
+    try {
+      const tickets = await this.zendeskService.getTicketsByStatus([status], limit);
+      
+      return {
+        message: `📊 Found **${tickets.length}** ${status} tickets`,
+        data: {
+          count: tickets.length,
+          status,
+          tickets: tickets.slice(0, 5) // Return first 5 for preview
+        },
+        executedTools
+      };
+    } catch (error: any) {
+      // Handle SupportProductInactive error gracefully
+      if (error.message && error.message.includes('Support product is not active')) {
+        return {
+          message: `🚫 **Zendesk Support Product Required**\n\n` +
+                  `I can't access ticket data because your Zendesk account doesn't have an active Support product.\n\n` +
+                  `**Solutions:**\n` +
+                  `• 🔧 **Activate Support Product**: Go to Zendesk Admin → Billing → Subscription\n` +
+                  `• 📊 **Alternative**: Use ClickUp for task counting with \`@TaskGenie clickup tasks\`\n` +
+                  `• 👥 **Team Info**: Check team status with \`@TaskGenie team status\`\n\n` +
+                  `Need help setting up Zendesk Support? Contact your admin!`,
+          data: {
+            error: 'SupportProductInactive',
+            status,
+            alternatives: [
+              'Use ClickUp for task management',
+              'Check team status instead',
+              'Activate Zendesk Support product'
+            ]
+          },
+          executedTools
+        };
+      }
+      
+      // Handle other errors
+      console.error('Error in handleTicketCount:', error);
+      return {
+        message: `❌ **Error getting ticket count**: ${error.message}\n\n` +
+                `Please check your Zendesk configuration or try again later.`,
+        data: {
+          error: error.message,
+          status
+        },
+        executedTools
+      };
+    }
   }
 
   /**

@@ -189,6 +189,7 @@ export class ZendeskService {
       
       // Try multiple approaches to find tickets
       let tickets: ZendeskTicket[] = [];
+      let lastError: any = null;
       
       // Approach 1: Use search API with lowercase status
       const statusQuery = statuses.map(status => `status:${status.toLowerCase()}`).join(' OR ');
@@ -206,10 +207,19 @@ export class ZendeskService {
         const data = await response.json() as { results: ZendeskTicket[], count: number };
         tickets = data.results || [];
         console.log(`✅ Found ${tickets.length} tickets with lowercase status search`);
+      } else {
+        // Check for SupportProductInactive error
+        const errorText = await response.text();
+        lastError = { status: response.status, statusText: response.statusText, body: errorText };
+        
+        if (response.status === 403 && errorText.includes('SupportProductInactive')) {
+          console.warn(`⚠️  Zendesk Support product is not active. Cannot access ticket APIs.`);
+          throw new Error('Zendesk Support product is not active. Please activate the Support product in your Zendesk account to use ticket-related features.');
+        }
       }
       
       // Approach 2: If no results, try with capitalized status
-      if (tickets.length === 0) {
+      if (tickets.length === 0 && !lastError) {
         const capitalizedStatusQuery = statuses.map(status => `status:${status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}`).join(' OR ');
         url = `${this.baseUrl}/search.json?query=type:ticket (${capitalizedStatusQuery})&per_page=${safeLimit}&sort_by=created_at&sort_order=desc`;
         console.log(`🔍 Fetching tickets by status (capitalized) from: ${url}`);
@@ -225,11 +235,19 @@ export class ZendeskService {
           const data = await response.json() as { results: ZendeskTicket[], count: number };
           tickets = data.results || [];
           console.log(`✅ Found ${tickets.length} tickets with capitalized status search`);
+        } else {
+          const errorText = await response.text();
+          lastError = { status: response.status, statusText: response.statusText, body: errorText };
+          
+          if (response.status === 403 && errorText.includes('SupportProductInactive')) {
+            console.warn(`⚠️  Zendesk Support product is not active. Cannot access ticket APIs.`);
+            throw new Error('Zendesk Support product is not active. Please activate the Support product in your Zendesk account to use ticket-related features.');
+          }
         }
       }
       
       // Approach 3: If still no results, try the tickets endpoint directly
-      if (tickets.length === 0) {
+      if (tickets.length === 0 && !lastError) {
         url = `${this.baseUrl}/tickets.json?per_page=${safeLimit}&sort_by=created_at&sort_order=desc`;
         console.log(`🔍 Fetching all recent tickets from: ${url}`);
         
@@ -256,19 +274,27 @@ export class ZendeskService {
           if (allTickets.length > 0) {
             console.log(`📊 Sample ticket statuses found:`, allTickets.slice(0, 5).map(t => ({ id: t.id, status: t.status })));
           }
+        } else {
+          const errorText = await response.text();
+          lastError = { status: response.status, statusText: response.statusText, body: errorText };
+          
+          if (response.status === 403 && errorText.includes('SupportProductInactive')) {
+            console.warn(`⚠️  Zendesk Support product is not active. Cannot access ticket APIs.`);
+            throw new Error('Zendesk Support product is not active. Please activate the Support product in your Zendesk account to use ticket-related features.');
+          }
         }
       }
 
-      if (!response.ok) {
-        const errorText = await response.text();
+      // If we have an error and no tickets, throw the error
+      if (lastError && tickets.length === 0) {
         console.error(`❌ Failed to fetch tickets by status:`, {
-          status: response.status,
-          statusText: response.statusText,
+          status: lastError.status,
+          statusText: lastError.statusText,
           url: url,
-          errorBody: errorText
+          errorBody: lastError.body
         });
         
-        throw new Error(`Zendesk API error: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(`Zendesk API error: ${lastError.status} ${lastError.statusText} - ${lastError.body}`);
       }
 
       console.log(`✅ Successfully fetched ${tickets.length} tickets with statuses: ${statuses.join(', ')}`);
