@@ -233,6 +233,12 @@ export class ProjectManagerAgent extends BaseAgent {
     console.log(`🔀 PM Agent Routing Decision for Ticket #${ticket.id}:`);
     console.log(`📄 Content keywords: ${content.substring(0, 100)}...`);
     
+    // FIRST: Filter out simple inquiries that don't need technical analysis
+    if (this.isSimpleInquiry(content)) {
+      console.log(`📝 Simple inquiry detected, no agent routing needed`);
+      return null; // Complete workflow without technical agents
+    }
+    
     // PRIORITY 1: WordPress Issues (Check first to handle WordPress crashes properly)
     if (content.includes('wordpress') || 
         content.includes('wp-') || 
@@ -374,7 +380,29 @@ export class ProjectManagerAgent extends BaseAgent {
   }
 
   private containsKeywords(content: string, keywords: string[]): boolean {
-    return keywords.some(keyword => content.includes(keyword.toLowerCase()));
+    return keywords.some(keyword => content.includes(keyword));
+  }
+
+  private isSimpleInquiry(content: string): boolean {
+    const inquiryPatterns = [
+      'how can i work with you',
+      'can you help me',
+      'need your company help',
+      'how do i contact',
+      'what services do you provide',
+      'how much does it cost',
+      'can we schedule a call',
+      'i need a quote',
+      'what do you do',
+      'tell me about your services',
+      'how to get started',
+      'pricing information',
+      'contact information',
+      'business inquiry',
+      'general question'
+    ];
+    
+    return inquiryPatterns.some(pattern => content.includes(pattern));
   }
 
   private assessBusinessImpact(ticket: ZendeskTicket, content: string): {

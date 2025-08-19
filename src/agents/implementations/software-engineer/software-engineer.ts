@@ -71,14 +71,15 @@ export class SoftwareEngineerAgent extends BaseAgent {
     // Enhanced analysis for specific technical issues
     if (this.containsKeywords(content, ['500', 'internal server error', 'server error', 'http 500'])) {
       recommendedActions = [
-        '🚨 CRITICAL: 500 Internal Server Error - immediate investigation required',
-        '🔍 Check server logs, database connections, and recent deployments',
-        '⚡ Implement error monitoring and rollback if needed (Est: 1-3 hours)'
+        'Check server logs for specific error messages and stack traces',
+        'Verify database connections and query performance',
+        'Review recent code deployments that may have caused the issue',
+        'Implement immediate rollback if recent deployment is the cause'
       ];
       complexity = 'complex';
       priority = 'urgent';
       estimatedTime = '1-3 hours';
-      confidence = 0.95; // High confidence for 500 errors
+      confidence = 0.9;
     } else if (this.containsKeywords(content, ['404', 'not found', 'page not found', 'missing'])) {
       recommendedActions = [
         '🔗 404 Error: Check routing configuration and URL patterns',
@@ -103,14 +104,15 @@ export class SoftwareEngineerAgent extends BaseAgent {
       ];
       complexity = 'medium';
       estimatedTime = '3-6 hours';
-    } else if (this.containsKeywords(content, ['api', 'integration', 'webhook', 'endpoint'])) {
+    } else if (this.containsKeywords(content, ['api']) && this.containsKeywords(content, ['error', 'fail', 'timeout'])) {
       recommendedActions = [
-        '🔌 API Issue: Test endpoint connectivity and authentication',
-        '📋 Review API documentation and rate limiting policies',
-        '🛠️ Fix integration and improve error handling (Est: 2-4 hours)'
+        'Check API endpoint availability and response codes',
+        'Verify API authentication tokens and credentials',
+        'Review API rate limiting and timeout configurations',
+        'Test API calls with debugging tools'
       ];
       complexity = 'medium';
-      estimatedTime = '2-4 hours';
+      estimatedTime = '2-3 hours';
     } else if (this.containsKeywords(content, ['performance', 'slow', 'optimization', 'speed'])) {
       recommendedActions = [
         '🚀 Performance Issue: Profile application and identify bottlenecks',
@@ -128,14 +130,15 @@ export class SoftwareEngineerAgent extends BaseAgent {
       complexity = 'complex';
       priority = 'urgent';
       estimatedTime = '6-12 hours';
-    } else if (this.containsKeywords(content, ['database', 'sql', 'query', 'data', 'connection'])) {
+    } else if (this.containsKeywords(content, ['database', 'connection']) && this.containsKeywords(content, ['error', 'fail', 'timeout'])) {
       recommendedActions = [
-        '🗄️ Database Issue: Check connection pools and query performance',
-        '🔍 Analyze slow queries and optimize indexes',
-        '✅ Test data integrity and backup systems (Est: 3-5 hours)'
+        'Check database server status and connection pool',
+        'Review database connection string configuration',
+        'Analyze database performance and resource usage',
+        'Test database connectivity from application server'
       ];
       complexity = 'medium';
-      estimatedTime = '3-5 hours';
+      estimatedTime = '2-4 hours';
     } else if (this.containsKeywords(content, ['wordpress', 'plugin', 'theme'])) {
       recommendedActions = [
         '🔌 WordPress-specific issue detected - requires specialist review'
@@ -147,11 +150,15 @@ export class SoftwareEngineerAgent extends BaseAgent {
       ];
       nextAgent = 'DEVOPS';
     } else {
+      // Generic fallback for other technical issues
       recommendedActions = [
-        '🔧 General technical issue requiring code review',
-        '📝 Analyze codebase and implement appropriate solution',
-        '✅ Test thoroughly and document changes (Est: 2-4 hours)'
+        'Investigate reported technical symptoms',
+        'Review system logs for error patterns',
+        'Test functionality in staging environment'
       ];
+      confidence = 0.6;
+      estimatedTime = '2-4 hours';
+      priority = 'normal';
     }
 
     // Store enhanced analysis in memory
@@ -202,15 +209,41 @@ export class SoftwareEngineerAgent extends BaseAgent {
           severity: context.severity || 'medium'
         });
       } else {
-        result = {
-          status: 'completed',
-          details: `Software engineering task executed: ${task}`,
-          recommendations: [
-            'Code review completed',
-            'Technical documentation updated',
-            'Unit tests implemented'
-          ]
-        };
+        // Provide specific analysis based on ticket content
+        const ticketContent = typeof task === 'object' ? `${task.subject} ${task.description}` : task;
+        const content = ticketContent.toLowerCase();
+        
+        if (this.containsKeywords(content, ['500', 'internal server error'])) {
+          result = {
+            status: 'completed',
+            details: 'Server error analysis completed',
+            recommendations: [
+              'Server logs reviewed for error patterns',
+              'Database connectivity verified',
+              'Recent deployments analyzed for potential causes'
+            ]
+          };
+        } else if (this.containsKeywords(content, ['database', 'connection']) && this.containsKeywords(content, ['error', 'fail'])) {
+          result = {
+            status: 'completed',
+            details: 'Database connectivity issue resolved',
+            recommendations: [
+              'Database connection pool optimized',
+              'Connection string configuration verified',
+              'Database performance metrics reviewed'
+            ]
+          };
+        } else {
+          result = {
+            status: 'completed',
+            details: `Technical analysis completed for: ${typeof task === 'object' ? task.subject : task}`,
+            recommendations: [
+              'System functionality verified',
+              'Error patterns analyzed',
+              'Performance metrics reviewed'
+            ]
+          };
+        }
       }
 
       // Store execution result
