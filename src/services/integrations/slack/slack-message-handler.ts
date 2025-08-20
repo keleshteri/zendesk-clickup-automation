@@ -299,31 +299,15 @@ export class SlackMessageHandler {
         }
       ];
 
-      // Add context footer with token usage and AI provider if available
-      if (tokenUsage || aiProvider) {
-        const contextElements = [];
-        
-        if (tokenUsage) {
-          contextElements.push({
-            type: 'mrkdwn',
-            text: SlackUtils.formatTokenUsage(tokenUsage)
-          });
-        }
-        
-        if (aiProvider) {
-          contextElements.push({
-            type: 'mrkdwn',
-            text: SlackUtils.formatAIProvider(aiProvider)
-          });
-        }
-
-        if (contextElements.length > 0) {
-          blocks.push({
-            type: 'context',
-            elements: contextElements
-          } as any);
-        }
-      }
+      // Add context footer with TaskGenie version, token usage and AI provider
+      const footerText = SlackUtils.createTaskGenieFooter(tokenUsage, aiProvider);
+      blocks.push({
+        type: 'context',
+        elements: [{
+          type: 'mrkdwn',
+          text: footerText
+        }]
+      } as any);
 
       const response = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',

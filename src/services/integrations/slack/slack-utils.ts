@@ -233,7 +233,7 @@ export class SlackUtils {
    */
   static formatTokenUsage(tokenUsage?: { input_tokens: number; output_tokens: number; total_tokens: number }): string {
     if (!tokenUsage) return '';
-    return `Tokens: ${tokenUsage.input_tokens}+${tokenUsage.output_tokens}=${tokenUsage.total_tokens}`;
+    return `:moneybag: input tokens: ${tokenUsage.input_tokens} | output tokens: ${tokenUsage.output_tokens} | cost: $0.00000`;
   }
 
   /**
@@ -241,7 +241,17 @@ export class SlackUtils {
    */
   static formatAIProvider(provider?: string): string {
     if (!provider) return '';
-    return `AI: ${provider}`;
+    return `provider: ${provider}`;
+  }
+
+  /**
+   * Create complete TaskGenie footer with version and token usage
+   */
+  static createTaskGenieFooter(tokenUsage?: { input_tokens: number; output_tokens: number; total_tokens: number }, provider?: string): string {
+    if (!tokenUsage || !provider) {
+      return `:robot_face: TaskGenie v${packageJson.version}`;
+    }
+    return `:robot_face: TaskGenie v${packageJson.version} :moneybag: input tokens: ${tokenUsage.input_tokens} | output tokens: ${tokenUsage.output_tokens} | cost: $0.00000 | provider: ${provider}`;
   }
 
   /**

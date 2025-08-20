@@ -73,7 +73,7 @@ export class TokenCalculator {
    * Format token usage for display in Slack footer
    */
   static formatUsageFooter(usage: TokenUsage, provider: string): string {
-    return `input tokens: ${usage.input_tokens} | output tokens: ${usage.output_tokens} | cost: $${usage.cost.toFixed(5)} | provider: ${provider}`;
+    return `:moneybag: input tokens: ${usage.input_tokens} | output tokens: ${usage.output_tokens} | cost: $${usage.cost.toFixed(5)} | provider: ${provider}`;
   }
 
   /**
