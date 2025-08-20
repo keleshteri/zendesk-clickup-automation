@@ -190,52 +190,7 @@ export class SlackMessageHandler {
     }
   }
 
-  /**
-   * Handle member joining channel event
-   */
-  async handleMemberJoined(event: SlackEvent, serviceStatuses: {
-    zendesk: boolean;
-    clickup: boolean;
-    ai: boolean;
-    zendeskDomain?: string;
-  }): Promise<void> {
-    try {
-      const { channel, user, bot_id } = event;
-      
-      // Skip if any bot is joining (including TaskGenie)
-      if (bot_id) {
-        console.log('Bot joined channel, skipping welcome message');
-        return;
-      }
-      
-      // Get bot info to check if the joining user is TaskGenie itself
-      try {
-        const botInfoResponse = await fetch('https://slack.com/api/auth.test', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (botInfoResponse.ok) {
-          const botInfo: any = await botInfoResponse.json();
-          if (botInfo.user_id === user) {
-            // TaskGenie is joining - send intro message
-            await this.notificationService.sendTaskGenieIntroMessage(channel, serviceStatuses);
-            return;
-          }
-        }
-      } catch (botInfoError) {
-        console.error('Error getting bot info:', botInfoError);
-      }
-      
-      // Send welcome message to new human users only
-      await this.notificationService.sendUserWelcomeMessage(channel, user, serviceStatuses);
-    } catch (error) {
-      console.error('Error handling member joined event:', error);
-    }
-  }
+
 
   // Placeholder methods for request handlers - these would need to be implemented
   // based on the existing logic in the original slack.ts file

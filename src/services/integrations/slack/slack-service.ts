@@ -63,22 +63,45 @@ export class SlackService {
    */
   async handleMemberJoined(event: SlackEvent): Promise<void> {
     try {
-      const { user, channel } = event;
+      const { user, channel, bot_id } = event;
       if (!user || !channel) {
         console.warn('Missing user or channel in member_joined_channel event');
+        return;
+      }
+
+      // Skip if any bot is joining (including TaskGenie)
+      if (bot_id) {
+        console.log('Bot joined channel, skipping welcome message');
         return;
       }
 
       // Get service statuses for welcome message
       const serviceStatuses = await this.getServiceStatuses();
 
-      // Send welcome message to the user
-      await this.notificationService.sendUserWelcomeMessage(channel, user, serviceStatuses);
-      
-      // Send TaskGenie introduction if available
-      if (this.taskGenie) {
-        await this.notificationService.sendTaskGenieIntroMessage(channel, serviceStatuses);
+      // Get bot info to check if the joining user is TaskGenie itself
+      try {
+        const botInfoResponse = await fetch('https://slack.com/api/auth.test', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (botInfoResponse.ok) {
+          const botInfo: any = await botInfoResponse.json();
+          if (botInfo.user_id === user) {
+            // TaskGenie is joining - send intro message
+            await this.notificationService.sendTaskGenieIntroMessage(channel, serviceStatuses);
+            return;
+          }
+        }
+      } catch (botInfoError) {
+        console.error('Error getting bot info:', botInfoError);
       }
+      
+      // Send welcome message to new human users only
+      await this.notificationService.sendUserWelcomeMessage(channel, user, serviceStatuses);
     } catch (error) {
       console.error('Error handling member joined event:', error);
     }
