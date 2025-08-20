@@ -45,13 +45,16 @@ export class SlackMessageHandler {
   async handleMention(event: SlackEvent): Promise<void> {
     try {
       const { channel, text, thread_ts, ts, user } = event;
-      const messageText = text || '';
+      let messageText = text || '';
+      
+      messageText = messageText.replace(/<@[A-Z0-9]+>/g, '').trim();
       
       console.log('🎯 handleMention called:', {
         channel,
         user: event.user,
         bot_id: event.bot_id,
         text: text?.substring(0, 100),
+        cleanedText: messageText.substring(0, 100),
         event_ts: ts
       });
 
