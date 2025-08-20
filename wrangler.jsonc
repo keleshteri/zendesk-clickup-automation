@@ -5,7 +5,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "zendesk-clickup-automation-dev",
+	"name": "zendesk-clickup-automation",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-08-03",
 	"observability": {
