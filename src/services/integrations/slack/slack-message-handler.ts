@@ -7,6 +7,12 @@ import { ZendeskService } from '../zendesk/zendesk.js';
 import { MultiAgentService } from '../../multi-agent-service.js';
 import { TaskGenie } from '../../task-genie.js';
 
+interface TaskGenieContext {
+  ticketId?: string;
+  channel: string;
+  threadTs?: string;
+}
+
 export class SlackMessageHandler {
   private env: Env;
   private aiService: AIService;
@@ -15,6 +21,7 @@ export class SlackMessageHandler {
   private taskGenie: TaskGenie | null = null;
   private clickupService: any = null;
   private notificationService: SlackNotificationService;
+  private slackService: any;
 
   constructor(
     env: Env,
@@ -37,6 +44,13 @@ export class SlackMessageHandler {
    */
   setClickUpService(clickupService: any): void {
     this.clickupService = clickupService;
+  }
+
+  /**
+   * Set Slack service instance
+   */
+  setSlackService(slackService: any): void {
+    this.slackService = slackService;
   }
 
   /**
@@ -196,33 +210,224 @@ export class SlackMessageHandler {
   // based on the existing logic in the original slack.ts file
   
   private async handleStatusRequest(channel: string, threadTs: string, text: string): Promise<void> {
-    // TODO: Implement status request handling
-    await this.sendSlackResponse(channel, threadTs, '🔄 Status request handling - implementation needed');
+    let ticketId: string | null = null;
+    
+    // First, try to extract ticket ID from the user's message
+    if (text) {
+      const ticketMatch = text.match(/(?:ticket\s*#?|#)(\d+)/i);
+      if (ticketMatch) {
+        ticketId = ticketMatch[1];
+      }
+    }
+    
+    // If no ticket ID found in message, try to get context from thread
+    if (!ticketId) {
+      const context = await this.getTaskGenieContext(channel, threadTs);
+      ticketId = context?.ticketId || null;
+    }
+    
+    if (ticketId) {
+      const ticket = await this.zendeskService.getTicketDetails(ticketId);
+      
+      if (ticket) {
+        await this.sendSlackResponse(
+          channel,
+          threadTs,
+          `📊 *Ticket Status Update*\n\n🎫 *Ticket #${ticket.id}*\n• Status: ${ticket.status.toUpperCase()}\n• Priority: ${ticket.priority.toUpperCase()}\n• Updated: ${new Date(ticket.updated_at).toLocaleString()}\n• Tags: ${ticket.tags.join(', ') || 'None'}`
+        );
+      } else {
+        await this.sendSlackResponse(
+          channel,
+          threadTs,
+          `❌ Sorry, I couldn't find ticket #${ticketId}. Please check if the ticket ID is correct and exists in Zendesk.`
+        );
+      }
+    } else {
+      await this.sendSlackResponse(
+        channel,
+        threadTs,
+        '❌ I couldn\'t find a ticket ID. Please specify a ticket number like:\n• `@TaskGenie status ticket #27`\n• `@TaskGenie status 27`\n• Or reply to a TaskGenie message in a thread.'
+      );
+    }
   }
 
   private async handleMultiAgentRequest(channel: string, threadTs: string, text: string): Promise<void> {
-    // TODO: Implement multi-agent request handling
-    await this.sendSlackResponse(channel, threadTs, '🤖 Multi-agent analysis - implementation needed');
+    // Check if multi-agent service is available
+    if (!this.multiAgentService) {
+      await this.sendSlackResponse(
+        channel,
+        threadTs,
+        '❌ Multi-agent analysis is currently unavailable. Please try again later or contact your administrator.'
+      );
+      return;
+    }
+
+    await this.sendSlackResponse(
+      channel,
+      threadTs,
+      '🤖 Let me analyze this ticket with our multi-agent system...'
+    );
+
+    let ticketId: string | null = null;
+    
+    // First, try to extract ticket ID from the user's message
+    if (text) {
+      const ticketMatch = text.match(/(?:ticket\s*#?|#)(\d+)/i);
+      if (ticketMatch) {
+        ticketId = ticketMatch[1];
+      }
+    }
+    
+    // If no ticket ID found in message, try to get context from thread
+    if (!ticketId) {
+      const context = await this.getTaskGenieContext(channel, threadTs);
+      ticketId = context?.ticketId || null;
+    }
+    
+    if (ticketId) {
+      try {
+        // Process ticket with multi-agent system
+        const result = await this.multiAgentService.processTicket(ticketId);
+        
+        // Format agent feedback for Slack
+        let agentFeedback = `🎯 *Multi-Agent Analysis for Ticket #${ticketId}*\n\n`;
+        
+        // Add workflow information
+        if (result.workflow && result.workflow.context && result.workflow.context.insights) {
+          agentFeedback += `📋 *Agent Workflow:*\n`;
+          result.workflow.context.insights.forEach((insight: any, index: number) => {
+            agentFeedback += `${index + 1}. **${insight.agentRole}**: ${insight.analysis}\n`;
+            if (insight.recommendedActions && insight.recommendedActions.length > 0) {
+              insight.recommendedActions.forEach((action: string) => {
+                agentFeedback += `   • ${action}\n`;
+              });
+            }
+          });
+          agentFeedback += `\n`;
+        }
+        
+        // Add final recommendations
+        if (result.finalRecommendations && result.finalRecommendations.length > 0) {
+          agentFeedback += `💡 *Final Recommendations:*\n`;
+          result.finalRecommendations.forEach((rec: string) => {
+            agentFeedback += `• ${rec}\n`;
+          });
+          agentFeedback += `\n`;
+        }
+        
+        // Add agent involvement summary
+        if (result.agentsInvolved && result.agentsInvolved.length > 0) {
+          agentFeedback += `👥 *Agents Involved:* ${result.agentsInvolved.join(', ')}\n`;
+        }
+        
+        if (result.confidence) {
+          agentFeedback += `📊 *Confidence Score:* ${(result.confidence * 100).toFixed(1)}%\n`;
+        }
+        
+        if (result.handoffCount !== undefined) {
+          agentFeedback += `🔄 *Handoffs:* ${result.handoffCount}\n`;
+        }
+        
+        if (result.processingTimeMs) {
+          agentFeedback += `⏱️ *Processing Time:* ${result.processingTimeMs}ms`;
+        }
+        
+        await this.sendSlackResponse(channel, threadTs, agentFeedback);
+      } catch (error) {
+        console.error('Error in multi-agent processing:', error);
+        await this.sendSlackResponse(
+          channel,
+          threadTs,
+          `❌ An error occurred while processing ticket #${ticketId} with the multi-agent system. Please try again later.`
+        );
+      }
+    } else {
+      await this.sendSlackResponse(
+        channel,
+        threadTs,
+        '❌ I couldn\'t find a ticket ID. Please specify a ticket number like:\n• `@TaskGenie analyze ticket #27`\n• `@TaskGenie process ticket 27`\n• Or reply to a TaskGenie message in a thread.'
+      );
+    }
   }
 
   private async handleSummarizeRequest(channel: string, threadTs: string, text: string): Promise<void> {
-    // TODO: Implement summarize request handling
-    await this.sendSlackResponse(channel, threadTs, '📋 Summarize request - implementation needed');
+    let ticketId: string | null = null;
+    
+    // First, try to extract ticket ID from the user's message
+    if (text) {
+      const ticketMatch = text.match(/(?:ticket\s*#?|#)(\d+)/i);
+      if (ticketMatch) {
+        ticketId = ticketMatch[1];
+      }
+    }
+    
+    // If no ticket ID found in message, try to get context from thread
+    if (!ticketId) {
+      const context = await this.getTaskGenieContext(channel, threadTs);
+      ticketId = context?.ticketId || null;
+    }
+    
+    if (ticketId) {
+      try {
+        await this.sendSlackResponse(
+          channel,
+          threadTs,
+          '📝 Let me analyze and summarize this ticket for you...'
+        );
+        
+        // Get ticket details from Zendesk
+        const ticket = await this.zendeskService.getTicket(parseInt(ticketId, 10));
+        
+        if (ticket) {
+          // Create ticket content for AI summarization
+          const ticketContent = `Subject: ${ticket.subject}\n\nDescription: ${ticket.description}\n\nStatus: ${ticket.status}\nPriority: ${ticket.priority}\nRequester: ${ticket.requester_id}`;
+          
+          // Use AI service to summarize the ticket
+          const summary = await this.aiService.summarizeTicket(ticketContent);
+          
+          const summaryMessage = `📋 *Ticket #${ticketId} Summary*\n\n${summary.summary}`;
+          
+          await this.sendSlackResponse(channel, threadTs, summaryMessage);
+        } else {
+          await this.sendSlackResponse(
+            channel,
+            threadTs,
+            `❌ Ticket #${ticketId} not found. Please check the ticket number and try again.`
+          );
+        }
+      } catch (error) {
+        console.error('Error summarizing ticket:', error);
+        await this.sendSlackResponse(
+          channel,
+          threadTs,
+          `❌ An error occurred while summarizing ticket #${ticketId}. Please try again later.`
+        );
+      }
+    } else {
+      await this.sendSlackResponse(
+        channel,
+        threadTs,
+        '❌ I couldn\'t find a ticket ID. Please specify a ticket number like:\n• `@TaskGenie summarize ticket #27`\n• `@TaskGenie summarize 27`\n• Or reply to a TaskGenie message in a thread.'
+      );
+    }
   }
 
   private async handleAnalyticsRequest(channel: string, threadTs: string): Promise<void> {
-    // TODO: Implement analytics request handling
-    await this.sendSlackResponse(channel, threadTs, '📊 Analytics request - implementation needed');
+    const analyticsMessage = `📊 *TaskGenie Analytics*\n\nHere are the types of analytics reports available:\n\n• **Ticket Volume**: Daily/weekly/monthly ticket counts\n• **Response Times**: Average first response and resolution times\n• **Agent Performance**: Individual agent metrics\n• **Priority Distribution**: Breakdown by ticket priority\n• **Status Tracking**: Tickets by status over time\n• **ClickUp Integration**: Task creation and completion rates\n\nTo get specific analytics, please:\n• Check the #analytics channel for automated reports\n• Ask for specific metrics like "show me this week's ticket volume"\n• Request custom reports from your team lead`;
+    
+    await this.sendSlackResponse(channel, threadTs, analyticsMessage);
   }
 
   private async handleCreateTaskRequest(channel: string, threadTs: string, text: string): Promise<void> {
-    // TODO: Implement create task request handling
-    await this.sendSlackResponse(channel, threadTs, '📝 Create task request - implementation needed');
+    const createTaskMessage = `✅ *Create ClickUp Task*\n\nTasks are automatically created from Zendesk tickets when they meet certain criteria.\n\nTo manually create a task:\n• Provide a ticket URL or ID\n• Example: \`@TaskGenie create task for ticket #123\`\n• Or: \`@TaskGenie create task https://yourcompany.zendesk.com/agent/tickets/123\`\n\nThe system will:\n• Extract ticket details\n• Create a ClickUp task\n• Link them together\n• Notify relevant team members`;
+    
+    await this.sendSlackResponse(channel, threadTs, createTaskMessage);
   }
 
   private async handleTicketSearchRequest(channel: string, threadTs: string, text: string): Promise<void> {
-    // TODO: Implement ticket search request handling
-    await this.sendSlackResponse(channel, threadTs, '🔍 Ticket search request - implementation needed');
+    const searchMessage = `🔍 *Search Tickets*\n\nHere are the ways you can search for tickets:\n\n**By Status:**\n• \`@TaskGenie list open tickets\`\n• \`@TaskGenie list pending tickets\`\n• \`@TaskGenie list solved tickets\`\n\n**By Priority:**\n• \`@TaskGenie list urgent tickets\`\n• \`@TaskGenie list high priority tickets\`\n• \`@TaskGenie list low priority tickets\`\n\n**By Assignee:**\n• \`@TaskGenie list my tickets\`\n• \`@TaskGenie list tickets assigned to john@company.com\`\n\n**By Date:**\n• \`@TaskGenie list tickets created today\`\n• \`@TaskGenie list tickets updated this week\`\n\n**By Keywords:**\n• \`@TaskGenie search tickets containing \"login issue\"\`\n• \`@TaskGenie find tickets about \"password reset\"\`\n\n**General Lists:**\n• \`@TaskGenie list tickets\` - Shows recent tickets\n• \`@TaskGenie show ticket #123\` - Get specific ticket details`;
+    
+    await this.sendSlackResponse(channel, threadTs, searchMessage);
   }
 
   private async handleListTicketsRequest(channel: string, threadTs: string, text: string): Promise<void> {
@@ -264,8 +469,20 @@ export class SlackMessageHandler {
   }
 
   private async handleGeneralQuestion(channel: string, threadTs: string, text: string): Promise<void> {
-    // TODO: Implement general question handling
-    await this.sendSlackResponse(channel, threadTs, '💬 General question handling - implementation needed');
+    try {
+      // Use AI service to generate a response
+      const prompt = `You are TaskGenie, an AI assistant that helps with Zendesk and ClickUp integration. Provide helpful, concise responses about ticket management, task creation, and workflow automation.\n\nUser question: ${text}`;
+      const response = await this.aiService.generateResponse(prompt);
+      
+      await this.sendSlackResponse(channel, threadTs, `🤖 ${response}`);
+    } catch (error) {
+      console.error('Error generating AI response:', error);
+      
+      // Fallback to help message
+      const helpMessage = `❓ I'm here to help with Zendesk and ClickUp integration!\n\nHere are some things I can help you with:\n\n• **Ticket Management**: Get ticket status, summaries, and details\n• **Task Creation**: Create ClickUp tasks from Zendesk tickets\n• **Analytics**: View reports and metrics\n• **Multi-Agent Analysis**: Get AI-powered ticket insights\n• **Search**: Find tickets by various criteria\n\nTry asking me something like:\n• "How do I create a task from a ticket?"\n• "Show me the status of ticket #123"\n• "What analytics are available?"\n\nFor a full list of commands, just say "help" or "commands".`;
+      
+      await this.sendSlackResponse(channel, threadTs, helpMessage);
+    }
   }
 
   /**
@@ -420,6 +637,65 @@ export class SlackMessageHandler {
       case 'normal': return '🟡';
       case 'low': return '🟢';
       default: return '⚪';
+    }
+  }
+
+  /**
+   * Get TaskGenie context from thread
+   */
+  private async getTaskGenieContext(channel: string, threadTs: string): Promise<TaskGenieContext | null> {
+    try {
+      // Get the original message in the thread
+      const result = await this.slackService.getConversationReplies(channel, threadTs);
+      
+      if (result && result.messages && result.messages.length > 0) {
+        const originalMessage = result.messages[0];
+        
+        // Look for ticket ID in the original message
+        if (originalMessage.text) {
+          const ticketMatch = originalMessage.text.match(/(?:ticket\s*#?|#)(\d+)/i);
+          if (ticketMatch) {
+            return {
+              ticketId: ticketMatch[1],
+              channel: channel,
+              threadTs: threadTs
+            };
+          }
+        }
+        
+        // Look for ticket ID in message blocks
+        if (originalMessage.blocks) {
+          for (const block of originalMessage.blocks) {
+            if (block.type === 'section' && block.text && block.text.text) {
+              const ticketMatch = block.text.text.match(/(?:ticket\s*#?|#)(\d+)/i);
+              if (ticketMatch) {
+                return {
+                  ticketId: ticketMatch[1],
+                  channel: channel,
+                  threadTs: threadTs
+                };
+              }
+            }
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting TaskGenie context:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Send message to Slack
+   */
+  private async sendMessage(message: { channel: string; text: string; thread_ts?: string }): Promise<void> {
+    try {
+      await this.slackService.sendMessage(message);
+    } catch (error) {
+      console.error('Error sending Slack message:', error);
+      throw error;
     }
   }
 }

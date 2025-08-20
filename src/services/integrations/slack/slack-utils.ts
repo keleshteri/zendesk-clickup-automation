@@ -273,18 +273,42 @@ export class SlackUtils {
    * Get emoji for sentiment/urgency
    */
   static getUrgencyEmoji(sentiment: string, priority?: string): string {
-    const sentimentMap: Record<string, string> = {
-      'frustrated': '😤',
-      'angry': '😡',
-      'neutral': '😐',
-      'happy': '😊'
+    const s = (sentiment || '').trim().toLowerCase();
+    const p = (priority || '').trim().toLowerCase();
+    if (p === 'urgent' || s === 'angry') return '🚨';
+    if (p === 'high' || s === 'frustrated') return '⚠️';
+    if (s === 'happy') return '😊';
+    return '📋';
+  }
+
+  /**
+   * Get team channel based on team type
+   */
+  static getTeamChannel(team: string, env: Env): string {
+    // Default to #zendesk-clickup-automation for all notifications
+    const defaultChannel = '#zendesk-clickup-automation';
+    const key = (team || '').trim().toLowerCase();
+    
+    const channelMap: Record<string, string> = {
+      'development': env.SLACK_DEVELOPMENT_CHANNEL || defaultChannel,
+      'support': env.SLACK_SUPPORT_CHANNEL || defaultChannel,
+      'billing': env.SLACK_BILLING_CHANNEL || defaultChannel,
+      'management': env.SLACK_MANAGEMENT_CHANNEL || defaultChannel
     };
     
-    // Override with priority-based emoji if urgent
-    if (priority === 'urgent') {
-      return '🚨';
-    }
-    
-    return sentimentMap[sentiment.toLowerCase()] || '😐';
+    return channelMap[key] || env.SLACK_DEFAULT_CHANNEL || defaultChannel;
+  }
+
+  /**
+   * Get alert emoji based on severity
+   */
+  static getAlertEmoji(severity: string): string {
+    const level = (severity || '').trim().toLowerCase();
+    const emojiMap: Record<string, string> = {
+      'high': '🔴',
+      'medium': '🟡',
+      'low': '🟢'
+    };
+    return emojiMap[level] || '⚪';
   }
 }

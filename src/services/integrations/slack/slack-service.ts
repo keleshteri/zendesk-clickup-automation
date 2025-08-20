@@ -41,6 +41,9 @@ export class SlackService {
     this.messageHandler = new SlackMessageHandler(env, this.aiService, this.zendeskService, this.notificationService, this.multiAgentService, this.taskGenie);
     this.threadManager = new SlackThreadManager(env);
     this.verification = new SlackVerification(env);
+    
+    // Set SlackService reference in messageHandler
+    this.messageHandler.setSlackService(this);
   }
 
   /**
@@ -684,6 +687,45 @@ export class SlackService {
     };
     const result = await this.verification.verifySlackRequest(body, headers);
     return result.isValid;
+  }
+
+  /**
+   * Get conversation replies from Slack API
+   */
+  async getConversationReplies(channel: string, threadTs: string, limit: number = 10, cursor?: string): Promise<any> {
+    try {
+      const response = await fetch('https://slack.com/api/conversations.replies', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          channel,
+          ts: threadTs,
+          limit,
+          ...(cursor ? { cursor } : {})
+        })
+      });
+
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('retry-after');
+        console.warn(`Slack rate limited conversations.replies. Retry after ${retryAfter ?? 'unknown'} seconds.`);
+        return null;
+      }
+
+      const result = await response.json() as any;
+      
+      if (result.ok) {
+        return result;
+      } else {
+        console.error('Failed to get conversation replies:', result.error);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error getting conversation replies:', error);
+      return null;
+    }
   }
 
   /**
