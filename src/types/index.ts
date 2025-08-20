@@ -30,6 +30,7 @@ export interface Env {
   // AI Provider Configuration
   AI_PROVIDER: 'googlegemini' | 'openai' | 'openrouter';
   GOOGLE_GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
   OPENAI_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
   OPENROUTER_MODEL?: string;

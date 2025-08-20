@@ -19,8 +19,10 @@ export class AIService {
       this.provider = this.createProvider();
       if (this.provider && this.provider.name === 'googlegemini') {
         const genAI = new GoogleGenerativeAI(this.env.GOOGLE_GEMINI_API_KEY!);
-        this.model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        console.log('✅ AI Service initialized successfully with Gemini 1.5 Flash');
+        const modelName = this.env.GEMINI_MODEL || 'gemini-1.5-flash';
+        this.model = genAI.getGenerativeModel({ model: modelName });
+        console.log(`🤖 Using Gemini model: ${modelName}`);
+        console.log(`✅ AI Service initialized successfully with ${this.env.GEMINI_MODEL || 'gemini-1.5-flash'}`);
       }
     } catch (error) {
       console.error('❌ AI provider initialization failed:', error instanceof Error ? error.message : 'Unknown error');
@@ -33,9 +35,18 @@ export class AIService {
    * Check if AI service is properly initialized and working
    */
   isAvailable(): boolean {
-    const available = this.provider !== null && this.model !== null;
+    const hasProvider = this.provider !== null;
+    const hasModel = this.model !== null;
+    const available = hasProvider && hasModel;
+    
     if (!available) {
       console.log('⚠️ AI Service not available - this will cause fallback to basic workflow');
+      console.log(`   Provider initialized: ${hasProvider ? '✅' : '❌'}`);
+      console.log(`   Model initialized: ${hasModel ? '✅' : '❌'}`);
+      if (!hasProvider) {
+        console.log(`   AI_PROVIDER: ${this.env.AI_PROVIDER || 'NOT_SET'}`);
+        console.log(`   GOOGLE_GEMINI_API_KEY: ${this.env.GOOGLE_GEMINI_API_KEY ? 'PRESENT' : 'MISSING'}`);
+      }
     }
     return available;
   }
@@ -44,17 +55,28 @@ export class AIService {
    * Test AI service with a simple prompt
    */
   async testConnection(): Promise<boolean> {
+    console.log('🧪 Testing AI Service connection...');
+    
     if (!this.isAvailable()) {
+      console.log('❌ AI Service not available - provider or model not initialized');
       return false;
     }
     
     try {
+      console.log('🔄 Sending test prompt to Gemini API...');
       const testResponse = await this.generateResponse('Say "test successful"');
       const success = testResponse.toLowerCase().includes('test successful');
-      console.log(`🧪 AI Service test: ${success ? 'PASSED' : 'FAILED'}`);
+      console.log(`🧪 AI Service test: ${success ? 'PASSED ✅' : 'FAILED ❌'}`);
+      if (!success) {
+        console.log(`📝 Unexpected response: ${testResponse}`);
+      }
       return success;
     } catch (error) {
       console.error('🧪 AI Service test FAILED:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       return false;
     }
   }

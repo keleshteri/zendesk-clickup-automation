@@ -7,9 +7,10 @@ export class GoogleGeminiProvider implements AIProvider {
   private genAI: GoogleGenerativeAI;
   private model: any;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, modelName?: string) {
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = modelName || 'gemini-1.5-flash';
+    this.model = this.genAI.getGenerativeModel({ model });
   }
 
   async summarize(text: string): Promise<string> {
