@@ -1,5 +1,5 @@
 import { Env, ZendeskWebhook, ClickUpWebhook, SlackEvent, ZendeskTicket, UserOAuthData } from './types/index.js';
-import { SlackService } from './services/integrations/slack/slack.js';
+import { SlackService } from './services/integrations/slack/slack-service.js';
 import { ZendeskService } from './services/integrations/zendesk/zendesk.js';
 import { ClickUpService } from './services/integrations/clickup/clickup.js';
 import { AIService } from './services/ai/ai-service.js';

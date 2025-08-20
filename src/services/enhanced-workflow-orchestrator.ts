@@ -3,7 +3,7 @@
  * Coordinates the enhanced workflow steps 4-7 after initial Slack message
  */
 
-import { SlackService } from './integrations/slack/slack.js';
+import { SlackService } from './integrations/slack/slack-service.js';
 import { MultiAgentService } from './multi-agent-service.js';
 import { AIService } from './ai/ai-service.js';
 import { ZendeskTicket, TicketAnalysis } from '../types/index.js';
