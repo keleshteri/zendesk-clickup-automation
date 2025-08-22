@@ -1,0 +1,68 @@
+{
+  "projectContext": {
+    "name": "zendesk-clickup-automation",
+    "description": "Multi-agent TypeScript automation system for Zendesk-ClickUp integration",
+    "architecture": "Multi-agent system with Cloudflare Workers deployment",
+    "techStack": [
+      "TypeScript",
+      "Cloudflare Workers",
+      "Multi-agent architecture",
+      "NLP routing",
+      "Wrangler"
+    ],
+    "codingStandards": "./docs/coding-standards.md",
+    "mainBranch": "main",
+    "created": "2025-08-22T02:29:35.391Z"
+  },
+  "sessions": [
+    {
+      "sessionId": "session-1755829775391-88xyw7zt2",
+      "task": "Initialize Zendesk-ClickUp automation project development with multi-agent architecture and workflow orchestration capabilities",
+      "started": "2025-08-22T02:29:35.391Z",
+      "completedSteps": [
+        "Initialized Memory AI MCP session",
+        "Recorded project architecture decisions",
+        "Created project-memory.json file"
+      ],
+      "nextSteps": [],
+      "importantDecisions": {
+        "projectArchitecture": "Multi-agent TypeScript automation system with Cloudflare Workers deployment",
+        "techStack": "TypeScript, Cloudflare Workers, Multi-agent architecture with NLP routing",
+        "codeOrganization": "Modular structure with agents, services, config, types, and utils directories"
+      },
+      "blockers": []
+    }
+  ],
+  "fileHistory": {},
+  "globalDecisions": [
+    {
+      "id": "project-architecture",
+      "key": "projectArchitecture",
+      "value": "Multi-agent TypeScript automation system with Cloudflare Workers deployment",
+      "reasoning": "The project uses a sophisticated multi-agent architecture with separate agents for communication, orchestration, and planning. Built with TypeScript and configured for Cloudflare Workers deployment via Wrangler, enabling serverless execution of Zendesk-ClickUp automation workflows.",
+      "timestamp": "2025-08-22T02:29:35.391Z",
+      "approvedBy": "system",
+      "relatedFiles": []
+    },
+    {
+      "id": "tech-stack",
+      "key": "techStack",
+      "value": "TypeScript, Cloudflare Workers, Multi-agent architecture with NLP routing",
+      "reasoning": "Core technologies include TypeScript for type safety, Cloudflare Workers for serverless deployment, and a custom multi-agent system with NLP routing capabilities for intelligent task processing between Zendesk and ClickUp integrations.",
+      "timestamp": "2025-08-22T02:29:35.391Z",
+      "approvedBy": "system",
+      "relatedFiles": []
+    },
+    {
+      "id": "code-organization",
+      "key": "codeOrganization",
+      "value": "Modular structure with agents, services, config, types, and utils directories",
+      "reasoning": "The codebase is well-organized with clear separation of concerns: agents/ for multi-agent components, services/ for business logic including AI and integrations, config/ for project mappings and team assignments, types/ for TypeScript definitions, and utils/ for shared utilities. This structure supports maintainability and scalability.",
+      "timestamp": "2025-08-22T02:29:35.391Z",
+      "approvedBy": "system",
+      "relatedFiles": []
+    }
+  ],
+  "approvalStates": {},
+  "lastUpdated": "2025-08-22T02:29:35.391Z"
+}
