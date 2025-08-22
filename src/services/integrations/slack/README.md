@@ -10,7 +10,8 @@ The Slack integration is built with a modular architecture where each component 
 slack/
 ├── slack-service.ts           # Main orchestrator
 ├── slack-message-handler.ts   # Message processing
-├── slack-command-parser.ts    # Command parsing
+├── handlers/
+│   └── slack-command-handler.ts # Command parsing and handling
 ├── slack-notification-service.ts # Notifications
 ├── slack-thread-manager.ts    # Thread management
 ├── slack-utils.ts            # Utility functions
@@ -72,29 +73,32 @@ slack/
 
 ---
 
-### 3. SlackCommandParser (`slack-command-parser.ts`)
+### 3. SlackCommandHandler (`handlers/slack-command-handler.ts`)
 
-**Purpose**: Parses and validates Slack slash commands
+**Purpose**: Comprehensive command parsing, validation, and execution system for Slack commands
 
 **Use Cases**:
-- Parsing slash command syntax
-- Validating command parameters
-- Extracting command arguments and options
-- Providing command help and usage information
+- Parsing slash commands, hashtag commands, and keyword triggers
+- Validating command parameters and permissions
+- Executing commands with proper security and rate limiting
+- Managing command registration and lifecycle
+- Providing backward compatibility with legacy parsing
 
 **When to Use**:
-- When implementing new slash commands
-- When you need to parse user input from commands
-- When validating command syntax and parameters
-- When providing command documentation
+- When implementing new slash commands or command types
+- When you need to parse user input from various command formats
+- When validating command syntax, parameters, and permissions
+- When executing commands with proper security controls
+- When providing command documentation and help
 
 **Key Methods**:
-- `parseCommand()` - Parse slash command input
-- `validateParameters()` - Validate command parameters
-- `getCommandHelp()` - Get help text for commands
-- `extractArguments()` - Extract command arguments
+- `parseCommand()` - Parse various command formats (slash, hashtag, keyword)
+- `executeCommand()` - Execute commands with validation and security
+- `registerCommand()` - Register new command definitions
+- `parseSlackCommand()` - Static method for backward compatibility
+- `validatePermissions()` - Validate user permissions for commands
 
-**Dependencies**: SlackUtils
+**Dependencies**: SlackApiClient, SlackMessageBuilder, SlackUtils
 
 ---
 
@@ -205,16 +209,16 @@ slack/
 
 ## Usage Patterns
 
-### important 
+### Important 
 
 1. **Start with SlackService**: This is your main entry point
 2. **Use SlackUtils**: For any UI formatting or utility needs
 3. **Implement SlackMessageHandler**: For processing user interactions
-4. **Add SlackCommandParser**: When implementing new commands
+4. **Use SlackCommandHandler**: For implementing and executing commands
 
 ### For Adding New Features
 
-1. **Commands**: Extend SlackCommandParser
+1. **Commands**: Register with SlackCommandHandler
 2. **Message Types**: Extend SlackMessageHandler
 3. **Notifications**: Use SlackNotificationService
 4. **UI Components**: Add to SlackUtils

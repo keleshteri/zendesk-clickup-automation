@@ -359,7 +359,7 @@ export class TaskGenie {
     let totalInteractions = 0;
     let totalResponseTime = 0;
     
-    for (const context of this.contexts.values()) {
+    for (const context of Array.from(this.contexts.values())) {
       totalInteractions += context.conversationHistory.length;
       totalResponseTime += context.conversationHistory.reduce(
         (sum, interaction) => sum + (interaction.response.processingTime || 0),

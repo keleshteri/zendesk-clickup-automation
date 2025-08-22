@@ -54,6 +54,9 @@ export interface SlackCommand {
   messageTs: string;
   triggerId?: string;
   responseUrl?: string;
+  // Legacy compatibility fields from slack-command-parser.ts
+  isCommand?: boolean;
+  originalText?: string;
 }
 
 export interface CommandDefinition {
@@ -388,6 +391,86 @@ export class SlackCommandHandler {
   }
 
   /**
+   * Static method for backward compatibility with SlackCommandParser
+   * Provides the same interface as the original parseSlackCommand method
+   */
+  static parseSlackCommand(text: string): SlackCommand | {
+    isCommand: boolean;
+    command: string;
+    args: string[];
+    originalText: string;
+  } {
+    const trimmedText = text.trim();
+    
+    // Check for slash commands: /help, /analyze, /status, etc.
+    const slashMatch = trimmedText.match(/^\/([a-zA-Z]+)(?:\s+(.*))?$/);
+    if (slashMatch) {
+      const command = slashMatch[1].toLowerCase();
+      const argsString = slashMatch[2] || '';
+      const args = argsString.trim() ? argsString.split(/\s+/) : [];
+      
+      return {
+        type: "slash" as const,
+        command,
+        args,
+        rawText: trimmedText,
+        userId: "",
+        channelId: "",
+        messageTs: "",
+        isCommand: true,
+        originalText: trimmedText
+      };
+    }
+    
+    // Check for hashtag commands: #help, #analyze, #status, etc.
+    const hashMatch = trimmedText.match(/^#([a-zA-Z]+)(?:\s+(.*))?$/);
+    if (hashMatch) {
+      const command = hashMatch[1].toLowerCase();
+      const argsString = hashMatch[2] || '';
+      const args = argsString.trim() ? argsString.split(/\s+/) : [];
+      
+      return {
+        type: "hashtag" as const,
+        command,
+        args,
+        rawText: trimmedText,
+        userId: "",
+        channelId: "",
+        messageTs: "",
+        isCommand: true,
+        originalText: trimmedText
+      };
+    }
+    
+    // Check for simple command words at the start
+    const simpleMatch = trimmedText.match(/^(help|status|analytics|list|analyze|summarize|create)(?:\s+(.*))?$/i);
+    if (simpleMatch) {
+      const command = simpleMatch[1].toLowerCase();
+      const argsString = simpleMatch[2] || '';
+      const args = argsString.trim() ? argsString.split(/\s+/) : [];
+      
+      return {
+        type: "keyword" as const,
+        command,
+        args,
+        rawText: trimmedText,
+        userId: "",
+        channelId: "",
+        messageTs: "",
+        isCommand: true,
+        originalText: trimmedText
+      };
+    }
+    
+    return {
+      isCommand: false,
+      command: '',
+      args: [],
+      originalText: trimmedText
+    };
+  }
+
+  /**
    * Get command metrics
    */
   getCommandMetrics(
@@ -520,6 +603,28 @@ export class SlackCommandHandler {
           messageTs: "",
         };
       }
+    }
+
+    // Legacy support: Check for simple command words at the start (from slack-command-parser.ts)
+    const trimmedText = text.trim();
+    const simpleMatch = trimmedText.match(/^(help|status|analytics|list|analyze|summarize|create)(?:\s+(.*))?$/i);
+    if (simpleMatch) {
+      const command = simpleMatch[1].toLowerCase();
+      const argsString = simpleMatch[2] || '';
+      const args = argsString.trim() ? argsString.split(/\s+/) : [];
+      
+      return {
+        type: "keyword",
+        command,
+        args,
+        rawText: text,
+        userId: "",
+        channelId: "",
+        messageTs: "",
+        // Legacy compatibility fields
+        isCommand: true,
+        originalText: trimmedText,
+      };
     }
 
     return null;

@@ -1,3 +1,13 @@
+// Cloudflare Workers KV Namespace type
+declare global {
+  interface KVNamespace {
+    get(key: string): Promise<string | null>;
+    put(key: string, value: string): Promise<void>;
+    delete(key: string): Promise<void>;
+    list(): Promise<{ keys: Array<{ name: string }> }>;
+  }
+}
+
 export interface Env {
   // Zendesk Configuration
   ZENDESK_DOMAIN: string;
@@ -26,6 +36,13 @@ export interface Env {
   SLACK_SUPPORT_CHANNEL?: string;
   SLACK_BILLING_CHANNEL?: string;
   SLACK_DEFAULT_CHANNEL?: string;
+  
+  // Slack Token Rotation Configuration
+  SLACK_TOKEN_ROTATION_ENABLED?: string;
+  SLACK_TOKEN_ROTATION_INTERVAL_HOURS?: string;
+  SLACK_TOKEN_GRACE_PERIOD_HOURS?: string;
+  SLACK_TOKEN_NOTIFY_BEFORE_HOURS?: string;
+  SLACK_BACKUP_TOKEN_COUNT?: string;
   
   // AI Provider Configuration
   AI_PROVIDER: 'googlegemini' | 'openai' | 'openrouter';
@@ -273,56 +290,18 @@ export interface IntegrationConfig {
   };
 }
 
-// Slack Types
-export interface SlackEvent {
-  type: string;
-  channel: string;
-  user: string;
-  text?: string;
-  ts: string;
-  thread_ts?: string;
-  // For member_joined_channel events
-  inviter?: string;
-  // For app_mention events
-  bot_id?: string;
-  // Additional properties for enhanced functionality
-  channel_type?: 'channel' | 'group' | 'im' | 'mpim';
-  team?: string;
-}
-
-export interface SlackMessage {
-  channel: string;
-  text: string;
-  thread_ts?: string;
-  blocks?: any[];
-  user: string;
-  ts: string;
-}
-
-export interface SlackApiResponse {
-  ok: boolean;
-  error?: string;
-  channel?: string;
-  ts?: string;
-  message?: {
-    text: string;
-    user: string;
-    ts: string;
-    thread_ts?: string;
-  };
-}
-
-export interface TaskGenieContext {
-  ticketId?: string;
-  zendesk_ticket_id?: number;
-  clickup_task_id?: string;
-  slack_thread_ts?: string;
-  channel: string;
-  threadTs: string;
-  user_id?: string;
-  channel_id?: string;
-  awaiting_summarization?: boolean;
-}
+// Re-export Slack types from dedicated Slack types folder
+export type {
+  SlackEvent,
+  SlackTeamJoinEvent,
+  SlackChannelCreatedEvent,
+  SlackFileSharedEvent,
+  SlackReactionAddedEvent,
+  SlackAuthTestResponse,
+  SlackMessage,
+  SlackApiResponse,
+  TaskGenieContext
+} from '../services/integrations/slack/types';
 
 // AI Provider Types
 export interface AIProvider {

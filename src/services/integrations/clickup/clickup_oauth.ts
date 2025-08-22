@@ -592,7 +592,7 @@ export class OAuthService {
           await this.env.TASK_MAPPING.put(cacheKey, JSON.stringify({
             valid: isValid,
             timestamp: Date.now()
-          }), { expirationTtl: 300 }); // 5 minutes TTL
+          })); // Cache without TTL
         } catch (error) {
           console.log('🔍 Failed to cache validation result');
         }

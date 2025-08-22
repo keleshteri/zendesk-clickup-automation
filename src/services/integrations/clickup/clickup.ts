@@ -217,14 +217,20 @@ export class ClickUpService {
       });
 
       console.log('📡 ClickUp API Response Status:', response.status);
-      console.log('📡 ClickUp API Response Headers:', Object.fromEntries(response.headers.entries()));
+      const headerEntries: [string, string][] = [];
+      response.headers.forEach((value, key) => headerEntries.push([key, value]));
+      console.log('📡 ClickUp API Response Headers:', Object.fromEntries(headerEntries));
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ ClickUp API Error Response:', {
           status: response.status,
           statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
+          headers: (() => {
+            const headerEntries: [string, string][] = [];
+            response.headers.forEach((value, key) => headerEntries.push([key, value]));
+            return Object.fromEntries(headerEntries);
+          })(),
           body: errorText
         });
         

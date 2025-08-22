@@ -1,6 +1,7 @@
-import { SlackMessage, Env } from '../../../types/index.js';
-import { SlackUtils } from './slack-utils.js';
-import { AIService } from '../../ai/ai-service.js';
+import { Env } from '../../../types/index';
+import { SlackMessage } from './types/index';
+import { SlackFormatters } from './utils/index';
+import { AIService } from '../../ai/ai-service';
 
 export class SlackNotificationService {
   private env: Env;
@@ -53,7 +54,7 @@ export class SlackNotificationService {
               text: `Need a summary of this ticket? Just reply to this thread and ask for "summarize" - I can help with that! 🤖`
             }
           },
-          SlackUtils.createContextFooter(this.aiService.isAvailable())
+          SlackFormatters.createContextFooter(this.aiService.isAvailable())
         ]
       };
 
@@ -61,7 +62,7 @@ export class SlackNotificationService {
       
       if (response && response.ok && response.message) {
         return {
-          ts: response.message.ts,
+          ts: response.ts || response.message?.ts || '',
           channel: response.channel,
           text: response.message.text || '',
           user: response.message.user || 'bot',
@@ -90,7 +91,7 @@ export class SlackNotificationService {
         channel,
         text: `🧞 TaskGenie has joined the channel!`,
         blocks: [
-          SlackUtils.createHeader('🧞 TaskGenie has joined!'),
+          SlackFormatters.createHeader('🧞 TaskGenie has joined!'),
           {
             type: 'section',
             text: {
@@ -119,8 +120,8 @@ export class SlackNotificationService {
               text: '🚀 *Ready to boost your productivity?* Just mention @TaskGenie and I\'ll assist!'
             }
           },
-          SlackUtils.createBrandingFooter(),
-          SlackUtils.createServiceStatusFooter(serviceStatuses)
+          SlackFormatters.createBrandingFooter(),
+            SlackFormatters.createServiceStatusFooter(serviceStatuses)
         ]
       };
 
@@ -144,7 +145,7 @@ export class SlackNotificationService {
         channel,
         text: `🧞 Welcome to TaskGenie!`,
         blocks: [
-          SlackUtils.createHeader('🧞 Welcome to TaskGenie!'),
+          SlackFormatters.createHeader('🧞 Welcome to TaskGenie!'),
           {
             type: 'section',
             text: {
@@ -173,8 +174,8 @@ export class SlackNotificationService {
               text: '🚀 *Ready to boost your productivity?* Just mention @TaskGenie and I\'ll assist!'
             }
           },
-          SlackUtils.createBrandingFooter(),
-          SlackUtils.createServiceStatusFooter(serviceStatuses)
+          SlackFormatters.createBrandingFooter(),
+            SlackFormatters.createServiceStatusFooter(serviceStatuses)
         ]
       };
 
@@ -194,7 +195,7 @@ export class SlackNotificationService {
         thread_ts: threadTs,
         text: `🧞 TaskGenie Help`,
         blocks: [
-          SlackUtils.createHeader('🧞 TaskGenie Help'),
+          SlackFormatters.createHeader('🧞 TaskGenie Help'),
           {
             type: 'section',
             text: {
@@ -209,7 +210,7 @@ export class SlackNotificationService {
               text: '*💡 Tips:*\n• You can use `/` or `#` prefixes: `/help`, `#analyze`\n• Ask natural questions: "What\'s the status of ticket 123?"\n• I understand context in threads!'
             }
           },
-          SlackUtils.createContextFooter(this.aiService.isAvailable())
+          SlackFormatters.createContextFooter(this.aiService.isAvailable())
         ]
       };
 
@@ -229,7 +230,7 @@ export class SlackNotificationService {
         thread_ts: threadTs,
         text: `🧞 TaskGenie Commands`,
         blocks: [
-          SlackUtils.createHeader('🧞 Available Commands'),
+          SlackFormatters.createHeader('🧞 Available Commands'),
           {
             type: 'section',
             text: {
@@ -237,7 +238,7 @@ export class SlackNotificationService {
               text: '*Command Formats:*\n\n*Slash Commands:*\n• `/help` - Show help\n• `/status` - System status\n• `/analyze ticket 123` - Analyze ticket\n• `/summarize ticket 123` - Summarize ticket\n• `/list tickets` - List tickets\n• `/analytics` - Generate analytics\n• `/create task from ticket 123` - Create task\n\n*Hashtag Commands:*\n• `#help` - Show help\n• `#status` - System status\n• `#analyze ticket 123` - Analyze ticket\n\n*Natural Language:*\n• "What\'s the status of ticket 123?"\n• "Summarize ticket 456"\n• "Create a task for ticket 789"'
             }
           },
-          SlackUtils.createContextFooter(this.aiService.isAvailable())
+          SlackFormatters.createContextFooter(this.aiService.isAvailable())
         ]
       };
 

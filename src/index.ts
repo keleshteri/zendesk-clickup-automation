@@ -1,4 +1,5 @@
-import { Env, ZendeskWebhook, ClickUpWebhook, SlackEvent, ZendeskTicket, UserOAuthData } from './types/index.js';
+import { Env, ZendeskWebhook, ClickUpWebhook, ZendeskTicket, UserOAuthData } from './types/index.js';
+import { SlackEvent, SlackAppMentionEvent, SlackMemberJoinedChannelEvent, SlackEventType } from './services/integrations/slack/types/slack-event-types.js';
 import { SlackService } from './services/integrations/slack/slack-service.js';
 import { ZendeskService } from './services/integrations/zendesk/zendesk.js';
 import { ClickUpService } from './services/integrations/clickup/clickup.js';
@@ -175,6 +176,21 @@ export default {
             'POST /clickup-webhook - ClickUp webhook endpoint',
             'POST /slack/events - Slack events endpoint',
             'POST /slack/commands - Slack commands endpoint',
+            'GET  /slack/socket/status - Socket Mode connection status',
+            'POST /slack/socket/reconnect - Reconnect Socket Mode',
+            'POST /slack/socket/shutdown - Shutdown Socket Mode',
+            'GET  /slack/manifest/templates - Get app configuration templates',
+            'POST /slack/manifest/deploy - Deploy app from template',
+            'PUT  /slack/manifest/:appId - Update app configuration',
+            'GET  /slack/manifest/:appId/validate - Validate app configuration',
+            'GET  /slack/manifest/permissions - Check manifest permissions',
+            'GET  /slack/security/metrics - Get security metrics',
+            'GET  /slack/security/audit - Get security audit log',
+            'GET  /slack/security/tokens - Get token metadata',
+            'GET  /slack/security/rotation/status - Check token rotation status',
+            'POST /slack/security/rotation/force - Force token rotation',
+            'PUT  /slack/security/rotation/config - Update rotation configuration',
+            'POST /slack/security/verify - Verify request with security audit',
             'GET  /auth/clickup - Start ClickUp OAuth flow',
             'GET  /auth/clickup/callback - ClickUp OAuth callback',
             'GET  /auth/clickup/status - Check OAuth authorization status',
@@ -582,25 +598,24 @@ export default {
 
           // Handle app mentions, direct messages, and member joined events
           if (data.type === 'event_callback' && data.event) {
-            const event: SlackEvent = data.event;
+            const event: SlackEventType = data.event;
             
             // Debug logging for event processing
             console.log(`${LOG_CONFIG.PREFIXES.SLACK} Slack event received:`, {
               type: event.type,
-              bot_id: event.bot_id,
-              user: event.user,
-              text: event.text?.substring(0, 50) + '...',
-              event_ts: event.ts
+              user: 'user' in event ? event.user : undefined,
+              text: 'text' in event ? event.text?.substring(0, 50) + '...' : undefined,
+              event_ts: event.event_ts
             });
             
-            if (event.type === 'app_mention' && !event.bot_id) {
+            if (event.type === 'app_mention') {
               console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Processing app mention event for user:`, event.user);
-              // Handle the mention asynchronously (skip bot messages to prevent loops)
-              ctx.waitUntil(slackService.handleMention(event));
+              // Handle the mention asynchronously
+              ctx.waitUntil(slackService.handleMention(event as any));
               
               return new Response('', { status: HTTP_STATUS.OK });
-            } else if (event.bot_id) {
-              console.log(`${LOG_CONFIG.PREFIXES.INFO} Skipping bot message from:`, event.bot_id);
+            } else if (event.type === 'message' && 'bot_id' in event && event.bot_id) {
+              console.log(`${LOG_CONFIG.PREFIXES.INFO} Skipping bot message from:`, (event as any).bot_id);
             } else if (event.type === 'message') {
               console.log(`${LOG_CONFIG.PREFIXES.INFO} Skipping regular message event (not a mention)`);
             }
@@ -658,6 +673,586 @@ export default {
           return new Response(JSON.stringify(formatErrorResponse(
             error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
             'slack-commands'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Slack Socket Mode Status
+      if (url.pathname === '/slack/socket/status' && method === 'GET') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const status = slackService.getSocketModeStatus();
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            socketMode: {
+              available: slackService.isSocketModeAvailable(),
+              connected: status.connected,
+              connectionState: status.connectionState,
+              lastConnected: status.lastConnected,
+              lastDisconnected: status.lastDisconnected,
+              reconnectAttempts: status.reconnectAttempts,
+              eventsReceived: status.eventsReceived,
+              lastEventTime: status.lastEventTime,
+              lastError: status.lastError
+            },
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error getting Socket Mode status:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-socket-status'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Slack Socket Mode Reconnect
+      if (url.pathname === '/slack/socket/reconnect' && method === 'POST') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          if (!slackService.isSocketModeAvailable()) {
+            return new Response(JSON.stringify(formatErrorResponse(
+              'Socket Mode is not available. Please check SLACK_APP_TOKEN configuration.',
+              'slack-socket-unavailable'
+            )), {
+              status: HTTP_STATUS.BAD_REQUEST,
+              headers: corsHeaders
+            });
+          }
+
+          await slackService.reconnectSocketMode();
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            message: 'Socket Mode reconnection initiated successfully',
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error reconnecting Socket Mode:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-socket-reconnect'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Slack Socket Mode Shutdown
+      if (url.pathname === '/slack/socket/shutdown' && method === 'POST') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          await slackService.shutdownSocketMode();
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            message: 'Socket Mode shutdown completed successfully',
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error shutting down Socket Mode:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-socket-shutdown'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Get App Manifest Templates
+      if (url.pathname === '/slack/manifest/templates' && method === 'GET') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const templates = slackService.getAppTemplates();
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            templates,
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error getting app templates:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-manifest-templates'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Deploy App from Template
+      if (url.pathname === '/slack/manifest/deploy' && method === 'POST') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const body = await request.json() as { templateName: string; appId?: string; customizations?: any };
+          
+          if (!body.templateName) {
+            return new Response(JSON.stringify(formatErrorResponse(
+              'Template name is required',
+              'slack-manifest-deploy-missing-template'
+            )), {
+              status: HTTP_STATUS.BAD_REQUEST,
+              headers: corsHeaders
+            });
+          }
+
+          const templates = slackService.getAppTemplates();
+          const template = templates[body.templateName];
+          
+          if (!template) {
+            return new Response(JSON.stringify(formatErrorResponse(
+              `Template '${body.templateName}' not found`,
+              'slack-manifest-deploy-template-not-found'
+            )), {
+              status: HTTP_STATUS.NOT_FOUND,
+              headers: corsHeaders
+            });
+          }
+
+          // Apply customizations if provided
+          const finalTemplate = body.customizations ? { ...template, ...body.customizations } : template;
+          
+          const result = await slackService.deployAppFromTemplate(finalTemplate, body.appId);
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            deployment: result,
+            timestamp: new Date().toISOString()
+          })), {
+            status: result.ok ? HTTP_STATUS.OK : HTTP_STATUS.BAD_REQUEST,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error deploying app from template:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-manifest-deploy'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Update App Configuration
+      if (url.pathname.startsWith('/slack/manifest/') && url.pathname.split('/').length === 4 && method === 'PUT') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const appId = url.pathname.split('/')[3];
+          const body = await request.json() as { updates: any; options?: any };
+          
+          if (!body.updates) {
+            return new Response(JSON.stringify(formatErrorResponse(
+              'Updates object is required',
+              'slack-manifest-update-missing-updates'
+            )), {
+              status: HTTP_STATUS.BAD_REQUEST,
+              headers: corsHeaders
+            });
+          }
+
+          const result = await slackService.updateAppConfiguration(appId, body.updates, body.options);
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            update: result,
+            timestamp: new Date().toISOString()
+          })), {
+            status: result.ok ? HTTP_STATUS.OK : HTTP_STATUS.BAD_REQUEST,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error updating app configuration:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-manifest-update'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Validate App Configuration
+      if (url.pathname.startsWith('/slack/manifest/') && url.pathname.endsWith('/validate') && method === 'GET') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const pathParts = url.pathname.split('/');
+          const appId = pathParts[3];
+          
+          if (!appId || appId === 'validate') {
+            return new Response(JSON.stringify(formatErrorResponse(
+              'App ID is required',
+              'slack-manifest-validate-missing-app-id'
+            )), {
+              status: HTTP_STATUS.BAD_REQUEST,
+              headers: corsHeaders
+            });
+          }
+
+          const validation = await slackService.validateAppConfiguration(appId);
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            validation,
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error validating app configuration:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-manifest-validate'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Check Manifest Permissions
+      if (url.pathname === '/slack/manifest/permissions' && method === 'GET') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const permissions = await slackService.checkManifestPermissions();
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            permissions,
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error checking manifest permissions:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-manifest-permissions'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Get Security Metrics
+      if (url.pathname === '/slack/security/metrics' && method === 'GET') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const metrics = slackService.getSecurityMetrics();
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            metrics,
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error getting security metrics:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-security-metrics'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Get Security Audit Log
+      if (url.pathname === '/slack/security/audit' && method === 'GET') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const urlParams = new URLSearchParams(url.search);
+          const limit = parseInt(urlParams.get('limit') || '100', 10);
+          const severity = urlParams.get('severity') as 'low' | 'medium' | 'high' | 'critical' | null;
+          
+          const auditLog = slackService.getSecurityAuditLog(limit, severity || undefined);
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            auditLog,
+            count: auditLog.length,
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error getting security audit log:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-security-audit'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Get Token Metadata
+      if (url.pathname === '/slack/security/tokens' && method === 'GET') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const tokens = slackService.getTokenMetadata();
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            tokens,
+            count: tokens.length,
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error getting token metadata:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-security-tokens'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Check Token Rotation Status
+      if (url.pathname === '/slack/security/rotation/status' && method === 'GET') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const status = await slackService.checkTokenRotationStatus();
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            rotationStatus: status,
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error checking token rotation status:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-security-rotation-status'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Force Token Rotation
+      if (url.pathname === '/slack/security/rotation/force' && method === 'POST') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const body = await request.json() as { tokenType?: 'bot' | 'user' | 'app' };
+          const tokenType = body.tokenType || 'bot';
+          
+          const result = await slackService.forceTokenRotation(tokenType);
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            rotation: result,
+            timestamp: new Date().toISOString()
+          })), {
+            status: result.success ? HTTP_STATUS.OK : HTTP_STATUS.BAD_REQUEST,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error forcing token rotation:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-security-rotation-force'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Update Token Rotation Configuration
+      if (url.pathname === '/slack/security/rotation/config' && method === 'PUT') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const body = await request.json() as { config: any };
+          
+          if (!body.config) {
+            return new Response(JSON.stringify(formatErrorResponse(
+              'Configuration object is required',
+              'slack-security-rotation-config-missing'
+            )), {
+              status: HTTP_STATUS.BAD_REQUEST,
+              headers: corsHeaders
+            });
+          }
+
+          slackService.updateTokenRotationConfig(body.config);
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            message: 'Token rotation configuration updated successfully',
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error updating token rotation config:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-security-rotation-config'
+          )), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Verify Request with Security Audit
+      if (url.pathname === '/slack/security/verify' && method === 'POST') {
+        try {
+          if (!slackService) {
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.SERVICE_UNAVAILABLE)), {
+              status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+              headers: corsHeaders
+            });
+          }
+
+          const body = await request.json() as { 
+            body: string; 
+            headers: Record<string, string>; 
+            source?: string 
+          };
+          
+          if (!body.body || !body.headers) {
+            return new Response(JSON.stringify(formatErrorResponse(
+              'Request body and headers are required',
+              'slack-security-verify-missing-data'
+            )), {
+              status: HTTP_STATUS.BAD_REQUEST,
+              headers: corsHeaders
+            });
+          }
+
+          const result = await slackService.verifyRequestWithAudit(
+            body.body, 
+            body.headers, 
+            body.source || 'api'
+          );
+          
+          return new Response(JSON.stringify(formatSuccessResponse({
+            verification: result,
+            timestamp: new Date().toISOString()
+          })), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error verifying request:`, error);
+          return new Response(JSON.stringify(formatErrorResponse(
+            error instanceof Error ? error.message : ERROR_MESSAGES.INTERNAL_ERROR,
+            'slack-security-verify'
           )), {
             status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
             headers: corsHeaders

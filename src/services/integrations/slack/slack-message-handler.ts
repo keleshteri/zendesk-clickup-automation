@@ -1,11 +1,12 @@
-import { SlackEvent, Env, TokenUsage } from '../../../types/index.js';
-import { SlackCommandParser, SlackCommand } from './slack-command-parser.js';
-import { SlackNotificationService } from './slack-notification-service.js';
-import { SlackUtils } from './slack-utils.js';
-import { AIService } from '../../ai/ai-service.js';
-import { ZendeskService } from '../zendesk/zendesk.js';
-import { MultiAgentService } from '../../multi-agent-service.js';
-import { TaskGenie } from '../../task-genie.js';
+import { Env, TokenUsage } from '../../../types/index';
+import { SlackEvent, SlackAppMentionEvent } from './types/index';
+import { SlackCommandHandler, SlackCommand } from './handlers/slack-command-handler';
+import { SlackNotificationService } from './slack-notification-service';
+import { SlackFormatters, SlackEmojis } from './utils/index';
+import { AIService } from '../../ai/ai-service';
+import { ZendeskService } from '../zendesk/zendesk';
+import { MultiAgentService } from '../../multi-agent-service';
+import { TaskGenie } from '../../task-genie';
 
 interface TaskGenieContext {
   ticketId?: string;
@@ -56,7 +57,7 @@ export class SlackMessageHandler {
   /**
    * Handle Slack mention events
    */
-  async handleMention(event: SlackEvent): Promise<void> {
+  async handleMention(event: SlackAppMentionEvent): Promise<void> {
     try {
       const { channel, text, thread_ts, ts, user } = event;
       let messageText = text || '';
@@ -66,17 +67,16 @@ export class SlackMessageHandler {
       console.log('🎯 handleMention called:', {
         channel,
         user: event.user,
-        bot_id: event.bot_id,
         text: text?.substring(0, 100),
         cleanedText: messageText.substring(0, 100),
         event_ts: ts
       });
 
       // Parse command-style queries first (slash commands, hashtag commands)
-      const commandResult = SlackCommandParser.parseSlackCommand(messageText);
+      const commandResult = SlackCommandHandler.parseSlackCommand(messageText);
       
       if (commandResult.isCommand) {
-        await this.handleSlackCommand(channel, thread_ts || ts, commandResult, user);
+        await this.handleSlackCommand(channel, thread_ts || ts, commandResult as SlackCommand, user);
         return;
       }
 
@@ -508,7 +508,7 @@ export class SlackMessageHandler {
       ];
 
       // Add context footer with TaskGenie version, token usage and AI provider
-      const footerText = SlackUtils.createTaskGenieFooter(tokenUsage, aiProvider);
+      const footerText = SlackFormatters.createTaskGenieFooter(tokenUsage, aiProvider);
       blocks.push({
         type: 'context',
         elements: [{
@@ -587,7 +587,7 @@ export class SlackMessageHandler {
       message += `${statusEmoji} *${status.toUpperCase()} (${tickets.length})*\n`;
       
       tickets.forEach(({ ticket, hasClickUpTask }) => {
-        const priorityEmoji = this.getPriorityEmoji(ticket.priority);
+        const priorityEmoji = SlackEmojis.getPriorityEmoji(ticket.priority);
         const taskStatus = hasClickUpTask ? '✅' : '❌';
         const ticketUrl = this.zendeskService.getTicketUrl(ticket.id);
         
@@ -624,19 +624,6 @@ export class SlackMessageHandler {
       case 'solved': return '✅';
       case 'closed': return '🔒';
       default: return '📋';
-    }
-  }
-
-  /**
-   * Get emoji for ticket priority
-   */
-  private getPriorityEmoji(priority: string): string {
-    switch (priority?.toLowerCase()) {
-      case 'urgent': return '🔴';
-      case 'high': return '🟠';
-      case 'normal': return '🟡';
-      case 'low': return '🟢';
-      default: return '⚪';
     }
   }
 

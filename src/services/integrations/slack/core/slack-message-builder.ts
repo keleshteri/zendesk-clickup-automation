@@ -8,7 +8,7 @@
  * @stability: stable
  * @edit-permissions: "method-specific"
  * @method-permissions: { "buildIntelligentNotification": "allow", "buildMultiAgentAnalysis": "allow", "buildTeamMentionMessage": "allow", "buildErrorMessage": "allow", "buildSuccessMessage": "allow", "buildProgressMessage": "allow", "reset": "allow", "addSection": "allow", "addHeader": "allow", "getBlocks": "read-only" }
- * @dependencies: ["../../../../types/index.ts", "../types/slack-message-types.ts", "../utils/slack-formatters.ts", "../utils/slack-emojis.ts", "../utils/slack-constants.ts", "../slack-utils.ts"]
+ * @dependencies: ["../../../../types/index.ts", "../types/slack-message-types.ts", "../utils/slack-formatters.ts", "../utils/slack-emojis.ts", "../utils/slack-constants.ts", "../utils/slack-utilities.ts"]
  * @tests: ["./tests/slack-message-builder.test.ts"]
  * @breaking-changes-risk: medium
  * @review-required: true
@@ -36,7 +36,7 @@ import { SlackMessage, SlackBlockType } from '../types/slack-message-types';
 import { SlackFormatters } from '../utils/slack-formatters';
 import { SlackEmojis } from '../utils/slack-emojis';
 import { SlackConstants } from '../utils/slack-constants';
-import { SlackUtils } from '../slack-utils';
+import { SlackUtilities } from '../utils/slack-utilities';
 // Version constant to avoid package.json import issues
 const TASKGENIE_VERSION = '0.0.2';
 
@@ -414,7 +414,7 @@ export class SlackMessageBuilder {
     }
     
     if (provider) {
-      footerText += ` | ${SlackUtils.formatAIProvider(provider)}`;
+      footerText += ` | ${SlackUtilities.formatAIProvider(provider)}`;
     }
     
     footerText += ` | ${SlackFormatters.formatTimestamp()}`;

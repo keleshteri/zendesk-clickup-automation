@@ -48,7 +48,7 @@ export class Orchestrator {
     this.agents.set('BUSINESS_ANALYST', new BusinessAnalystAgent());
 
     // Initialize agent utilization metrics
-    for (const role of this.agents.keys()) {
+    for (const role of Array.from(this.agents.keys())) {
       this.workflowMetrics.agentUtilization.set(role, {
         tasksHandled: 0,
         averageConfidence: 0,
@@ -229,7 +229,7 @@ export class Orchestrator {
    * Reset metrics for all agents and orchestrator
    */
   resetMetrics(): void {
-    for (const [role, agent] of this.agents) {
+    for (const [role, agent] of Array.from(this.agents)) {
       // Reset agent metrics if the method exists
       if (typeof (agent as any).resetMetrics === 'function') {
         (agent as any).resetMetrics();
@@ -247,7 +247,7 @@ export class Orchestrator {
     };
 
     // Reinitialize agent utilization metrics
-    for (const role of this.agents.keys()) {
+    for (const role of Array.from(this.agents.keys())) {
       this.workflowMetrics.agentUtilization.set(role, {
         tasksHandled: 0,
         averageConfidence: 0,

@@ -39,6 +39,7 @@ export { SlackEmojis } from './slack-emojis';
 export { SlackFormatters } from './slack-formatters';
 export { SlackValidators, type ValidationResult } from './slack-validators';
 export { SlackConstants } from './slack-constants';
+export { SlackUtilities } from './slack-utilities';
 
 // Re-export commonly used types and interfaces
 // ValidationResult is already exported above with SlackValidators
@@ -54,6 +55,7 @@ export type Timestamp = string;
 import { SlackFormatters } from './slack-formatters';
 import { SlackValidators } from './slack-validators';
 import { SlackConstants } from './slack-constants';
+import { SlackUtilities } from './slack-utilities';
 
 // Common utility functions
 export const SlackUtils = {
@@ -77,6 +79,30 @@ export const SlackUtils = {
     channelId: SlackValidators.validateChannelId,
     messageText: SlackValidators.validateMessageText,
     timestamp: SlackValidators.validateTimestamp
+  },
+
+  /**
+   * Utility functions
+   */
+  utils: {
+    extractTicketId: SlackUtilities.extractTicketId,
+    getTeamChannel: SlackUtilities.getTeamChannel,
+    formatAIProvider: SlackUtilities.formatAIProvider,
+    formatServiceStatus: SlackUtilities.formatServiceStatus,
+    escapeMarkdown: SlackUtilities.escapeSlackMarkdown
+  },
+
+  /**
+   * Message blocks
+   */
+  blocks: {
+    error: SlackUtilities.createErrorMessage,
+    success: SlackUtilities.createSuccessMessage,
+    info: SlackUtilities.createInfoMessage,
+    warning: SlackUtilities.createWarningMessage,
+    loading: SlackUtilities.createLoadingMessage,
+    divider: SlackUtilities.createDivider,
+    fields: SlackUtilities.createFieldsSection
   },
 
   /**

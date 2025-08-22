@@ -35,6 +35,7 @@
 export { SlackThreadContext } from './slack-thread-context';
 export { SlackThreadBuilder } from './slack-thread-builder';
 export { SlackThreadAnalyzer } from './slack-thread-analyzer';
+export { SlackThreadManager } from './slack-thread-manager';
 
 // Thread Analysis Types
 export type {
@@ -49,3 +50,9 @@ export type {
   ThreadActivity,
   ThreadMetadata
 } from './slack-thread-context';
+
+// Thread Manager Types
+export type {
+  ThreadContext,
+  ThreadMessage
+} from './slack-thread-manager';
