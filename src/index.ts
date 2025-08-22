@@ -575,24 +575,27 @@ export default {
           }
 
           const body = await request.text();
-          const timestamp = request.headers.get('X-Slack-Request-Timestamp') || '';
-          const signature = request.headers.get('X-Slack-Signature') || '';
-
-          // Verify Slack request signature
-          if (!await slackService.verifyRequest(body, timestamp, signature)) {
-            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.UNAUTHORIZED)), {
-              status: HTTP_STATUS.UNAUTHORIZED,
-              headers: corsHeaders
-            });
-          }
-
           const data = JSON.parse(body);
 
-          // Handle URL verification challenge
+          // Handle URL verification challenge FIRST (before signature verification)
+          // Challenge requests may not have proper signatures
           if (data.type === 'url_verification') {
+            console.log(`${LOG_CONFIG.PREFIXES.SLACK} Slack URL verification challenge received`);
             return new Response(data.challenge, {
               status: HTTP_STATUS.OK,
               headers: { 'Content-Type': 'text/plain' }
+            });
+          }
+
+          // For all other requests, verify signature
+          const timestamp = request.headers.get('X-Slack-Request-Timestamp') || '';
+          const signature = request.headers.get('X-Slack-Signature') || '';
+
+          if (!await slackService.verifyRequest(body, timestamp, signature)) {
+            console.warn(`${LOG_CONFIG.PREFIXES.SLACK} Invalid Slack webhook signature`);
+            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.UNAUTHORIZED)), {
+              status: HTTP_STATUS.UNAUTHORIZED,
+              headers: corsHeaders
             });
           }
 
