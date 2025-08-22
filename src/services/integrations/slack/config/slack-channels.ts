@@ -86,6 +86,52 @@ export class SlackChannels {
   /**
    * Default channel configurations
    */
+  /**
+   * Default Slack channel configurations for the automation system.
+   * 
+   * This configuration serves multiple purposes:
+   * - **Type Safety**: Defines the structure and properties for channel configurations
+   * - **Documentation**: Shows available channel types and their intended purposes
+   * - **Future Flexibility**: Ready for scaling to dedicated channels when needed
+   * - **Fallback Configuration**: Provides default settings for channel validation
+   * 
+   * **Current Usage:**
+   * - These are NOT actively used for message routing (environment variables take precedence)
+   * - Used for type definitions, validation, and as templates for future channel creation
+   * - The actual channels used are defined in .env file (currently all point to #zendesk-clickup-automation)
+   * 
+   * **Channel Categories:**
+   * - Support Team: ticket handling, urgent issues, resolved tickets
+   * - Development Team: tasks, deployments, code-related notifications
+   * - System Monitoring: alerts, AI insights, system health
+   * - General Communication: announcements, help, daily reports
+   * 
+   * **Properties Explained:**
+   * - `id`: Slack channel ID (placeholder values, replace with real IDs when creating channels)
+   * - `name`: Channel name without # prefix
+   * - `purpose`: Description of channel's intended use
+   * - `isPrivate`: Whether channel is private (false = public)
+   * - `allowedMessageTypes`: Array of message types that can be sent to this channel
+   * - `defaultThreading`: Whether messages should be threaded by default
+   * - `notificationLevel`: 'all' (notify everyone) or 'mentions' (only @mentions)
+   * - `retentionDays`: Optional message retention period in days
+   * 
+   * @example
+   * ```typescript
+   * // Get channel configuration
+   * const config = SlackChannels.getChannelConfig('support-tickets');
+   * 
+   * // Validate channel setup
+   * const isValid = SlackChannels.validateChannelConfig(config);
+   * 
+   * // Get channel ID for messaging
+   * const channelId = SlackChannels.getChannelId('dev-tasks');
+   * ```
+   * 
+   * @see {@link ChannelConfig} for detailed property definitions
+   * @see {@link SlackService.getTeamChannel} for actual channel resolution logic
+   * @see .env file for current active channel mappings
+   */
   static readonly DEFAULT_CHANNELS: Record<string, ChannelConfig> = {
     // Support Team Channels
     'support-tickets': {

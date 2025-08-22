@@ -261,6 +261,42 @@ get_recent_changes(days)
 3. Block the modification until approval is granted
 4. Suggest alternative approaches if available
 
+### When Edit Permissions are Restricted
+When AI agent encounters `@edit-permissions` restrictions:
+
+#### For `@edit-permissions: "read-only"` files:
+1. **NEVER attempt modification**
+2. **Explain the restriction**: "This file is marked as read-only and cannot be modified by AI agents"
+3. **Request user action**: "Would you like to:
+   - Grant temporary edit access by updating the @edit-permissions metadata?
+   - Make the changes manually yourself?
+   - Provide specific approval to override this restriction?"
+4. **Suggest alternatives**: Offer to create new files or modify related components instead
+
+#### For `@edit-permissions: "add-only"` files:
+1. **Explain the limitation**: "This file only allows appending new code, not modifying existing code"
+2. **Offer options**: "I can:
+   - Add new functions/methods at the end of the file
+   - Create a separate file for the modifications
+   - Wait for you to grant full edit permissions"
+
+#### For `@edit-permissions: "method-specific"` files:
+1. **Check individual method permissions** in `@method-permissions`
+2. **Explain specific restrictions**: "Method X is read-only, but I can modify method Y"
+3. **Request clarification**: "Would you like to update the method permissions or handle this differently?"
+
+#### User Override Commands:
+```javascript
+// Temporary permission grant
+"Grant edit access to [filename]" → Update @edit-permissions temporarily
+
+// Permanent permission change
+"Change [filename] to full edit permissions" → Update @edit-permissions permanently
+
+// Override for specific task
+"Override read-only for this task" → Allow modification with explicit user consent
+```
+
 ---
 
 ## Development Workflow
