@@ -1,22 +1,34 @@
 import { TaskGenieContext, Env, TicketAnalysis, ZendeskTicket, AssignmentRecommendation, AIInsights, TokenUsage, SlackEvent as MainSlackEvent } from '../../../types/index';
-import { SlackMessage, SlackEvent, SlackMessageEvent, SlackApiResponse, SlackBlockType } from './types/index';
 import { AIService } from '../../ai/ai-service';
 import { ZendeskService } from '../zendesk/zendesk';
 import { MultiAgentService } from '../../multi-agent-service';
 import { TaskGenie } from '../../task-genie';
-import { SlackCommand } from './handlers/slack-command-handler';
+
+// Internal Slack module imports - using index files for modularity
+import { SlackMessage, SlackEvent, SlackMessageEvent, SlackApiResponse, SlackBlockType } from './types/index';
+import { 
+  SlackApiClient, 
+  SlackMessageBuilder, 
+  SlackSocketService, 
+  SocketServiceConfig,
+  SlackAppManifestService, 
+  AppConfigTemplate,
+  SlackSecurityService, 
+  TokenRotationConfig, 
+  SecurityMetrics, 
+  SecurityAuditEntry 
+} from './core/index';
+import { 
+  SlackWorkflowHandler, 
+  SlackMentionHandler, 
+  SlackCommandHandler, 
+  SlackCommand,
+  MentionEvent 
+} from './handlers/index';
+import { SlackEmojis, SlackFormatters, SlackValidators, SlackConstants } from './utils/index';
 import { SlackMessageHandler } from './slack-message-handler';
 import { SlackNotificationService } from './slack-notification-service';
 import { SlackThreadManager } from './threads';
-// SlackVerification functionality now consolidated into SlackSecurityService
-
-import { SlackApiClient } from './core/slack-api-client';
-import { SlackMessageBuilder } from './core/slack-message-builder';
-import { SlackSocketService, SocketServiceConfig } from './core/slack-socket-service';
-import { SlackAppManifestService, AppConfigTemplate } from './core/slack-app-manifest-service';
-import { SlackSecurityService, TokenRotationConfig, SecurityMetrics, SecurityAuditEntry } from './core/slack-security-service';
-import { SlackWorkflowHandler, SlackMentionHandler, SlackCommandHandler, MentionEvent } from './handlers/index';
-import { SlackEmojis, SlackFormatters, SlackValidators, SlackConstants } from './utils/index';
 // Version constant to avoid package.json import issues
 const TASKGENIE_VERSION = '0.0.2';
 
@@ -1045,11 +1057,11 @@ export class SlackService {
   /**
    * Deploy app configuration from template
    */
-  async deployAppFromTemplate(template: AppConfigTemplate, appId?: string) {
+  async deployAppFromTemplate(template: AppConfigTemplate, appId?: string, request?: Request) {
     if (!this._manifestService) {
       throw new Error('App Manifest service not initialized');
     }
-    return this._manifestService.deployFromTemplate(template, appId);
+    return this._manifestService.deployFromTemplate(template, appId, request);
   }
 
   /**
@@ -1065,11 +1077,11 @@ export class SlackService {
   /**
    * Get available app templates
    */
-  getAppTemplates() {
+  getAppTemplates(request?: Request) {
     if (!this._manifestService) {
       throw new Error('App Manifest service not initialized');
     }
-    return this._manifestService.getTemplates();
+    return this._manifestService.getTemplates(request);
   }
 
   /**

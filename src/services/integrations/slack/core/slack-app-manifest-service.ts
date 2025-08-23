@@ -40,6 +40,7 @@ import {
   AppManifestResponse, 
   ManifestValidationResult 
 } from './slack-app-manifest-client.js';
+import { URLBuilder } from '../../../../utils/url-builder.js';
 
 /**
  * App configuration template options
@@ -109,12 +110,12 @@ export class SlackAppManifestService {
   /**
    * Deploy app configuration from template
    */
-  async deployFromTemplate(template: AppConfigTemplate, appId?: string): Promise<AppManifestResponse> {
+  async deployFromTemplate(template: AppConfigTemplate, appId?: string, request?: Request): Promise<AppManifestResponse> {
     try {
       console.log(`🚀 Deploying app configuration: ${template.name}`);
       
       // Generate manifest from template
-      const manifest = this.generateManifestFromTemplate(template);
+      const manifest = this.generateManifestFromTemplate(template, request);
       
       // Validate manifest first
       const validation = await this.manifestClient.validateManifest(manifest);
@@ -313,7 +314,7 @@ export class SlackAppManifestService {
   /**
    * Generate manifest from template
    */
-  private generateManifestFromTemplate(template: AppConfigTemplate): SlackAppManifest {
+  private generateManifestFromTemplate(template: AppConfigTemplate, request?: Request): SlackAppManifest {
     const botEvents = template.events.bot || [];
     const userEvents = template.events.user || [];
     
@@ -349,10 +350,15 @@ export class SlackAppManifestService {
     );
   }
 
+
+
   /**
    * Get predefined templates for common app configurations
    */
-  getTemplates(): Record<string, AppConfigTemplate> {
+  getTemplates(request?: Request): Record<string, AppConfigTemplate> {
+    const urlBuilder = new URLBuilder({ env: this.env, request });
+    const workerUrl = urlBuilder.getWorkerBaseUrl();
+    
     return {
       development: {
         name: 'TaskGenie Development',
@@ -368,8 +374,8 @@ export class SlackAppManifestService {
           workflowSteps: false
         },
         urls: {
-          requestUrl: 'https://dev.example.com/slack/events',
-          redirectUrls: ['https://dev.example.com/auth/slack/callback']
+          requestUrl: urlBuilder.getSlackEventsUrl(),
+          redirectUrls: [urlBuilder.getSlackAuthCallbackUrl()]
         },
         scopes: {
           bot: [
@@ -393,6 +399,7 @@ export class SlackAppManifestService {
             'message.im',
             'message.mpim',
             'team_join',
+            'member_joined_channel',
             'reaction_added'
           ]
         }
@@ -411,8 +418,8 @@ export class SlackAppManifestService {
           workflowSteps: true
         },
         urls: {
-          requestUrl: 'https://api.example.com/slack/events',
-          redirectUrls: ['https://app.example.com/auth/slack/callback']
+          requestUrl: urlBuilder.getSlackEventsUrl(),
+          redirectUrls: [urlBuilder.getSlackAuthCallbackUrl()]
         },
         scopes: {
           bot: [

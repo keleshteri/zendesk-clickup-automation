@@ -48,6 +48,11 @@ export interface Env {
   AI_PROVIDER: 'googlegemini' | 'openai' | 'openrouter';
   GOOGLE_GEMINI_API_KEY?: string;
   GEMINI_MODEL?: string;
+  
+  // Worker URL Configuration
+  WORKER_BASE_URL?: string;
+  SLACK_EVENTS_ENDPOINT?: string;
+  SLACK_AUTH_CALLBACK_ENDPOINT?: string;
   OPENAI_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
   OPENROUTER_MODEL?: string;
@@ -301,7 +306,7 @@ export type {
   SlackMessage,
   SlackApiResponse,
   TaskGenieContext
-} from '../services/integrations/slack/types';
+} from '../services/integrations/slack';
 
 // AI Provider Types
 export interface AIProvider {
