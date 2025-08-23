@@ -440,6 +440,7 @@ export class SlackAppManifestService {
             'message.im',
             'message.mpim',
             'team_join',
+            'member_joined_channel',
             'channel_created',
             'file_shared',
             'reaction_added'

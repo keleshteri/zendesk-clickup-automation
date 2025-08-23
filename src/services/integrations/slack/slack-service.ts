@@ -187,12 +187,6 @@ export class SlackService {
         return;
       }
 
-      // Skip if any bot is joining (including TaskGenie)
-      if (bot_id) {
-        console.log('Bot joined channel, skipping welcome message');
-        return;
-      }
-
       // Get service statuses for welcome message
       const serviceStatuses = await this.getServiceStatuses();
 
@@ -210,12 +204,19 @@ export class SlackService {
           const botInfo: any = await botInfoResponse.json();
           if (botInfo.user_id === user) {
             // TaskGenie is joining - send intro message
+            console.log('TaskGenie joined channel, sending welcome message');
             await this.notificationService.sendTaskGenieIntroMessage(channel, serviceStatuses);
             return;
           }
         }
       } catch (botInfoError) {
         console.error('Error getting bot info:', botInfoError);
+      }
+      
+      // Skip if any other bot is joining (not TaskGenie)
+      if (bot_id) {
+        console.log('Other bot joined channel, skipping welcome message');
+        return;
       }
       
       // Send welcome message to new human users only

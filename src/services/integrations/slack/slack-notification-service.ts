@@ -89,39 +89,50 @@ export class SlackNotificationService {
     try {
       const message = {
         channel,
-        text: `🧞 TaskGenie has joined the channel!`,
+        text: `:genie: TaskGenie has joined!`,
         blocks: [
-          SlackFormatters.createHeader('🧞 TaskGenie has joined!'),
           {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: `Hi everyone! 👋\n\nI'm *TaskGenie*, your AI-powered task automation assistant. I'm here to help streamline your workflow between Zendesk and ClickUp!`
+              text: `:genie: *TaskGenie has joined!*\n\nHi everyone! :wave:\n\nI'm TaskGenie, your AI-powered task automation assistant. I'm here to help streamline your workflow between Zendesk and ClickUp!`
             }
           },
           {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*🎯 What I can do for you:*\n• 🎫 Automatically create ClickUp tasks from Zendesk tickets\n• 📋 Provide AI-powered ticket summaries and analysis\n• 📊 Generate insights and analytics reports\n• 🔍 Help you search and find tickets\n• 🤖 Answer questions about your tickets and tasks\n• 🔗 Keep everything connected with smart automation'
+              text: `:dart: *What I can do for you:*\n• :ticket: Automatically create ClickUp tasks from Zendesk tickets\n• :clipboard: Provide AI-powered ticket summaries and analysis\n• :bar_chart: Generate insights and analytics reports\n• :mag: Help you search and find tickets\n• :robot_face: Answer questions about your tickets and tasks\n• :link: Keep everything connected with smart automation`
             }
           },
           {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '*💬 How to interact with me:*\n• Mention me with `@TaskGenie` followed by your question\n• Ask for help: `@TaskGenie help`\n• List open tickets: `@TaskGenie list tickets`\n• Get ticket summaries: `@TaskGenie summarize ticket #27`\n• Check status: `@TaskGenie status ticket #27`\n• Get analytics: `@TaskGenie analytics`'
+              text: `:speech_balloon: *How to interact with me:*\n• Mention me with @TaskGenie followed by your question\n• Ask for help: @TaskGenie help\n• List open tickets: @TaskGenie list tickets\n• Get ticket summaries: @TaskGenie summarize ticket #27\n• Check status: @TaskGenie status ticket #27\n• Get analytics: @TaskGenie analytics`
             }
           },
           {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '🚀 *Ready to boost your productivity?* Just mention @TaskGenie and I\'ll assist!'
+              text: `:rocket: *Ready to boost your productivity?* Just mention @TaskGenie and I'll assist!`
             }
           },
-          SlackFormatters.createBrandingFooter(),
-            SlackFormatters.createServiceStatusFooter(serviceStatuses)
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `:robot_face: TaskGenie v0.0.2 • Made by 2DC Team • Powered by AI`
+            }
+          },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `:large_green_circle: Zendesk (${serviceStatuses.zendeskDomain || '2damcreative.zendesk.com'}) | :large_green_circle: ClickUp | :large_green_circle: AI Provider`
+            }
+          }
         ]
       };
 
