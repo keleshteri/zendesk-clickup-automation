@@ -1,3 +1,14 @@
+/**
+ * @ai-metadata
+ * @component: SlackMessageEventInterface
+ * @description: Interface for Slack message events triggered when a message is posted in a channel
+ * @last-update: 2024-01-13
+ * @last-editor: ai-assistant
+ * @stability: stable
+ * @edit-permissions: "full"
+ * @dependencies: ["./slack-event.interface"]
+ */
+
 import type { SlackEvent } from './slack-event.interface';
 
 /**

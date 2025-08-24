@@ -1,3 +1,14 @@
+/**
+ * @ai-metadata
+ * @component: SlackMemberJoinedChannelEventInterface
+ * @description: Interface for Slack member joined channel events triggered when a user joins a channel
+ * @last-update: 2024-01-13
+ * @last-editor: ai-assistant
+ * @stability: stable
+ * @edit-permissions: "full"
+ * @dependencies: ["./slack-event.interface"]
+ */
+
 import type { SlackEvent } from './slack-event.interface';
 
 /**

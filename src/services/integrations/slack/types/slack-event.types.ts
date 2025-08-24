@@ -1,3 +1,14 @@
+/**
+ * @ai-metadata
+ * @component: SlackEventTypes
+ * @description: Union type definitions for all supported Slack event types
+ * @last-update: 2024-01-13
+ * @last-editor: ai-assistant
+ * @stability: stable
+ * @edit-permissions: "full"
+ * @dependencies: ["../interfaces/slack-app-mention-event.interface", "../interfaces/slack-member-joined-channel-event.interface", "../interfaces/slack-message-event.interface"]
+ */
+
 import type { SlackAppMentionEvent } from '../interfaces/slack-app-mention-event.interface';
 import type { SlackMemberJoinedChannelEvent } from '../interfaces/slack-member-joined-channel-event.interface';
 import type { SlackMessageEvent } from '../interfaces/slack-message-event.interface';
