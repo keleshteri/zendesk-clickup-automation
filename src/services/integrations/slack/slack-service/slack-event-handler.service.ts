@@ -97,16 +97,45 @@ export class SlackEventHandler {
    */
   async handleMemberJoined(event: SlackMemberJoinedChannelEvent): Promise<void> {
     try {
-      // Check if the bot joined the channel
+      console.log(`💬 Member ${event.user} joined channel ${event.channel}`);
+      
+      // Wait for bot user ID to be initialized (with timeout)
+      if (!this.botUserId) {
+        console.log(`⏳ Bot user ID not yet initialized, waiting...`);
+        // Wait up to 10 seconds for initialization
+        await this.waitForBotUserId(10000);
+      }
+      
+      console.log(`🔍 Debug: event.user=${event.user}, botUserId=${this.botUserId}`);
+      
+      // Check if the bot itself joined the channel
       if (event.user === this.botUserId) {
-        console.log(`🤖 Bot joined channel: ${event.channel}`);
+        console.log(`🤖 Bot joined channel ${event.channel}, sending welcome message`);
         await this.botManager.handleBotJoinedChannel(event.channel);
       } else {
-        console.log(`👤 User ${event.user} joined channel: ${event.channel}`);
-        // Handle regular user joins if needed
+        console.log(`👤 User ${event.user} joined channel ${event.channel}, sending welcome message`);
+        await this.messagingService.sendUserWelcomeMessage(event.channel, event.user);
+        console.log(`✅ Welcome message sent to user ${event.user} in channel ${event.channel}`);
       }
     } catch (error) {
-      console.error('Error handling member joined event:', error);
+      console.error('❌ Failed to process member join event:', error);
+      console.log('⚠️ Skipping member join processing due to initialization timeout');
+    }
+  }
+
+  /**
+   * Wait for bot user ID to be initialized
+   * @param timeoutMs - Maximum time to wait in milliseconds
+   * @returns Promise that resolves when bot user ID is available or timeout occurs
+   */
+  private async waitForBotUserId(timeoutMs: number): Promise<void> {
+    const startTime = Date.now();
+    while (!this.botUserId && (Date.now() - startTime) < timeoutMs) {
+      await new Promise(resolve => setTimeout(resolve, 100)); // Wait 100ms
+    }
+    
+    if (!this.botUserId) {
+      throw new Error(`Bot user ID not initialized within ${timeoutMs}ms timeout`);
     }
   }
 

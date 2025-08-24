@@ -11,11 +11,9 @@
 
 import { WebClient } from '@slack/web-api';
 import type { Env } from '../../../../types';
-// Note: These types should be defined in the main types or created as needed
-// For now, using 'any' to resolve compilation errors
-// TODO: Define proper types for SlackMessage, SlackMessageBlock, SlackAttachment, TicketData, TaskData
 import { SlackEmojiService } from './slack-emoji.service';
 import { SlackErrorReportingService } from './slack-error-reporting.service';
+import { SlackMessageBuilderService } from './slack-message-builder.service';
 
 /**
  * Service responsible for all Slack messaging operations
@@ -25,6 +23,7 @@ export class SlackMessagingService {
   private env: Env;
   private emojiService: SlackEmojiService;
   private errorReportingService?: SlackErrorReportingService;
+  private messageBuilder: SlackMessageBuilderService;
 
   /**
    * Initialize the Slack messaging service
@@ -37,6 +36,7 @@ export class SlackMessagingService {
     this.env = env;
     this.emojiService = new SlackEmojiService();
     this.errorReportingService = errorReportingService;
+    this.messageBuilder = new SlackMessageBuilderService();
   }
 
   /**
@@ -337,56 +337,7 @@ export class SlackMessagingService {
    * @returns Promise that resolves when message is sent
    */
   async sendBotIntroMessage(channel: string): Promise<void> {
-    const introMessage = {
-      channel,
-      blocks: [
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: ':genie: *TaskGenie has joined!*\n\nHi everyone! :wave:'
-          }
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: "I'm TaskGenie, your AI-powered task automation assistant. I'm here to help streamline your workflow between Zendesk and ClickUp!"
-          }
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: ':dart: *What I can do for you:*\n• :ticket: Automatically create ClickUp tasks from Zendesk tickets\n• :clipboard: Provide AI-powered ticket summaries and analysis\n• :bar_chart: Generate insights and analytics reports\n• :mag: Help you search and find tickets\n• :robot_face: Answer questions about your tickets and tasks\n• :link: Keep everything connected with smart automation'
-          }
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: ':speech_balloon: *How to interact with me:*\n• Mention me with @TaskGenie followed by your question\n• Ask for help: `@TaskGenie help`\n• List open tickets: `@TaskGenie list tickets`\n• Get ticket summaries: `@TaskGenie summarize ticket #27`\n• Check status: `@TaskGenie status ticket #27`\n• Get analytics: `@TaskGenie analytics`'
-          }
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: ':rocket: *Ready to boost your productivity?* Just mention @TaskGenie and I\'ll assist!'
-          }
-        },
-        {
-          type: 'context',
-          elements: [
-            {
-              type: 'mrkdwn',
-              text: ':robot_face: TaskGenie v0.0.2 • Made by 2DC Team • Powered by AI\n:large_green_circle: Zendesk (2damcreative.zendesk.com) | :large_green_circle: ClickUp | :large_green_circle: AI Provider'
-            }
-          ]
-        }
-      ]
-    };
-
+    const introMessage = this.messageBuilder.buildBotIntroMessageSafe({ channel });
     await this.client.chat.postMessage(introMessage);
   }
 
@@ -414,6 +365,17 @@ export class SlackMessagingService {
    */
   getEmojiService(): SlackEmojiService {
     return this.emojiService;
+  }
+
+  /**
+   * Send welcome message to a new user who joined a channel
+   * @param channel - The channel ID where the user joined
+   * @param userId - The user ID of the new member
+   * @returns Promise that resolves when message is sent
+   */
+  async sendUserWelcomeMessage(channel: string, userId: string): Promise<void> {
+    const welcomeMessage = this.messageBuilder.buildWelcomeMessageSafe({ channel, userId });
+    await this.client.chat.postMessage(welcomeMessage);
   }
 
   /**

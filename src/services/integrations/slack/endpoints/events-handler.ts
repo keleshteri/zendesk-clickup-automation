@@ -161,14 +161,17 @@ export class SlackEventsHandler {
       } else {
         console.log(`${LOG_CONFIG.PREFIXES.SLACK} 👤 User ${event.user} joined channel: ${event.channel}`);
         
-        // Handle regular user joins if needed (placeholder for future functionality)
-        const response = { ok: true, message: 'User join processed' };
+        // Send welcome message to the user who joined
+        const userWelcomePromise = this.options.slackService.handleMemberJoined(event);
+        
         if (ctx) {
-          ctx.waitUntil(Promise.resolve(response));
+          ctx.waitUntil(userWelcomePromise);
+        } else {
+          await userWelcomePromise;
         }
         
         return this.createSuccessResponse({ 
-          message: 'User join processed',
+          message: 'User welcome message sent',
           eventId: Date.now().toString(),
           userJoined: true
         });

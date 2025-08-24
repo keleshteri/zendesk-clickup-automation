@@ -139,12 +139,24 @@ export default {
 
     // Initialize SlackService with multiAgentService and TaskGenie
     try {
+      console.log('🚀 Creating SlackService instance...');
       slackService = new SlackService(env);
-      // Initialize bot user ID asynchronously
-      slackService.initialize().catch(error => {
+      console.log('✅ SlackService instance created, starting initialization...');
+      
+      // Initialize bot user ID asynchronously with proper error handling
+      slackService.initialize().then(() => {
+        console.log('✅ SlackService fully initialized with bot user ID');
+      }).catch(error => {
+        console.error('❌ SlackService initialization failed:', error);
+        console.error('❌ Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
         logError('Slack initialization', error);
       });
     } catch (error) {
+      console.error('❌ Failed to create SlackService:', error);
       logError('Slack', error);
     }
 
@@ -253,6 +265,54 @@ export default {
         } catch (error) {
           return new Response(JSON.stringify({
             error: 'Failed to get service statuses',
+            details: error instanceof Error ? error.message : 'Unknown error'
+          }), {
+            status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            headers: corsHeaders
+          });
+        }
+      }
+
+      // Route: Test bot welcome message (for debugging)
+      if (url.pathname === '/test/bot-welcome' && method === 'POST') {
+        if (!slackService) {
+          return new Response(JSON.stringify({
+            error: 'Slack service not available'
+          }), {
+            status: HTTP_STATUS.SERVICE_UNAVAILABLE,
+            headers: corsHeaders
+          });
+        }
+        
+        try {
+          const body = await request.json() as { channel?: string; user?: string };
+          const testChannel = body.channel || 'C09BY7A600Z';
+          const testUser = body.user || 'U1234567890';
+          
+          // Test the welcome message functionality by simulating a member join event
+          const memberJoinEvent = {
+            type: 'member_joined_channel' as const,
+            user: testUser,
+            channel: testChannel,
+            event_ts: Date.now().toString()
+          };
+          
+          await slackService.handleEvent(memberJoinEvent);
+          const result = { success: true, event: 'member_joined_channel' };
+          
+          return new Response(JSON.stringify({
+            status: 'ok',
+            message: 'Bot welcome message test completed',
+            result: result,
+            botUserId: slackService.getBotUserId(),
+            timestamp: new Date().toISOString()
+          }), {
+            status: HTTP_STATUS.OK,
+            headers: corsHeaders
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({
+            error: 'Failed to send welcome message',
             details: error instanceof Error ? error.message : 'Unknown error'
           }), {
             status: HTTP_STATUS.INTERNAL_SERVER_ERROR,
