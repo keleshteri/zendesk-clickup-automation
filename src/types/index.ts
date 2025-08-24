@@ -295,19 +295,6 @@ export interface IntegrationConfig {
   };
 }
 
-// Re-export Slack types from dedicated Slack types folder
-export type {
-  SlackEvent,
-  SlackTeamJoinEvent,
-  SlackChannelCreatedEvent,
-  SlackFileSharedEvent,
-  SlackReactionAddedEvent,
-  SlackAuthTestResponse,
-  SlackMessage,
-  SlackApiResponse,
-  TaskGenieContext
-} from '../services/integrations/slack';
-
 // AI Provider Types
 export interface AIProvider {
   name: 'googlegemini' | 'openai' | 'openrouter';
