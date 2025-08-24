@@ -1,5 +1,5 @@
 import { Env, ZendeskWebhook, ClickUpWebhook, ZendeskTicket, UserOAuthData } from './types/index.js';
-import { SlackEvent, SlackAppMentionEvent, SlackMemberJoinedChannelEvent, SlackEventType, SlackService } from './services/integrations/slack';
+import { SlackEvent, SlackAppMentionEvent, SlackMemberJoinedChannelEvent, SlackMessageEvent, SlackEventType, SlackService } from './services/integrations/slack';
 import { ZendeskService } from './services/integrations/zendesk/zendesk.js';
 import { ClickUpService } from './services/integrations/clickup/clickup.js';
 import { AIService } from './services/ai/ai-service.js';
@@ -138,7 +138,7 @@ export default {
 
     // Initialize SlackService with multiAgentService and TaskGenie
     try {
-      slackService = new SlackService(env, multiAgentService || undefined, taskGenie || undefined);
+      slackService = new SlackService(env);
     } catch (error) {
       logError('Slack', error);
     }
@@ -438,9 +438,10 @@ export default {
                 if (aiAnalysis) {
                   // Send intelligent notification with AI insights
                   console.log(`${LOG_CONFIG.PREFIXES.SLACK} Sending intelligent Slack notification with AI insights...`);
+                  const defaultChannel = SLACK_DEFAULTS.CHANNEL;
                   const slackMessage = await slackService.sendIntelligentNotification(
+                    defaultChannel,
                     ticket,
-                    aiAnalysis,
                     clickupUrl,
                     null // No assignment recommendation for now
                   );
@@ -613,13 +614,16 @@ export default {
             if (event.type === 'app_mention') {
               console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Processing app mention event for user:`, event.user);
               // Handle the mention asynchronously
-              ctx.waitUntil(slackService.handleMention(event as any));
+              ctx.waitUntil(slackService.handleMention(event as SlackAppMentionEvent));
               
               return new Response('', { status: HTTP_STATUS.OK });
-            } else if (event.type === 'message' && 'bot_id' in event && event.bot_id) {
-              console.log(`${LOG_CONFIG.PREFIXES.INFO} Skipping bot message from:`, (event as any).bot_id);
             } else if (event.type === 'message') {
-              console.log(`${LOG_CONFIG.PREFIXES.INFO} Skipping regular message event (not a mention)`);
+              const messageEvent = event as SlackMessageEvent;
+              if (messageEvent.bot_id) {
+                console.log(`${LOG_CONFIG.PREFIXES.INFO} Skipping bot message from:`, messageEvent.bot_id);
+              } else {
+                console.log(`${LOG_CONFIG.PREFIXES.INFO} Skipping regular message event (not a mention)`);
+              }
             }
             
             // Handle member joined channel events
@@ -1049,11 +1053,11 @@ export default {
           const limit = parseInt(urlParams.get('limit') || '100', 10);
           const severity = urlParams.get('severity') as 'low' | 'medium' | 'high' | 'critical' | null;
           
-          const auditLog = slackService.getSecurityAuditLog(limit, severity || undefined);
+          const auditLog = slackService.getSecurityAuditLog();
           
           return new Response(JSON.stringify(formatSuccessResponse({
             auditLog,
-            count: auditLog.length,
+            count: auditLog.entries.length,
             timestamp: new Date().toISOString()
           })), {
             status: HTTP_STATUS.OK,
@@ -1081,11 +1085,11 @@ export default {
             });
           }
 
-          const tokens = slackService.getTokenMetadata();
+          const tokens = await slackService.getTokenMetadata();
           
           return new Response(JSON.stringify(formatSuccessResponse({
             tokens,
-            count: tokens.length,
+            count: tokens.tokens?.length || 0,
             timestamp: new Date().toISOString()
           })), {
             status: HTTP_STATUS.OK,
@@ -1147,7 +1151,7 @@ export default {
           const body = await request.json() as { tokenType?: 'bot' | 'user' | 'app' };
           const tokenType = body.tokenType || 'bot';
           
-          const result = await slackService.forceTokenRotation(tokenType);
+          const result = await slackService.forceTokenRotation();
           
           return new Response(JSON.stringify(formatSuccessResponse({
             rotation: result,
@@ -1237,10 +1241,13 @@ export default {
             });
           }
 
+          const signature = body.headers['x-slack-signature'] || '';
+          const timestamp = body.headers['x-slack-request-timestamp'] || '';
+          
           const result = await slackService.verifyRequestWithAudit(
+            signature,
             body.body, 
-            body.headers, 
-            body.source || 'api'
+            timestamp
           );
           
           return new Response(JSON.stringify(formatSuccessResponse({
@@ -1660,10 +1667,7 @@ export default {
                 });
               }
               
-              await slackService.sendMessage({
-                channel: body.channel,
-                text: body.message
-              });
+              await slackService.sendMessage(body.channel, body.message);
               
               results.message_sent = {
                 channel: body.channel,

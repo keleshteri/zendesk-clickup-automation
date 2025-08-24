@@ -173,11 +173,21 @@ export class EnhancedWorkflowOrchestrator {
       }
 
       // Send threaded reply with AI analysis
+      const analysisText = typeof aiSummary === 'string' ? aiSummary : 
+        `**AI Analysis Summary**\n\n` +
+        `📋 **Summary:** ${aiSummary.summary}\n` +
+        `🎯 **Priority:** ${aiSummary.priority}\n` +
+        `📂 **Category:** ${aiSummary.category}\n` +
+        `😊 **Sentiment:** ${aiSummary.sentiment}\n` +
+        `⚡ **Complexity:** ${aiSummary.estimated_complexity}\n` +
+        `🎯 **Suggested Team:** ${aiSummary.suggested_team}\n` +
+        `📊 **Confidence:** ${(aiSummary.confidence_score * 100).toFixed(1)}%\n\n` +
+        `**Action Items:**\n${aiSummary.action_items.map(item => `• ${item}`).join('\n')}`;
+      
       const slackResponse = await this.slackService.sendThreadedAIAnalysis(
         context.channel,
         context.initialSlackTs || '',
-        context.ticket,
-        aiSummary
+        analysisText
       );
 
       return {
