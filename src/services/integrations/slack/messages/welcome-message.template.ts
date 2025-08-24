@@ -12,6 +12,7 @@
  */
 
 import type { WelcomeMessageContext, MessageTemplateRenderer, SlackMessageTemplate } from './types';
+import { createTaskGenieFooter } from './footers/taskgenie-footer.template';
 
 /**
  * Welcome message template for new channel members
@@ -54,7 +55,15 @@ export const welcomeMessageTemplate: MessageTemplateRenderer<WelcomeMessageConte
             text: ':robot_face: Ready to boost your productivity? Just mention me anytime!'
           }
         ]
-      }
+      },
+      ...createTaskGenieFooter({
+        version: 'v0.0.2',
+        zendeskDomain: '2damcreative.zendesk.com',
+        showSystemStatus: false
+      }).elements.map(element => ({
+        type: 'context' as const,
+        elements: [element]
+      }))
     ]
   };
 };
