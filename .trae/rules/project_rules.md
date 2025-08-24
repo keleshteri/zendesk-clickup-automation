@@ -1,7 +1,10 @@
 # Zendesk-ClickUp Automation Project Rules
 
 ## Project Overview
-**Project**: Zendesk-ClickUp Automation  
+**Project**: Zendesk-ClickUp Automation 
+**Description**: Automates Zendesk tickets and ClickUp tasks using NLP routing and AI-assisted agents.
+**Status**: In development
+**stack**: Zendesk, ClickUp, TypeScript, Cloudflare Workers, Multi-agent architecture, NLP routing, AI Memory MCP, Project Tracking
 **Architecture**: Multi-agent TypeScript system with Cloudflare Workers  
 **Tech Stack**: TypeScript, Cloudflare Workers, Multi-agent architecture, NLP routing  
 **Memory System**: AI Memory MCP with persistent project tracking  
