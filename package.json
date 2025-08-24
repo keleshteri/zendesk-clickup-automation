@@ -24,6 +24,8 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.7.1",
+    "@slack/types": "^2.16.0",
+    "@slack/web-api": "^7.10.0",
     "hono": "^4.6.20"
   },
   "devDependencies": {

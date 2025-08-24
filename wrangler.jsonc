@@ -8,6 +8,7 @@
 	"name": "zendesk-clickup-automation",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-08-03",
+	"compatibility_flags": ["nodejs_compat"],
 	"observability": {
 		"enabled": true
 	},
