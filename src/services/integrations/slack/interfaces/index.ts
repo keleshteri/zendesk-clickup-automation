@@ -14,3 +14,4 @@ export * from './slack-event.interface';
 export * from './slack-member-joined-channel-event.interface';
 export * from './slack-message-event.interface';
 export * from './slack-error.interface';
+export * from './slack-error-reporting.interface';

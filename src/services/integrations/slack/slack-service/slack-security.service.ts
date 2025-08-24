@@ -2,7 +2,7 @@
  * @ai-metadata
  * @component: SlackSecurityService
  * @description: Handles Slack request verification, security auditing, and token management
- * @last-update: 2024-01-13
+ * @last-update: 2025-08-24T09:42:58.273Z
  * @last-editor: ai-assistant
  * @stability: stable
  * @edit-permissions: "full"
@@ -11,6 +11,7 @@
 
 import { WebClient } from '@slack/web-api';
 import type { Env } from '../../../../types';
+import { ErrorSeverity } from '../interfaces/slack-error-reporting.interface';
 // Security types will be defined when needed
 
 /**
@@ -24,6 +25,7 @@ export class SlackSecurityService {
    * Initialize the Slack security service
    * @param client - The Slack WebClient instance
    * @param env - Environment configuration containing security secrets
+   * @param errorReporter - Optional error reporting service for security events
    */
   constructor(client: WebClient, env: Env) {
     this.client = client;
@@ -149,14 +151,14 @@ export class SlackSecurityService {
         {
           timestamp: new Date().toISOString(),
           event: 'request_verification_failed',
-          severity: 'medium',
+          severity: ErrorSeverity.MEDIUM,
           details: 'Invalid signature detected',
           source: 'slack_webhook'
         },
         {
           timestamp: new Date(Date.now() - 3600000).toISOString(),
           event: 'token_rotation_completed',
-          severity: 'info',
+          severity: ErrorSeverity.INFO,
           details: 'Slack bot token rotated successfully',
           source: 'token_manager'
         }

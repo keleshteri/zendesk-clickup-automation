@@ -1,5 +1,6 @@
 import { Env, ZendeskWebhook, ClickUpWebhook, ZendeskTicket, UserOAuthData } from './types/index.js';
-import { SlackEvent, SlackAppMentionEvent, SlackMemberJoinedChannelEvent, SlackMessageEvent, SlackEventType, SlackService } from './services/integrations/slack';
+import { SlackService } from './services/integrations/slack';
+import { SlackWebhookHandler } from './services/integrations/slack/endpoints/webhook-handler.js';
 import { ZendeskService } from './services/integrations/zendesk/zendesk.js';
 import { ClickUpService } from './services/integrations/clickup/clickup.js';
 import { AIService } from './services/ai/ai-service.js';
@@ -139,6 +140,10 @@ export default {
     // Initialize SlackService with multiAgentService and TaskGenie
     try {
       slackService = new SlackService(env);
+      // Initialize bot user ID asynchronously
+      slackService.initialize().catch(error => {
+        logError('Slack initialization', error);
+      });
     } catch (error) {
       logError('Slack', error);
     }
@@ -303,6 +308,8 @@ export default {
           headers: corsHeaders
         });
       }
+
+
 
       // Route: Zendesk webhook - Create ClickUp task and notify Slack
       if (url.pathname === APP_ENDPOINTS.WEBHOOK_ZENDESK && method === 'POST') {
@@ -574,68 +581,12 @@ export default {
             });
           }
 
-          const body = await request.text();
-          const data = JSON.parse(body);
-
-          // Handle URL verification challenge FIRST (before signature verification)
-          // Challenge requests may not have proper signatures
-          if (data.type === 'url_verification') {
-            console.log(`${LOG_CONFIG.PREFIXES.SLACK} Slack URL verification challenge received`);
-            return new Response(data.challenge, {
-              status: HTTP_STATUS.OK,
-              headers: { 'Content-Type': 'text/plain' }
-            });
-          }
-
-          // For all other requests, verify signature
-          const timestamp = request.headers.get('X-Slack-Request-Timestamp') || '';
-          const signature = request.headers.get('X-Slack-Signature') || '';
-
-          if (!await slackService.verifyRequest(body, timestamp, signature)) {
-            console.warn(`${LOG_CONFIG.PREFIXES.SLACK} Invalid Slack webhook signature`);
-            return new Response(JSON.stringify(formatErrorResponse(ERROR_MESSAGES.UNAUTHORIZED)), {
-              status: HTTP_STATUS.UNAUTHORIZED,
-              headers: corsHeaders
-            });
-          }
-
-          // Handle app mentions, direct messages, and member joined events
-          if (data.type === 'event_callback' && data.event) {
-            const event: SlackEventType = data.event;
-            
-            // Debug logging for event processing
-            console.log(`${LOG_CONFIG.PREFIXES.SLACK} Slack event received:`, {
-              type: event.type,
-              user: 'user' in event ? event.user : undefined,
-              text: 'text' in event ? event.text?.substring(0, 50) + '...' : undefined,
-              event_ts: event.event_ts
-            });
-            
-            if (event.type === 'app_mention') {
-              console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Processing app mention event for user:`, event.user);
-              // Handle the mention asynchronously
-              ctx.waitUntil(slackService.handleMention(event as SlackAppMentionEvent));
-              
-              return new Response('', { status: HTTP_STATUS.OK });
-            } else if (event.type === 'message') {
-              const messageEvent = event as SlackMessageEvent;
-              if (messageEvent.bot_id) {
-                console.log(`${LOG_CONFIG.PREFIXES.INFO} Skipping bot message from:`, messageEvent.bot_id);
-              } else {
-                console.log(`${LOG_CONFIG.PREFIXES.INFO} Skipping regular message event (not a mention)`);
-              }
-            }
-            
-            // Handle member joined channel events
-            if (event.type === 'member_joined_channel') {
-              // Send welcome message asynchronously
-              ctx.waitUntil(slackService.handleMemberJoined(event));
-              
-              return new Response('', { status: HTTP_STATUS.OK });
-            }
-          }
-
-          return new Response('', { status: HTTP_STATUS.OK });
+          const webhookHandler = new SlackWebhookHandler({
+            env,
+            slackService,
+            corsHeaders
+          });
+          return await webhookHandler.handle(request, ctx);
         } catch (error) {
           console.error(`${LOG_CONFIG.PREFIXES.ERROR} Error processing Slack event:`, error);
           return new Response(JSON.stringify(formatErrorResponse(
@@ -1702,7 +1653,7 @@ export default {
               const testTimestamp = Math.floor(Date.now() / 1000).toString();
               const testSignature = 'v0=test_signature';
               
-              const isValid = await slackService.verifyRequest(testBody, testTimestamp, testSignature);
+              const isValid = await slackService.verifyRequest(testSignature, testBody, testTimestamp);
               results.webhook_verification = {
                 test_body: testBody,
                 test_timestamp: testTimestamp,

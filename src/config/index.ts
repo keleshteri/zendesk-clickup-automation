@@ -34,6 +34,9 @@ export * from './constants';
 // Export all endpoints
 export * from './endpoints';
 
+// Export error reporting configuration
+export * from './error-reporting.config';
+
 // Agent capabilities moved to ../agents/config/
 
 // Re-export commonly used configurations for convenience

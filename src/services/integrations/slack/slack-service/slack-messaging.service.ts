@@ -15,6 +15,7 @@ import type { Env } from '../../../../types';
 // For now, using 'any' to resolve compilation errors
 // TODO: Define proper types for SlackMessage, SlackMessageBlock, SlackAttachment, TicketData, TaskData
 import { SlackEmojiService } from './slack-emoji.service';
+import { SlackErrorReportingService } from './slack-error-reporting.service';
 
 /**
  * Service responsible for all Slack messaging operations
@@ -23,16 +24,19 @@ export class SlackMessagingService {
   private client: WebClient;
   private env: Env;
   private emojiService: SlackEmojiService;
+  private errorReportingService?: SlackErrorReportingService;
 
   /**
    * Initialize the Slack messaging service
    * @param client - The Slack WebClient instance
    * @param env - Environment configuration
+   * @param errorReportingService - Optional error reporting service
    */
-  constructor(client: WebClient, env: Env) {
+  constructor(client: WebClient, env: Env, errorReportingService?: SlackErrorReportingService) {
     this.client = client;
     this.env = env;
     this.emojiService = new SlackEmojiService();
+    this.errorReportingService = errorReportingService;
   }
 
   /**
@@ -53,6 +57,27 @@ export class SlackMessagingService {
       return result.message;
     } catch (error) {
       console.error('Failed to send message:', error);
+      
+      // Report error to error reporting service
+      if (this.errorReportingService) {
+        await this.errorReportingService.reportError(
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            service: 'SlackMessagingService',
+            method: 'sendMessage',
+            file: __filename
+          },
+          {
+            metadata: {
+              channel,
+              text: text.substring(0, 100), // Truncate for privacy
+              threadTs,
+              timestamp: new Date().toISOString()
+            }
+          }
+        );
+      }
+      
       throw error;
     }
   }
@@ -316,25 +341,38 @@ export class SlackMessagingService {
       channel,
       blocks: [
         {
-          type: 'header',
+          type: 'section',
           text: {
-            type: 'plain_text',
-            text: '👋 Hello! I\'m TaskGenie',
-            emoji: true
+            type: 'mrkdwn',
+            text: ':genie: *TaskGenie has joined!*\n\nHi everyone! :wave:'
           }
         },
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: 'I\'m here to help streamline your workflow between Zendesk and ClickUp! 🎯\n\n*What I can do:*\n• 🎫 Automatically create ClickUp tasks from Zendesk tickets\n• 🤖 Provide AI-powered ticket analysis and insights\n• 👥 Smart team assignment based on ticket content\n• 📊 Real-time status updates and notifications\n• 💬 Interactive commands for ticket management'
+            text: "I'm TaskGenie, your AI-powered task automation assistant. I'm here to help streamline your workflow between Zendesk and ClickUp!"
           }
         },
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: '🚀 *Ready to boost your productivity?* Just mention @TaskGenie and I\'ll assist!'
+            text: ':dart: *What I can do for you:*\n• :ticket: Automatically create ClickUp tasks from Zendesk tickets\n• :clipboard: Provide AI-powered ticket summaries and analysis\n• :bar_chart: Generate insights and analytics reports\n• :mag: Help you search and find tickets\n• :robot_face: Answer questions about your tickets and tasks\n• :link: Keep everything connected with smart automation'
+          }
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: ':speech_balloon: *How to interact with me:*\n• Mention me with @TaskGenie followed by your question\n• Ask for help: `@TaskGenie help`\n• List open tickets: `@TaskGenie list tickets`\n• Get ticket summaries: `@TaskGenie summarize ticket #27`\n• Check status: `@TaskGenie status ticket #27`\n• Get analytics: `@TaskGenie analytics`'
+          }
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: ':rocket: *Ready to boost your productivity?* Just mention @TaskGenie and I\'ll assist!'
           }
         },
         {
@@ -342,7 +380,7 @@ export class SlackMessagingService {
           elements: [
             {
               type: 'mrkdwn',
-              text: '🤖 TaskGenie v0.0.2 • Made by 2DC Team • Powered by AI\n🟢 Zendesk (2damcreative.zendesk.com) | 🟢 ClickUp | 🟢 AI Provider'
+              text: ':robot_face: TaskGenie v0.0.2 • Made by 2DC Team • Powered by AI\n:large_green_circle: Zendesk (2damcreative.zendesk.com) | :large_green_circle: ClickUp | :large_green_circle: AI Provider'
             }
           ]
         }

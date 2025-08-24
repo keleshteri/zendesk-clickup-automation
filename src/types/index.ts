@@ -59,6 +59,7 @@ export interface Env {
   
   // KV Storage
   TASK_MAPPING?: KVNamespace;
+  SLACK_ERROR_REPORTS?: KVNamespace;
   
   // Optional
   ENVIRONMENT?: string;

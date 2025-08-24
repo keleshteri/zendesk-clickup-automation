@@ -22,6 +22,8 @@ import { SlackMessagingService } from './slack-messaging.service';
 import { SlackEventHandler } from './slack-event-handler.service';
 import { SlackBotManager } from './slack-bot-manager.service';
 import { SlackSecurityService } from './slack-security.service';
+import { SlackErrorReportingService } from './slack-error-reporting.service';
+import { initializeErrorReporter } from '../utils/slack-error-reporter.util';
 
 /**
  * Main Slack service that orchestrates all Slack-related functionality
@@ -37,24 +39,37 @@ export class SlackService {
   private eventHandler: SlackEventHandler;
   private botManager: SlackBotManager;
   private securityService: SlackSecurityService;
+  private errorReportingService: SlackErrorReportingService;
 
   /**
    * Initialize the SlackService with environment configuration
-   * Sets up all sub-services and initializes bot user ID
+   * Sets up all sub-services but does not initialize bot user ID (call initialize() for that)
    * @param env - Environment configuration containing Slack tokens and settings
    */
   constructor(env: Env) {
     this.env = env;
     this.client = new WebClient(env.SLACK_BOT_TOKEN);
     
-    // Initialize sub-services
-    this.messagingService = new SlackMessagingService(this.client, env);
+    // Initialize error reporting service first
+    this.errorReportingService = new SlackErrorReportingService(this.client, env);
+    
+    // Initialize global error reporter for application-wide use
+    initializeErrorReporter(this.errorReportingService);
+    
+    // Initialize sub-services with error reporting
+    this.messagingService = new SlackMessagingService(this.client, env, this.errorReportingService);
     this.botManager = new SlackBotManager(this.client, this.messagingService, env);
     this.eventHandler = new SlackEventHandler(this.client, this.messagingService, this.botManager);
     this.securityService = new SlackSecurityService(this.client, env);
-    
-    // Initialize bot user ID
-    this.initializeBotUserId();
+  }
+
+  /**
+   * Initialize the SlackService asynchronously
+   * This must be called after construction to properly set up bot user ID
+   * @returns Promise that resolves when initialization is complete
+   */
+  async initialize(): Promise<void> {
+    await this.initializeBotUserId();
   }
 
   /**
@@ -532,10 +547,18 @@ export class SlackService {
   }
 
   /**
-   * Get security service (for advanced usage)
+   * Get the security service instance
    * @returns The SlackSecurityService instance
    */
   getSecurityService(): SlackSecurityService {
     return this.securityService;
+  }
+
+  /**
+   * Get the error reporting service instance
+   * @returns The SlackErrorReportingService instance
+   */
+  getErrorReportingService(): SlackErrorReportingService {
+    return this.errorReportingService;
   }
 }
