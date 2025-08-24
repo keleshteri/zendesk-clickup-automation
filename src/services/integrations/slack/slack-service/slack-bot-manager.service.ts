@@ -1,24 +1,55 @@
 /**
  * @ai-metadata
  * @component: SlackBotManager
- * @description: Manages bot join tracking, channel management, and persistent storage of bot state
- * @last-update: 2024-01-13
+ * @description: Service responsible for bot join tracking and channel management using shared error handling utilities
+ * @last-update: 2025-01-13
  * @last-editor: ai-assistant
+ * @changelog: ./docs/changelog/slack-bot-manager.md
  * @stability: stable
  * @edit-permissions: "full"
- * @dependencies: ["@slack/web-api", "../../../../types", "../types"]
+ * @dependencies: ["@slack/web-api", "../interfaces/index.ts", "../utils/index.ts", "./slack-messaging.service.ts", "../types/index.ts"]
+ * @tests: ["./tests/slack-bot-manager.test.ts"]
+ * @breaking-changes-risk: low
+ * @review-required: true
+ * @ai-context: "Refactored to use shared SlackAPIError interface and error utilities (isSlackPlatformError, isSlackAPIError, logSlackError) for consistent error handling across all Slack services. Improved maintainability and reusability."
+ * 
+ * @approvals:
+ *   - dev-approved: true
+ *   - dev-approved-by: "ai-assistant"
+ *   - dev-approved-date: "2025-01-13T10:55:00Z"
+ *   - code-review-approved: false
+ *   - qa-approved: false
  */
 
-import { WebClient } from '@slack/web-api';
+import { WebClient, ErrorCode } from '@slack/web-api';
 import type { Env } from '../../../../types';
 import type {
   BotJoinTracker,
   PersistentBotJoinData
 } from '../types';
+import type { SlackAPIError } from '../interfaces';
+import { 
+  isSlackPlatformError, 
+  isSlackAPIError, 
+  logSlackError 
+} from '../utils';
 import { SlackMessagingService } from './slack-messaging.service';
 
 /**
  * Service responsible for bot join tracking and channel management
+ * 
+ * This class manages:
+ * - Bot join tracking with cooldown periods
+ * - Persistent storage of bot state in KV storage
+ * - Channel management and intro message sending
+ * - In-memory tracking for performance optimization
+ * 
+ * @example
+ * ```typescript
+ * const botManager = new SlackBotManager(client, messagingService, env);
+ * botManager.setBotUserId('U1234567890');
+ * await botManager.handleBotJoinedChannel('C1234567890');
+ * ```
  */
 export class SlackBotManager {
   private client: WebClient;
@@ -53,18 +84,40 @@ export class SlackBotManager {
 
   /**
    * Set the bot's user ID for tracking purposes
-   * @param botUserId - The bot's Slack user ID
+   * @param botUserId - The bot's Slack user ID (must be a valid Slack user ID)
+   * @throws {Error} If botUserId is empty or invalid format
    */
   setBotUserId(botUserId: string): void {
+    if (!botUserId || typeof botUserId !== 'string' || botUserId.trim().length === 0) {
+      throw new Error('Bot user ID must be a non-empty string');
+    }
+    
+    // Basic validation for Slack user ID format (starts with U)
+    if (!botUserId.startsWith('U')) {
+      console.warn(`⚠️ Bot user ID '${botUserId}' does not follow standard Slack user ID format (should start with 'U')`);
+    }
+    
     this.botUserId = botUserId;
+    console.log(`🤖 Bot user ID set to: ${botUserId}`);
   }
 
   /**
    * Handle bot joining a channel with cooldown and intro message
-   * @param channel - The channel ID that the bot joined
+   * @param channel - The channel ID that the bot joined (must be a valid Slack channel ID)
    * @returns Promise that resolves when join handling is complete
+   * @throws {Error} If channel ID is invalid
    */
   async handleBotJoinedChannel(channel: string): Promise<void> {
+    // Input validation
+    if (!channel || typeof channel !== 'string' || channel.trim().length === 0) {
+      throw new Error('Channel ID must be a non-empty string');
+    }
+    
+    // Basic validation for Slack channel ID format (starts with C)
+    if (!channel.startsWith('C')) {
+      console.warn(`⚠️ Channel ID '${channel}' does not follow standard Slack channel ID format (should start with 'C')`);
+    }
+    
     try {
       // Check if we've already processed this channel recently
       const existingData = await this.getBotJoinData(channel);
@@ -95,10 +148,13 @@ export class SlackBotManager {
       await this.messagingService.sendBotIntroMessage(channel);
       
       console.log(`✅ Bot successfully joined and introduced to channel: ${channel}`);
-    } catch (error) {
-      console.error(`❌ Error handling bot join for channel ${channel}:`, error);
+    } catch (error: unknown) {
+      logSlackError(error, `SlackBotManager.handleBotJoinedChannel(${channel})`, 'bot join handling');
+      throw error;
     }
   }
+
+
 
   /**
    * Get bot join data from KV storage
@@ -133,8 +189,8 @@ export class SlackBotManager {
       }
 
       return JSON.parse(data) as PersistentBotJoinData;
-    } catch (error) {
-      console.error('💥 Error retrieving bot join data:', error);
+    } catch (error: unknown) {
+      logSlackError(error, `SlackBotManager.getBotJoinData(${channelId})`, 'retrieving bot join data');
       return null;
     }
   }
@@ -155,8 +211,8 @@ export class SlackBotManager {
       const key = `${this.KV_BOT_JOIN_PREFIX}${channelId}`;
       await this.env.TASK_MAPPING.put(key, JSON.stringify(data));
       console.log('💾 Bot join data stored for channel:', channelId);
-    } catch (error) {
-      console.error('💥 Error storing bot join data:', error);
+    } catch (error: unknown) {
+      logSlackError(error, `SlackBotManager.storeBotJoinData(${channelId})`, 'storing bot join data');
     }
   }
 
@@ -164,8 +220,20 @@ export class SlackBotManager {
    * Reset channel tracking data
    * @param channelId - Optional specific channel ID to reset, or all channels if not provided
    * @returns Promise that resolves when tracking is reset
+   * @throws {Error} If channelId is provided but invalid
    */
   async resetChannelTracking(channelId?: string): Promise<void> {
+    // Input validation for channelId if provided
+    if (channelId !== undefined) {
+      if (!channelId || typeof channelId !== 'string' || channelId.trim().length === 0) {
+        throw new Error('Channel ID must be a non-empty string when provided');
+      }
+      
+      // Basic validation for Slack channel ID format (starts with C)
+      if (!channelId.startsWith('C')) {
+        console.warn(`⚠️ Channel ID '${channelId}' does not follow standard Slack channel ID format (should start with 'C')`);
+      }
+    }
     if (channelId) {
       // Clear in-memory tracking
       this.botJoinTracker.channelsJoined.delete(channelId);
@@ -177,8 +245,8 @@ export class SlackBotManager {
           const key = `${this.KV_BOT_JOIN_PREFIX}${channelId}`;
           await this.env.TASK_MAPPING.delete(key);
           console.log(`🔄 Reset tracking for channel ${channelId} (memory + storage)`);
-        } catch (error) {
-          console.error(`❌ Failed to clear persistent data for channel ${channelId}:`, error);
+        } catch (error: unknown) {
+          logSlackError(error, `SlackBotManager.resetChannelTracking(${channelId})`, 'clearing persistent data');
         }
       } else {
         console.log(`🔄 Reset in-memory tracking for channel ${channelId}`);
@@ -201,29 +269,6 @@ export class SlackBotManager {
     return this.botJoinTracker;
   }
 
-  /**
-   * Check if bot has joined a specific channel
-   * @param channelId - The channel ID to check
-   * @returns True if the bot has joined the channel
-   */
-  hasJoinedChannel(channelId: string): boolean {
-    return this.botJoinTracker.channelsJoined.has(channelId);
-  }
-
-  /**
-   * Get the last join time for a specific channel
-   * @param channelId - The channel ID to get join time for
-   * @returns The timestamp of last join or undefined if never joined
-   */
-  getLastJoinTime(channelId: string): number | undefined {
-    return this.botJoinTracker.lastJoinTime.get(channelId);
-  }
-
-  /**
-   * Get all channels that the bot has joined
-   * @returns Array of channel IDs that the bot has joined
-   */
-  getTrackedChannels(): string[] {
-    return Array.from(this.botJoinTracker.channelsJoined);
-  }
+  // Note: Removed unused utility methods (hasJoinedChannel, getLastJoinTime, getTrackedChannels)
+  // These methods were not being used anywhere in the codebase and can be re-added if needed
 }

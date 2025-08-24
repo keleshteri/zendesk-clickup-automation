@@ -9,7 +9,8 @@
  * @dependencies: ["./slack-event.interface", "./slack-app-mention-event.interface", "./slack-member-joined-channel-event.interface", "./slack-message-event.interface"]
  */
 
-export * from './slack-event.interface';
 export * from './slack-app-mention-event.interface';
+export * from './slack-event.interface';
 export * from './slack-member-joined-channel-event.interface';
 export * from './slack-message-event.interface';
+export * from './slack-error.interface';
