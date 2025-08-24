@@ -3,10 +3,6 @@
  */
 export { SlackService } from './slack-service';
 
-// Export types for compatibility
-export type {
-  SlackEvent,
-  SlackEventType,
-  SlackAppMentionEvent,
-  SlackMemberJoinedChannelEvent
-} from './slack-service';
+// Export interfaces from organized files
+export * from './interfaces';
+export * from './types';
