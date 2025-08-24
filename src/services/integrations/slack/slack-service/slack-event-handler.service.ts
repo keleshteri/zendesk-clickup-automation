@@ -10,7 +10,6 @@
  */
 
 import { WebClient } from '@slack/web-api';
-import type { Env } from '../../../../types';
 import type {
   SlackAppMentionEvent,
   SlackMemberJoinedChannelEvent
