@@ -4,7 +4,7 @@
  */
 
 import { WebClient } from '@slack/web-api';
-import type { Env } from '../../types';
+import type { Env } from '../../../types';
 
 // Simplified types (keep only what you actually use)
 export interface SlackEvent {
