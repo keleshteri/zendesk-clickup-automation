@@ -321,6 +321,123 @@ When AI agent encounters `@edit-permissions` restrictions:
 
 ---
 
+## TypeScript Best Practices
+
+### Code Quality Standards
+- **Strict TypeScript**: Use `strict: true` in tsconfig.json
+- **No `any` types**: Use proper typing or `unknown` with type guards
+- **Interface over Type**: Prefer interfaces for object shapes, types for unions/intersections
+- **Explicit return types**: Always specify return types for functions
+- **Readonly properties**: Use `readonly` for immutable data
+
+### Naming Conventions
+- **PascalCase**: Classes, interfaces, types, enums
+- **camelCase**: Variables, functions, methods, properties
+- **SCREAMING_SNAKE_CASE**: Constants and enum values
+- **kebab-case**: File names (e.g., `user-service.ts`)
+- **Prefix interfaces**: Use `I` prefix only when needed for disambiguation
+
+### File Organization
+- **Barrel exports**: Use `index.ts` files for clean imports
+- **Single responsibility**: One main export per file
+- **Co-location**: Keep related types, tests, and implementations together
+- **Absolute imports**: Use path mapping in tsconfig for `src/` imports
+
+### Type Safety Patterns
+```typescript
+// Use discriminated unions for state management
+type RequestState = 
+  | { status: 'loading' }
+  | { status: 'success'; data: any }
+  | { status: 'error'; error: string };
+
+// Use type guards for runtime validation
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+// Use generic constraints
+interface Repository<T extends { id: string }> {
+  findById(id: string): Promise<T | null>;
+}
+```
+
+### Error Handling
+- **Custom error classes**: Extend `Error` with specific error types
+- **Result pattern**: Use `Result<T, E>` type for operations that can fail
+- **Async error handling**: Always handle Promise rejections
+- **Validation**: Use schema validation libraries (Zod, Joi)
+
+### Performance Guidelines
+- **Lazy loading**: Use dynamic imports for large modules
+- **Tree shaking**: Structure exports to enable dead code elimination
+- **Type-only imports**: Use `import type` when importing only for types
+- **Avoid deep nesting**: Keep type complexity manageable
+
+### Documentation Requirements
+- **JSDoc comments**: Document all public APIs
+- **Type annotations**: Self-documenting code through types
+- **README files**: Include usage examples with TypeScript
+- **Inline comments**: Explain complex business logic
+
+### Testing Standards
+- **Type testing**: Use `@ts-expect-error` for negative type tests
+- **Mock typing**: Properly type mocks and stubs
+- **Test utilities**: Create typed test helpers
+- **Coverage**: Ensure type coverage with tools like `type-coverage`
+
+### AI Assistant Enforcement Rules
+
+#### BEFORE Writing TypeScript Code:
+1. **Check existing patterns**: Review similar files for consistency
+2. **Validate imports**: Ensure proper import organization and types
+3. **Type safety first**: Never use `any` without explicit justification
+4. **Interface compliance**: Verify new code matches existing interfaces
+
+#### DURING Code Generation:
+- **Explicit typing**: Always provide return types and parameter types
+- **Error boundaries**: Include proper error handling with typed errors
+- **Validation**: Add runtime validation for external data
+- **Documentation**: Include JSDoc for complex functions
+
+#### AFTER Code Changes:
+1. **Type check**: Ensure TypeScript compilation succeeds
+2. **Import cleanup**: Remove unused imports, organize remaining ones
+3. **Consistency check**: Verify naming conventions are followed
+4. **Test coverage**: Ensure new code has appropriate tests
+
+#### Code Quality Checklist:
+```typescript
+// ✅ Good: Explicit types and error handling
+interface UserData {
+  readonly id: string;
+  readonly email: string;
+  readonly createdAt: Date;
+}
+
+async function fetchUser(id: string): Promise<UserData | null> {
+  try {
+    const response = await api.get(`/users/${id}`);
+    if (!isUserData(response.data)) {
+      throw new ValidationError('Invalid user data format');
+    }
+    return response.data;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+// ❌ Bad: Any types and poor error handling
+function getUser(id: any): any {
+  return api.get('/users/' + id).then(r => r.data);
+}
+```
+
+---
+
 ## Integration Points
 
 ### Zendesk Integration
