@@ -59,7 +59,7 @@ export const welcomeMessageTemplate: MessageTemplateRenderer<WelcomeMessageConte
       ...createTaskGenieFooter({
         version: 'v0.0.2',
         zendeskDomain: '2damcreative.zendesk.com',
-        showSystemStatus: false
+        showSystemStatus: true
       }).elements.map(element => ({
         type: 'context' as const,
         elements: [element]
