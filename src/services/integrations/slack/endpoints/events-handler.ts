@@ -79,10 +79,13 @@ export class SlackEventsHandler {
     console.log(`${LOG_CONFIG.PREFIXES.SLACK} App mention from user ${event.user} in channel ${event.channel}`);
     
     try {
-      // Placeholder: Process app mention event
-      const response = { ok: true, message: 'App mention processed' };
+      // Process app mention event using SlackService
+      const mentionPromise = this.options.slackService.handleMention(event);
+      
       if (ctx) {
-        ctx.waitUntil(Promise.resolve(response));
+        ctx.waitUntil(mentionPromise);
+      } else {
+        await mentionPromise;
       }
       
       return this.createSuccessResponse({ 
@@ -107,10 +110,13 @@ export class SlackEventsHandler {
     console.log(`${LOG_CONFIG.PREFIXES.SLACK} Direct message from user ${event.user}`);
     
     try {
-      // Placeholder: Process message event
-      const response = { ok: true, message: 'Message processed' };
+      // Process message event using SlackService handleEvent method
+      const messagePromise = this.options.slackService.handleEvent(event);
+      
       if (ctx) {
-        ctx.waitUntil(Promise.resolve(response));
+        ctx.waitUntil(messagePromise);
+      } else {
+        await messagePromise;
       }
       
       return this.createSuccessResponse({ 

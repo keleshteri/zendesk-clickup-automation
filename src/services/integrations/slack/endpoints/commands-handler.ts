@@ -132,19 +132,8 @@ export class SlackCommandsHandler {
     channelId: string,
     context: RequestContext
   ): Promise<Response> {
-    const helpText = `
-*Available Commands:*
-
-• \`/zendesk [action]\` - Manage Zendesk tickets
-• \`/clickup [action]\` - Manage ClickUp tasks
-• \`/status\` - Check system status
-• \`/help\` - Show this help message
-
-*Examples:*
-• \`/zendesk create ticket\` - Create a new Zendesk ticket
-• \`/clickup list tasks\` - List your ClickUp tasks
-• \`/status\` - Check if all services are running
-    `;
+    // Get help message from SlackService
+    const helpText = this.options.slackService.getHelpMessage();
 
     return this.createSuccessResponse({
       response_type: 'ephemeral',
@@ -162,12 +151,12 @@ export class SlackCommandsHandler {
     context: RequestContext
   ): Promise<Response> {
     try {
-      // Placeholder: Get system status
-      const status = { ok: true, message: 'All systems operational' };
+      // Use SlackService to handle status request
+      await this.options.slackService.handleStatusRequest(channelId, userId);
       
       return this.createSuccessResponse({
         response_type: 'ephemeral',
-        text: `*System Status:*\n${status.message}`
+        text: '*System Status:* Status information sent to channel.'
       });
     } catch (error) {
       console.error(`${LOG_CONFIG.PREFIXES.SLACK} Status command error:`, error);

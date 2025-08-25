@@ -330,11 +330,16 @@ export class SlackEventHandler {
       case 'app_mention':
         await this.handleMention(event as SlackAppMentionEvent);
         break;
+      case 'message':
+        //todo: handle message event
+        console.log('message event', event);
+        break;
       case 'member_joined_channel':
         await this.handleMemberJoined(event as SlackMemberJoinedChannelEvent);
         break;
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        // This should never happen with proper typing, but handle gracefully
+        console.log(`Unhandled event type: ${(event as any).type}`);
     }
   }
 }
