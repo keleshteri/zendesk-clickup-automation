@@ -144,6 +144,8 @@ export interface SlackErrorReport {
   lastSeen: Date;
   /** Tags for categorization and filtering */
   tags: string[];
+  /** Unique fingerprint for deduplication */
+  fingerprint: string;
 }
 
 /**

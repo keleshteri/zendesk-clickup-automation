@@ -327,7 +327,8 @@ export function enhanceErrorReport(errorReport: Partial<SlackErrorReport>): Slac
     tags: [
       ...categorization.tags,
       ...(errorReport.tags || [])
-    ].filter((tag, index, array) => array.indexOf(tag) === index) // Remove duplicates
+    ].filter((tag, index, array) => array.indexOf(tag) === index), // Remove duplicates
+    fingerprint: errorReport.fingerprint || `${categorization.category}_${slackError.code}_${slackError.message}`.replace(/[^a-zA-Z0-9_]/g, '_')
   };
 }
 
