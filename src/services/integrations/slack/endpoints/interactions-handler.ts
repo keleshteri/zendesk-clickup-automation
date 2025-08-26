@@ -16,7 +16,6 @@
 
 import type { InteractionHandlerOptions, RequestContext } from './types';
 import { HTTP_STATUS, LOG_CONFIG } from '../../../../config';
-import { formatSuccessResponse, formatErrorResponse } from '../../../../utils';
 import type { ExecutionContext } from '@cloudflare/workers-types';
 
 /**

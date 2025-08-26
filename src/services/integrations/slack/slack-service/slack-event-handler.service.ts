@@ -28,7 +28,6 @@ export class SlackEventHandler {
   private client: WebClient;
   private messagingService: SlackMessagingService;
   private botManager: SlackBotManager;
-  private multiAgentService?: any;
   private taskGenie?: any;
   private botUserId?: string;
 
@@ -37,20 +36,17 @@ export class SlackEventHandler {
    * @param client - The Slack WebClient instance
    * @param messagingService - The messaging service for sending responses
    * @param botManager - The bot manager for bot-related operations
-   * @param multiAgentService - Optional multi-agent service for advanced processing
    * @param taskGenie - Optional task genie service for task operations
    */
   constructor(
     client: WebClient,
     messagingService: SlackMessagingService,
     botManager: SlackBotManager,
-    multiAgentService?: any,
     taskGenie?: any
   ) {
     this.client = client;
     this.messagingService = messagingService;
     this.botManager = botManager;
-    this.multiAgentService = multiAgentService;
     this.taskGenie = taskGenie;
   }
 
