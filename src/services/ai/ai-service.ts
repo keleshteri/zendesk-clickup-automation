@@ -1,7 +1,33 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+/**
+ * @ai-metadata
+ * @component: AIService
+ * @description: Core AI service for ticket analysis and natural language processing
+ * @last-update: 2025-01-15
+ * @last-editor: ai-assistant@trae.ai
+ * @changelog: ./docs/changelog/ai-service.md
+ * @stability: stable
+ * @edit-permissions: "full"
+ * @dependencies: ["../../types/index.js", "../../utils/token-calculator.js", "./gemini-service.js"]
+ * @tests: ["./tests/ai-service.test.ts"]
+ * @breaking-changes-risk: medium
+ * @review-required: true
+ * @ai-context: "Primary AI service that handles ticket analysis, duplicate detection, and NLP tasks"
+ * 
+ * @approvals:
+ *   - dev-approved: false
+ *   - code-review-approved: false
+ *   - qa-approved: false
+ * 
+ * @approval-rules:
+ *   - require-dev-approval-for: ["breaking-changes", "ai-model-changes"]
+ *   - require-code-review-for: ["all-changes"]
+ *   - require-qa-approval-for: ["production-ready"]
+ */
+
 import { AIProvider, AIResponse, Env, TicketAnalysis, TicketMetadata, DuplicateAnalysis, ZendeskTicket, AIInsights, TokenUsage } from '../../types/index.js';
-import { TokenCalculator } from '../token-calculator.js';
+import { TokenCalculator } from '../../utils/token-calculator.js';
 import { GoogleGeminiProvider } from './gemini-service.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export class AIService {
   private provider: AIProvider | null = null;
@@ -90,12 +116,8 @@ export class AIService {
         return new GoogleGeminiProvider(this.env.GOOGLE_GEMINI_API_KEY);
       
       case 'openai':
-        // TODO: Implement OpenAI provider
-        throw new Error('OpenAI provider not yet implemented');
-      
       case 'openrouter':
-        // TODO: Implement OpenRouter provider
-        throw new Error('OpenRouter provider not yet implemented');
+        throw new Error(`Provider '${this.env.AI_PROVIDER}' is not currently supported. Only 'googlegemini' is available.`);
       
       default:
         throw new Error(`Unsupported AI provider: ${this.env.AI_PROVIDER}`);
@@ -472,9 +494,20 @@ Respond with ONLY the JSON object.`;
     // Generate action items based on category
     const actionItems = this.generateActionItems(category, priority);
     
+    // Map priority to urgency
+    let urgency: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+    if (priority === 'urgent') {
+      urgency = 'critical';
+    } else if (priority === 'high') {
+      urgency = 'high';
+    } else if (priority === 'normal') {
+      urgency = 'medium';
+    }
+
     return {
       summary,
       priority,
+      urgency,
       category,
       sentiment,
       urgency_indicators: urgencyIndicators.filter(indicator => content.includes(indicator)),
@@ -531,6 +564,7 @@ Respond with ONLY the JSON object.`;
     const validated: TicketAnalysis = {
       summary: this.validateString(analysis.summary) || this.generateBasicSummary(originalContent, 'general', 'normal'),
       priority: this.validatePriority(analysis.priority) || 'normal',
+      urgency: this.validateUrgency(analysis.urgency) || 'medium',
       category: this.validateCategory(analysis.category) || 'general',
       sentiment: this.validateSentiment(analysis.sentiment) || 'neutral',
       urgency_indicators: Array.isArray(analysis.urgency_indicators) ? analysis.urgency_indicators : [],
@@ -560,6 +594,11 @@ Respond with ONLY the JSON object.`;
   private validateSentiment(value: any): 'frustrated' | 'neutral' | 'happy' | 'angry' | null {
     const validSentiments = ['frustrated', 'neutral', 'happy', 'angry'];
     return validSentiments.includes(value) ? value : null;
+  }
+
+  private validateUrgency(value: any): 'low' | 'medium' | 'high' | 'critical' | null {
+    const validUrgencies = ['low', 'medium', 'high', 'critical'];
+    return validUrgencies.includes(value) ? value : null;
   }
 
   private validateComplexity(value: any): 'simple' | 'medium' | 'complex' | null {

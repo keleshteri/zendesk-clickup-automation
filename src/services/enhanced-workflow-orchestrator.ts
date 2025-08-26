@@ -4,7 +4,7 @@
  */
 
 import { SlackService } from './integrations/slack';
-import { MultiAgentService } from './multi-agent-service.js';
+import { AutomationService } from './automation-service.js';
 import { AIService } from './ai/ai-service.js';
 import { ZendeskTicket, TicketAnalysis } from '../types/index.js';
 import { MultiAgentResponse, AgentRole } from '../agents/types/agent-types.js';
@@ -63,17 +63,17 @@ export interface EnhancedWorkflowResult {
  */
 export class EnhancedWorkflowOrchestrator {
   private slackService: SlackService;
-  private multiAgentService: MultiAgentService;
+  private automationService: AutomationService;
   private aiService: AIService;
   private isInitialized: boolean = false;
 
   constructor(
     slackService: SlackService,
-    multiAgentService: MultiAgentService,
+    automationService: AutomationService,
     aiService: AIService
   ) {
     this.slackService = slackService;
-    this.multiAgentService = multiAgentService;
+    this.automationService = automationService;
     this.aiService = aiService;
     this.isInitialized = true;
   }
@@ -260,7 +260,7 @@ export class EnhancedWorkflowOrchestrator {
       console.log(`👥 Step 6: Enhanced Multi-Agent Analysis for ticket ${context.ticket.id}`);
 
       // Get comprehensive multi-agent analysis
-      const multiAgentResponse = await this.multiAgentService.processTicket(context.ticket.id.toString());
+      const multiAgentResponse = await this.automationService.processTicket(context.ticket.id.toString());
       
       // Format enhanced analysis message with blocks
       const analysisBlocks = this.formatMultiAgentAnalysis(multiAgentResponse, aiAnalysis);

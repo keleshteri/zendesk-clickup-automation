@@ -330,6 +330,7 @@ export interface TicketMetadata {
 export interface TicketAnalysis {
   summary: string;
   priority: 'low' | 'normal' | 'high' | 'urgent';
+  urgency: 'low' | 'medium' | 'high' | 'critical';
   category: 'technical' | 'billing' | 'general' | 'account' | 'bug' | 'feature';
   sentiment: 'frustrated' | 'neutral' | 'happy' | 'angry';
   urgency_indicators: string[];
@@ -337,6 +338,12 @@ export interface TicketAnalysis {
   action_items: string[];
   estimated_complexity: 'simple' | 'medium' | 'complex';
   confidence_score: number;
+  recommendedAgent?: string;
+  enhancedInsights?: {
+    ticketComplexity: 'low' | 'medium' | 'high';
+    estimatedResolutionTime: string;
+    businessImpact: 'low' | 'medium' | 'high';
+  };
 }
 
 export interface DuplicateAnalysis {

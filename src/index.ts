@@ -5,7 +5,7 @@ import { ZendeskService } from './services/integrations/zendesk/zendesk.js';
 import { ClickUpService } from './services/integrations/clickup/clickup.js';
 import { AIService } from './services/ai/ai-service.js';
 import { OAuthService } from './services/integrations/clickup/clickup_oauth.js';
-import { MultiAgentService } from './services/multi-agent-service.js';
+import { AutomationService } from './services/automation-service.js';
 import { TaskGenie } from './services/task-genie.js';
 import { EnhancedWorkflowOrchestrator } from './services/enhanced-workflow-orchestrator.js';
 import { AgentRole } from './agents/types/agent-types.js';
@@ -68,7 +68,7 @@ export default {
     let clickupService: ClickUpService | null = null;
     let aiService: AIService | null = null;
     let oauthService: OAuthService | null = null;
-    let multiAgentService: MultiAgentService | null = null;
+    let automationService: AutomationService | null = null;
     let taskGenie: TaskGenie | null = null;
 
     // Standardized service initialization with consistent error logging
@@ -118,18 +118,18 @@ export default {
 
     try {
       if (aiService && zendeskService && clickupService) {
-        multiAgentService = new MultiAgentService(env, aiService, zendeskService, clickupService);
+        automationService = new AutomationService(env, aiService, slackService, zendeskService, clickupService);
       } else {
-        logWarning('MultiAgent', 'Required services not available');
+        logWarning('Automation', 'Required services not available');
       }
     } catch (error) {
-      logError('MultiAgent', error);
+      logError('Automation', error);
     }
 
     // Initialize TaskGenie with all required services
     try {
-      if (aiService && zendeskService && multiAgentService && clickupService) {
-        taskGenie = new TaskGenie(env, aiService, zendeskService, multiAgentService, clickupService);
+      if (aiService && zendeskService && automationService && clickupService) {
+        taskGenie = new TaskGenie(env, aiService, zendeskService, automationService, clickupService);
       } else {
         logWarning('TaskGenie', 'Required services not available');
       }
@@ -137,7 +137,7 @@ export default {
       logError('TaskGenie', error);
     }
 
-    // Initialize SlackService with multiAgentService and TaskGenie
+    // Initialize SlackService with automationService and TaskGenie
     try {
       console.log('🚀 Creating SlackService instance...');
       slackService = new SlackService(env);
@@ -332,7 +332,7 @@ export default {
             clickup: clickupService ? '✅ available' : '❌ unavailable',
             ai: aiService ? '✅ available' : '❌ unavailable',
             oauth: oauthService ? '✅ available' : '❌ unavailable',
-            multiAgent: multiAgentService ? '✅ available' : '❌ unavailable',
+            automation: automationService ? '✅ available' : '❌ unavailable',
             taskGenie: taskGenie ? '✅ available' : '❌ unavailable'
           },
           environment: {
@@ -534,12 +534,12 @@ export default {
                   try {
                     console.log(`${LOG_CONFIG.PREFIXES.SUCCESS} Starting enhanced workflow orchestration...`);
                     console.log(`🤖 AI Service available: ${aiService ? 'YES' : 'NO'}`);
-                    console.log(`🎯 Multi-agent service available: ${multiAgentService ? 'YES' : 'NO'}`);
+                    console.log(`🎯 Automation service available: ${automationService ? 'YES' : 'NO'}`);
                     console.log(`💬 Slack service available: ${slackService ? 'YES' : 'NO'}`);
                     
                     const orchestrator = new EnhancedWorkflowOrchestrator(
                       slackService,
-                      multiAgentService,
+                      automationService,
                       aiService
                     );
                     
@@ -2158,12 +2158,12 @@ export default {
       }
 
       // Agent Routes
-      if (url.pathname.startsWith('/agents/') && multiAgentService) {
+      if (url.pathname.startsWith('/agents/') && automationService) {
         try {
           // Route: Process ticket with multi-agent system
           if (url.pathname === '/agents/process-ticket' && method === 'POST') {
             const body = await request.json() as { ticketId: string };
-            const result = await multiAgentService.processTicket(body.ticketId);
+            const result = await automationService.processTicket(body.ticketId);
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
               status: HTTP_STATUS.OK,
               headers: corsHeaders
@@ -2173,7 +2173,7 @@ export default {
           // Route: Analyze ticket and create ClickUp tasks
           if (url.pathname === '/agents/analyze-and-create-tasks' && method === 'POST') {
             const body = await request.json() as { ticketId: string; workspaceId?: string; listId?: string };
-            const result = await multiAgentService.analyzeAndCreateTasks(
+            const result = await automationService.analyzeAndCreateTasks(
               body.ticketId,
               body.listId
             );
@@ -2198,7 +2198,7 @@ export default {
             }
             
             // For now, process the first ticket (can be extended to handle multiple)
-            const result = await multiAgentService.getComprehensiveInsights(ticketIds[0]);
+            const result = await automationService.getComprehensiveInsights(ticketIds[0]);
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
               status: HTTP_STATUS.OK,
               headers: corsHeaders
@@ -2208,7 +2208,7 @@ export default {
           // Route: Route ticket to specific agent
           if (url.pathname === '/agents/route-ticket' && method === 'POST') {
             const body = await request.json() as { ticketId: string; targetAgent: AgentRole; context?: any };
-            const result = await multiAgentService.routeToAgent(body.ticketId, body.targetAgent);
+            const result = await automationService.routeToAgent(body.ticketId, body.targetAgent);
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
               status: HTTP_STATUS.OK,
               headers: corsHeaders
@@ -2217,7 +2217,7 @@ export default {
 
           // Route: Get workflow metrics
           if (url.pathname === '/agents/metrics' && method === 'GET') {
-            const result = await multiAgentService.getWorkflowMetrics();
+            const result = await automationService.getWorkflowMetrics();
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
               status: HTTP_STATUS.OK,
               headers: corsHeaders
@@ -2226,7 +2226,7 @@ export default {
 
           // Route: Get all agent statuses
           if (url.pathname === '/agents/status' && method === 'GET') {
-            const result = await multiAgentService.getAgentStatuses();
+            const result = await automationService.getAgentStatuses();
             return new Response(JSON.stringify(formatSuccessResponse(result)), {
               status: HTTP_STATUS.OK,
               headers: corsHeaders
@@ -2236,7 +2236,7 @@ export default {
           // Route: Get specific agent status
           if (url.pathname.startsWith('/agents/status/') && method === 'GET') {
             const role = url.pathname.split('/')[3] as AgentRole;
-            const result = await multiAgentService.getAgentStatuses();
+            const result = await automationService.getAgentStatuses();
             const agentStatus = result.agents.find(agent => agent.role === role);
             if (agentStatus) {
               return new Response(JSON.stringify(formatSuccessResponse(agentStatus)), {
@@ -2449,7 +2449,7 @@ export default {
       }
 
       // Agent routes require multi-agent service
-      if (url.pathname.startsWith('/agents/') && !multiAgentService) {
+      if (url.pathname.startsWith('/agents/') && !automationService) {
         return new Response(JSON.stringify(formatErrorResponse(
           ERROR_MESSAGES.SERVICE_UNAVAILABLE
         )), {

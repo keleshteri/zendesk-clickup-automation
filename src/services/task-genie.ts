@@ -1,7 +1,7 @@
 import { NLPRouter, NLPResponse } from './nlp-router.js';
 import { AIService } from './ai/ai-service.js';
 import { ZendeskService } from './integrations/zendesk/zendesk.js';
-import { MultiAgentService } from './multi-agent-service.js';
+import { AutomationService } from './automation-service.js';
 import { Env } from '../types/index.js';
 
 export interface TaskGenieConfig {
@@ -49,7 +49,7 @@ export class TaskGenie {
     env: Env,
     aiService: AIService,
     zendeskService: ZendeskService,
-    multiAgentService: MultiAgentService,
+    automationService: AutomationService,
     clickupService: any,
     config?: Partial<TaskGenieConfig>
   ) {
@@ -58,7 +58,7 @@ export class TaskGenie {
       env,
       aiService,
       zendeskService,
-      multiAgentService,
+      automationService,
       clickupService
     );
     
@@ -300,7 +300,7 @@ export class TaskGenie {
         suggestions.push('Show recent ticket trends');
       }
       
-      if (response.executedTools.includes('MultiAgentService.processTicket')) {
+      if (response.executedTools.includes('AutomationService.processTicket')) {
         suggestions.push('Create tasks from this analysis');
         suggestions.push('Route to specific agent');
       }

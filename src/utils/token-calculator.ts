@@ -1,3 +1,24 @@
+/**
+ * @ai-metadata
+ * @component: TokenCalculator
+ * @description: Utility class for calculating token usage and costs across different AI providers
+ * @last-update: 2025-01-15
+ * @last-editor: ai-assistant@trae.ai
+ * @changelog: ./docs/changelog/token-calculator.md
+ * @stability: stable
+ * @edit-permissions: "full"
+ * @dependencies: ["../types/index.js"]
+ * @tests: ["./tests/token-calculator.test.ts"]
+ * @breaking-changes-risk: low
+ * @review-required: false
+ * @ai-context: "Utility for token counting and cost calculation across AI providers (Google Gemini, OpenAI, OpenRouter)"
+ * 
+ * @approvals:
+ *   - dev-approved: false
+ *   - code-review-approved: false
+ *   - qa-approved: false
+ */
+
 import { TokenUsage } from '../types/index.js';
 
 export interface ProviderPricing {

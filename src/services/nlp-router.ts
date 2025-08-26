@@ -1,6 +1,6 @@
 import { AIService } from './ai/ai-service.js';
 import { ZendeskService } from './integrations/zendesk/zendesk.js';
-import { MultiAgentService } from './multi-agent-service.js';
+import { AutomationService } from './automation-service.js';
 import { AgentRole } from '../agents/types/agent-types.js';
 import { Env, TokenUsage } from '../types/index.js';
 
@@ -39,7 +39,7 @@ export interface ToolMapping {
 export class NLPRouter {
   private aiService: AIService;
   private zendeskService: ZendeskService;
-  private multiAgentService: MultiAgentService;
+  private automationService: AutomationService;
   private clickupService: any;
   private env: Env;
   private toolMappings: ToolMapping[];
@@ -49,13 +49,13 @@ export class NLPRouter {
     env: Env,
     aiService: AIService,
     zendeskService: ZendeskService,
-    multiAgentService: MultiAgentService,
+    automationService: AutomationService,
     clickupService: any
   ) {
     this.env = env;
     this.aiService = aiService;
     this.zendeskService = zendeskService;
-    this.multiAgentService = multiAgentService;
+    this.automationService = automationService;
     this.clickupService = clickupService;
     this.toolMappings = this.initializeToolMappings();
   }
@@ -476,10 +476,10 @@ Extract relevant entities like:
       };
     }
 
-    executedTools.push('MultiAgentService.processTicket');
+    executedTools.push('AutomationService.processTicket');
     
     try {
-      const result = await this.multiAgentService.processTicket(ticketId);
+      const result = await this.automationService.processTicket(ticketId);
       
       // Format recommendations properly
       let recommendationsText = 'No specific recommendations available';
@@ -543,9 +543,9 @@ Extract relevant entities like:
       };
     }
 
-    executedTools.push('MultiAgentService.analyzeAndCreateTasks');
+    executedTools.push('AutomationService.analyzeAndCreateTasks');
     
-    const result = await this.multiAgentService.analyzeAndCreateTasks(ticketId);
+    const result = await this.automationService.analyzeAndCreateTasks(ticketId);
     
     return {
       message: `✅ **Created ${result.clickUpTasks.length} ClickUp task(s)** from ticket #${ticketId}\n**Tasks:** ${result.clickUpTasks.map(t => t.name).join(', ')}`,
@@ -562,9 +562,9 @@ Extract relevant entities like:
     data?: any;
     executedTools: string[];
   }> {
-    executedTools.push('MultiAgentService.getAllAgentsStatus');
+    executedTools.push('AutomationService.getAllAgentsStatus');
     
-    const agentStatuses = this.multiAgentService.getAllAgentsStatus();
+    const agentStatuses = this.automationService.getAgentStatuses();
     
     const statusReport = agentStatuses
       .map(agent => `**${agent.role}:** ${agent.status} (${agent.tasksCompleted} tasks)`) 
@@ -595,9 +595,9 @@ Extract relevant entities like:
       };
     }
 
-    executedTools.push('MultiAgentService.routeToAgent');
+    executedTools.push('AutomationService.routeToAgent');
     
-    const result = await this.multiAgentService.routeToAgent(ticketId, agentType);
+    const result = await this.automationService.routeToAgent(ticketId, agentType);
     
     return {
       message: `🎯 **Routed ticket #${ticketId}** to ${agentType.replace('_', ' ').toLowerCase()}`,
@@ -614,9 +614,9 @@ Extract relevant entities like:
     data?: any;
     executedTools: string[];
   }> {
-    executedTools.push('MultiAgentService.getWorkflowMetrics');
+    executedTools.push('AutomationService.getWorkflowMetrics');
     
-    const metrics = this.multiAgentService.getWorkflowMetrics();
+    const metrics = this.automationService.getWorkflowMetrics();
     
     return {
       message: `📊 **System Insights**\n**Total Workflows:** ${metrics.totalWorkflows}\n**Success Rate:** ${((metrics.successfulWorkflows / metrics.totalWorkflows) * 100).toFixed(1)}%\n**Avg Processing Time:** ${metrics.averageProcessingTime}ms`,

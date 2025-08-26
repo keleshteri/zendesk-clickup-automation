@@ -43,6 +43,13 @@ export interface WorkflowState {
   };
   isComplete: boolean;
   handoffReason: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
+  handoffHistory: Array<{
+    from: AgentRole;
+    to: AgentRole;
+    reason: string;
+    timestamp: string;
+  }>;
 }
 
 export interface TaskAssignment {
@@ -64,6 +71,8 @@ export interface AgentAnalysis {
   priority?: 'low' | 'normal' | 'high' | 'urgent';
   estimatedTime?: string;
   complexity?: 'simple' | 'medium' | 'complex';
+  reasoning?: string;
+  recommendedNextAgent?: AgentRole;
 }
 
 export interface MultiAgentResponse {
@@ -95,6 +104,8 @@ export interface WorkflowMetrics {
     averageConfidence: number;
     successRate: number;
     averageProcessingTime: number;
+    totalTasks: number;
+    lastActive: string;
   }>;
   handoffCount: number;
   lastUpdated: string;

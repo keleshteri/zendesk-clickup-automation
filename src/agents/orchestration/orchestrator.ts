@@ -1,3 +1,29 @@
+/**
+ * @ai-metadata
+ * @component: Orchestrator
+ * @description: Multi-agent workflow orchestrator for Zendesk-ClickUp automation
+ * @last-update: 2025-01-15
+ * @last-editor: ai-assistant@trae.ai
+ * @changelog: ./docs/changelog/orchestrator.md
+ * @stability: stable
+ * @edit-permissions: "full"
+ * @dependencies: ["../types/agent-types.js", "../../types/index.js", "../implementations/*"]
+ * @tests: ["./tests/orchestrator.test.ts"]
+ * @breaking-changes-risk: medium
+ * @review-required: true
+ * @ai-context: "Core orchestration engine that manages multi-agent workflows for ticket processing"
+ * 
+ * @approvals:
+ *   - dev-approved: false
+ *   - code-review-approved: false
+ *   - qa-approved: false
+ * 
+ * @approval-rules:
+ *   - require-dev-approval-for: ["breaking-changes", "workflow-logic"]
+ *   - require-code-review-for: ["all-changes"]
+ *   - require-qa-approval-for: ["production-ready"]
+ */
+
 import { AgentRole, WorkflowState, MultiAgentResponse, WorkflowMetrics, AgentAnalysis } from '../types/agent-types.js';
 import { ZendeskTicket } from '../../types/index.js';
 import { ProjectManagerAgent } from '../implementations/project-manager/project-manager.js';
@@ -53,7 +79,9 @@ export class Orchestrator {
         tasksHandled: 0,
         averageConfidence: 0,
         successRate: 0,
-        averageProcessingTime: 0
+        averageProcessingTime: 0,
+        totalTasks: 0,
+        lastActive: new Date().toISOString()
       });
     }
   }
@@ -79,7 +107,9 @@ export class Orchestrator {
           confidence: 0
         },
         isComplete: false,
-        handoffReason: ''
+        handoffReason: '',
+        status: 'in_progress',
+        handoffHistory: []
       };
 
       // Execute enhanced workflow that guarantees both PM and technical analysis
@@ -252,7 +282,9 @@ export class Orchestrator {
         tasksHandled: 0,
         averageConfidence: 0,
         successRate: 0,
-        averageProcessingTime: 0
+        averageProcessingTime: 0,
+        totalTasks: 0,
+        lastActive: new Date().toISOString()
       });
     }
   }
