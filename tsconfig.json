@@ -8,6 +8,9 @@
 		"allowJs": true,
 		"resolveJsonModule": true,
 		"moduleDetection": "force",
+		/* Decorator Support for TSyringe */
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true,
 		/* Strictness */
 		"noImplicitAny": false,
 		"noImplicitThis": true,

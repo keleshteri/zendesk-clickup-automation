@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { Env, ZendeskWebhook, ClickUpWebhook, ZendeskTicket, UserOAuthData } from './types/index.js';
 import { SlackService } from './services/integrations/slack';
 import { SlackWebhookHandler } from './services/integrations/slack/endpoints/webhook-handler.js';

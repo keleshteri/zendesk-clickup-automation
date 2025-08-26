@@ -26,7 +26,9 @@
     "@google/generative-ai": "^0.7.1",
     "@slack/types": "^2.16.0",
     "@slack/web-api": "^7.10.0",
-    "hono": "^4.6.20"
+    "hono": "^4.6.20",
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.10.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250813.0",
