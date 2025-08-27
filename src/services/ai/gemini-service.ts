@@ -20,8 +20,8 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { AIProvider, AIResponse, Env, TicketAnalysis, TicketMetadata, DuplicateAnalysis, ZendeskTicket, AIInsights, TokenUsage } from '../../types/index.js';
-import { TokenCalculator } from '../../utils/token-calculator.js';
+import { AIProvider, TicketAnalysis, DuplicateAnalysis, ZendeskTicket, AIInsights, TokenUsage } from '../../types/index';
+import { TokenCalculator } from '../../utils/token-calculator';
 
 export class GoogleGeminiProvider implements AIProvider {
   name: 'googlegemini' = 'googlegemini';

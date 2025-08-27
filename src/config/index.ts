@@ -1,82 +1,81 @@
 /**
- * Configuration Module Index
- * Centralized exports for all configuration modules
+ * @ai-metadata
+ * @component: ConfigIndex
+ * @description: Main configuration exports for the application
+ * @last-update: 2024-01-27
+ * @last-editor: ai-assistant
+ * @stability: stable
+ * @edit-permissions: "full"
+ * @breaking-changes-risk: low
+ * @review-required: false
+ * @ai-context: "Central configuration exports for simplified Zendesk-ClickUp automation"
  */
 
-// Import and re-export constants
-import {
-  SLACK_DEFAULTS,
-  CLICKUP_DEFAULTS,
-  ZENDESK_DEFAULTS,
-  AI_DEFAULTS,
-  AGENT_DEFAULTS,
-  ERROR_MESSAGES,
-  HTTP_STATUS,
-  LOG_CONFIG,
-  APP_ENDPOINTS,
-  TASK_MAPPING
-} from './constants';
+// HTTP Status codes
+export const HTTP_STATUS = {
+  OK: 200,
+  CREATED: 201,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  INTERNAL_SERVER_ERROR: 500,
+  SERVICE_UNAVAILABLE: 503
+} as const;
 
-import {
-  ZENDESK_ENDPOINTS,
-  CLICKUP_ENDPOINTS,
-  SLACK_ENDPOINTS,
-  AI_ENDPOINTS,
-  WEBHOOK_EVENTS,
-  QUERY_PARAMS
-} from './endpoints';
-
-// Agent capabilities moved to ../agents/config/agent-capabilities.js
-
-// Export all constants
-export * from './constants';
-
-// Export all endpoints
-export * from './endpoints';
-
-// Export error reporting configuration
-export * from './error-reporting.config';
-
-// Agent capabilities moved to ../agents/config/
-
-// Re-export commonly used configurations for convenience
-export {
-  SLACK_DEFAULTS,
-  CLICKUP_DEFAULTS,
-  ZENDESK_DEFAULTS,
-  AI_DEFAULTS,
-  AGENT_DEFAULTS,
-  ERROR_MESSAGES,
-  HTTP_STATUS,
-  LOG_CONFIG
-} from './constants';
-
-export {
-  ZENDESK_ENDPOINTS,
-  CLICKUP_ENDPOINTS,
-  SLACK_ENDPOINTS,
-  APP_ENDPOINTS,
-  WEBHOOK_EVENTS
-} from './endpoints';
-
-// Agent capabilities exports moved to ../agents/config/
-
-// Configuration utility functions
-// getAgentByRole moved to ../agents/config/
-
-export const getEndpointUrl = (service: 'zendesk' | 'clickup' | 'slack', endpoint: string, params?: Record<string, any>) => {
-  switch (service) {
-    case 'zendesk':
-      return ZENDESK_ENDPOINTS.BASE_URL(params?.domain || '') + endpoint;
-    case 'clickup':
-      return CLICKUP_ENDPOINTS.BASE_URL + endpoint;
-    case 'slack':
-      return SLACK_ENDPOINTS.BASE_URL + endpoint;
-    default:
-      throw new Error(`Unknown service: ${service}`);
+// Logging configuration
+export const LOG_CONFIG = {
+  LEVEL: 'info',
+  FORMAT: 'json',
+  TIMESTAMP: true,
+  REQUEST_ID: true,
+  PREFIXES: {
+    SLACK: '[SLACK]',
+    ZENDESK: '[ZENDESK]',
+    CLICKUP: '[CLICKUP]',
+    AI: '[AI]',
+    WEBHOOK: '[WEBHOOK]',
+    ERROR: '[ERROR]'
   }
-};
+} as const;
 
-export const getLogPrefix = (type: keyof typeof LOG_CONFIG.PREFIXES) => {
-  return LOG_CONFIG.PREFIXES[type] || LOG_CONFIG.PREFIXES.INFO;
-};
+// Error messages
+export const ERROR_MESSAGES = {
+  INVALID_REQUEST: 'Invalid request format',
+  UNAUTHORIZED_ACCESS: 'Unauthorized access',
+  UNAUTHORIZED: 'Unauthorized access',
+  SERVICE_UNAVAILABLE: 'Service temporarily unavailable',
+  INTERNAL_ERROR: 'Internal server error',
+  MISSING_REQUIRED_FIELD: 'Missing required field',
+  INVALID_WEBHOOK_SIGNATURE: 'Invalid webhook signature'
+} as const;
+
+// Slack configuration defaults
+export const SLACK_DEFAULTS = {
+  BOT_NAME: 'ZendeskBot',
+  CHANNEL: '#general',
+  TIMEOUT: 30000,
+  RETRY_ATTEMPTS: 3
+} as const;
+
+// ClickUp configuration defaults
+export const CLICKUP_DEFAULTS = {
+  TIMEOUT: 30000,
+  RETRY_ATTEMPTS: 3,
+  DEFAULT_STATUS: 'Open'
+} as const;
+
+// Zendesk configuration defaults
+export const ZENDESK_DEFAULTS = {
+  TIMEOUT: 30000,
+  RETRY_ATTEMPTS: 3,
+  WEBHOOK_TIMEOUT: 10000
+} as const;
+
+// AI service defaults
+export const AI_DEFAULTS = {
+  MODEL: 'gpt-3.5-turbo',
+  MAX_TOKENS: 1000,
+  TEMPERATURE: 0.7,
+  TIMEOUT: 30000
+} as const;

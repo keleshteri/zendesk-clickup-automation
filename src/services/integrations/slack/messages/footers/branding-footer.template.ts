@@ -24,8 +24,8 @@ export interface BrandingFooterConfig {
 }
 
 /**
- * Creates a full branding footer with team and powered by text
- * Example: :robot_face: TaskGenie v0.0.2 • Made by 2DC Team • Powered by AI
+ * Creates a full branding footer with team and powered by text/**
+ * Example: :robot_face: Bot v0.0.2 • Made by 2DC Team • Powered by AI
  */
 export function createFullBrandingFooter(config: BrandingFooterConfig = {}): SlackBlock {
   const {
@@ -35,7 +35,7 @@ export function createFullBrandingFooter(config: BrandingFooterConfig = {}): Sla
     customText
   } = config;
 
-  let text = `:robot_face: TaskGenie ${version}`;
+  let text = `:robot_face: Bot ${version}`;
   
   if (showTeam) {
     text += ' • Made by 2DC Team';
@@ -61,8 +61,8 @@ export function createFullBrandingFooter(config: BrandingFooterConfig = {}): Sla
 }
 
 /**
- * Creates a minimal branding footer with just TaskGenie name and version
- * Example: TaskGenie v0.0.2
+ * Creates a minimal branding footer with just bot name and version
+ * Example: Bot v0.0.2
  */
 export function createMinimalBrandingFooter(version: string = 'v0.0.2'): SlackBlock {
   return {
@@ -70,7 +70,7 @@ export function createMinimalBrandingFooter(version: string = 'v0.0.2'): SlackBl
     elements: [
       {
         type: 'mrkdwn',
-        text: `TaskGenie ${version}`
+        text: `Bot ${version}`
       }
     ]
   };

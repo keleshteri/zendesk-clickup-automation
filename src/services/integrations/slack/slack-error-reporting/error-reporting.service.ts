@@ -47,10 +47,10 @@ import {
  * Delegates specialized functionality to focused modules
  */
 export class SlackErrorReportingService implements ISlackErrorReportingService {
-  private client: WebClient;
-  private env: Env;
+  private _client: WebClient;
+  private _env: Env;
   private config: ErrorReportingConfig;
-  private messagingService?: any;
+  private _messagingService?: any;
 
   // Specialized modules
   private core: ErrorReportingCore;
@@ -67,17 +67,17 @@ export class SlackErrorReportingService implements ISlackErrorReportingService {
    * @param messagingService - Optional messaging service for notifications
    */
   constructor(
-    client: WebClient, 
-    env: Env, 
+    _client: WebClient, 
+    _env: Env, 
     config?: ErrorReportingConfig,
     messagingService?: any
   ) {
-    this.client = client;
-    this.env = env;
-    this.messagingService = messagingService;
+    this._client = _client;
+    this._env = _env;
+    this._messagingService = messagingService;
     
     // Get configuration from environment or use provided config
-    this.config = config || getErrorReportingConfig(env);
+    this.config = config || getErrorReportingConfig(this._env);
     
     // Validate configuration
     const validationErrors = validateErrorReportingConfig(this.config);
@@ -89,7 +89,7 @@ export class SlackErrorReportingService implements ISlackErrorReportingService {
     console.log('Error reporting service initialized with configuration:\n' + getConfigSummary(this.config));
     
     // Initialize specialized modules
-    this.persistence = new ErrorPersistence(env, this.config);
+    this.persistence = new ErrorPersistence(this._env, this.config);
     this.core = new ErrorReportingCore(this.persistence, this.config);
     this.analytics = new ErrorAnalytics(this.persistence);
     this.alerting = new ErrorAlerting(this.persistence, this.config.alerts);

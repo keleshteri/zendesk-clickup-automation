@@ -1,5 +1,5 @@
-import { ZendeskTicket, Env } from '../../../types/index.js';
-import { createZendeskAuth } from '../../../utils/index.js';
+import { ZendeskTicket, Env } from '../../../types/index';
+import { createZendeskAuth } from '../../../utils/index';
 
 export class ZendeskService {
   private env: Env;
@@ -104,6 +104,73 @@ export class ZendeskService {
 
   getTicketUrl(ticketId: number): string {
     return `https://${this.env.ZENDESK_DOMAIN}/agent/tickets/${ticketId}`;
+  }
+
+  /**
+   * Verify Zendesk webhook signature
+   * @param body - The raw request body
+   * @param signature - The webhook signature from headers
+   * @param timestamp - The webhook timestamp from headers
+   * @param secret - The webhook secret
+   * @returns Promise that resolves to true if signature is valid
+   */
+  async verifyWebhookSignature(
+    body: string,
+    signature: string,
+    timestamp: string,
+    secret: string
+  ): Promise<boolean> {
+    try {
+      if (!secret) {
+        console.error('❌ Zendesk webhook secret not configured');
+        return false;
+      }
+
+      // Check timestamp to prevent replay attacks (within 5 minutes)
+      const currentTime = Math.floor(Date.now() / 1000);
+      const requestTime = parseInt(timestamp);
+      if (Math.abs(currentTime - requestTime) > 300) {
+        console.error('❌ Zendesk webhook timestamp too old');
+        return false;
+      }
+
+      // Create the signature base string
+      const baseString = `${timestamp}${body}`;
+      
+      // Create HMAC-SHA256 hash
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      
+      const signatureBuffer = await crypto.subtle.sign(
+        'HMAC',
+        key,
+        encoder.encode(baseString)
+      );
+      
+      // Convert to base64 string
+      const hashArray = Array.from(new Uint8Array(signatureBuffer));
+      const hashBase64 = btoa(String.fromCharCode(...hashArray));
+      
+      // Compare signatures
+      const isValid = signature === hashBase64;
+      
+      if (!isValid) {
+        console.error('❌ Invalid Zendesk webhook signature');
+        console.error('Expected:', hashBase64);
+        console.error('Received:', signature);
+      }
+      
+      return isValid;
+    } catch (error) {
+      console.error('💥 Error verifying Zendesk webhook:', error);
+      return false;
+    }
   }
 
   /**

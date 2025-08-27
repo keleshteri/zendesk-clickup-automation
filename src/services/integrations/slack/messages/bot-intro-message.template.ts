@@ -1,26 +1,26 @@
 /**
  * @ai-metadata
  * @component: BotIntroMessageTemplate
- * @description: Slack bot introduction message template for when TaskGenie joins a channel
+ * @description: Slack bot introduction message template for when bot joins a channel
  * @last-update: 2025-01-14
  * @last-editor: ai-assistant
  * @stability: experimental
  * @edit-permissions: "full"
  * @breaking-changes-risk: low
  * @review-required: true
- * @ai-context: "Template for introducing TaskGenie bot when it joins a new Slack channel"
+ * @ai-context: "Template for introducing bot when it joins a new Slack channel"
  */
 
 import type { BotIntroMessageContext, MessageTemplateRenderer, SlackMessageTemplate } from './types';
 
 /**
- * Bot introduction message template for when TaskGenie joins a channel
- * Provides comprehensive overview of bot capabilities and usage instructions
+ * Bot introduction message template for when bot joins a channel
+ * Provides comprehensive overview of capabilities and usage instructions
  */
 export const botIntroMessageTemplate: MessageTemplateRenderer<BotIntroMessageContext> = (
   context: BotIntroMessageContext
 ): SlackMessageTemplate => {
-  const { channel, teamName } = context;
+  const { channel, _teamName } = context;
 
   return {
     channel,
@@ -29,14 +29,14 @@ export const botIntroMessageTemplate: MessageTemplateRenderer<BotIntroMessageCon
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: ':genie: *TaskGenie has joined!*\n\nHi everyone! :wave:'
+          text: ':robot_face: *Bot has joined!*\n\nHi everyone! :wave:'
         }
       },
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: "I'm TaskGenie, your AI-powered task automation assistant. I'm here to help streamline your workflow between Zendesk and ClickUp!"
+          text: "I'm your AI-powered task automation assistant. I'm here to help streamline your workflow between Zendesk and ClickUp!"
         }
       },
       {
@@ -50,14 +50,14 @@ export const botIntroMessageTemplate: MessageTemplateRenderer<BotIntroMessageCon
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: ':speech_balloon: *How to interact with me:*\n• Mention me with @TaskGenie followed by your question\n• Ask for help: `@TaskGenie help`\n• List open tickets: `@TaskGenie list tickets`\n• Get ticket summaries: `@TaskGenie summarize ticket #27`\n• Check status: `@TaskGenie status ticket #27`\n• Get analytics: `@TaskGenie analytics`'
+          text: ':speech_balloon: *How to interact with me:*\n• Mention me followed by your question\n• Ask for help: `help`\n• List open tickets: `list tickets`\n• Get ticket summaries: `summarize ticket #27`\n• Check status: `status ticket #27`\n• Get analytics: `analytics`'
         }
       },
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: ':rocket: *Ready to boost your productivity?* Just mention @TaskGenie and I\'ll assist!'
+          text: ':rocket: *Ready to boost your productivity?* Just mention me and I\'ll assist!'
         }
       },
       {
@@ -65,7 +65,7 @@ export const botIntroMessageTemplate: MessageTemplateRenderer<BotIntroMessageCon
         elements: [
           {
             type: 'mrkdwn',
-            text: ':robot_face: TaskGenie v0.0.2 • Made by 2DC Team • Powered by AI\n:large_green_circle: Zendesk (2damcreative.zendesk.com) | :large_green_circle: ClickUp | :large_green_circle: AI Provider'
+            text: ':robot_face: Bot v0.0.2 • Made by 2DC Team • Powered by AI\n:large_green_circle: Zendesk (2damcreative.zendesk.com) | :large_green_circle: ClickUp | :large_green_circle: AI Provider'
           }
         ]
       }

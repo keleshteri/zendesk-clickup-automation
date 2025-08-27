@@ -311,6 +311,6 @@ export class SlackBotManager {
     return this.botJoinTracker;
   }
 
-  // Note: Removed unused utility methods (hasJoinedChannel, getLastJoinTime, getTrackedChannels)
+
   // These methods were not being used anywhere in the codebase and can be re-added if needed
 }

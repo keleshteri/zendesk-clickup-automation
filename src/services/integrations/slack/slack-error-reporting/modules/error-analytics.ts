@@ -84,12 +84,12 @@ export class ErrorAnalytics {
 
     // Basic counts
     const totalErrors = errors.length;
-    const resolvedErrors = errors.filter(e => e.resolved === true).length;
-    const openErrors = errors.filter(e => e.resolved === false).length;
+    const _resolvedErrors = errors.filter(e => e.resolved === true).length;
+    const _openErrors = errors.filter(e => e.resolved === false).length;
 
     // Time-based counts
-    const last24Hours = errors.filter(e => e.timestamp >= oneDayAgo).length;
-    const last7Days = errors.filter(e => e.timestamp >= oneWeekAgo).length;
+    const _last24Hours = errors.filter(e => e.timestamp >= oneDayAgo).length;
+    const _last7Days = errors.filter(e => e.timestamp >= oneWeekAgo).length;
 
     // Severity breakdown
     const severityBreakdown = this.calculateSeverityBreakdown(errors);
@@ -98,7 +98,7 @@ export class ErrorAnalytics {
     const serviceBreakdown = this.calculateServiceBreakdown(errors);
 
     // Error rate calculation
-    const errorRate = this.calculateErrorRate(errors, timeRange);
+    const _errorRate = this.calculateErrorRate(errors, timeRange);
 
     // Top errors
     const topErrors = this.getTopErrors(errors);

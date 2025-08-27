@@ -12,7 +12,6 @@
  */
 
 import type { WelcomeMessageContext, MessageTemplateRenderer, SlackMessageTemplate } from './types';
-import { createTaskGenieFooter } from './footers/taskgenie-footer.template';
 
 /**
  * Welcome message template for new channel members
@@ -37,14 +36,14 @@ export const welcomeMessageTemplate: MessageTemplateRenderer<WelcomeMessageConte
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: "I'm TaskGenie :genie:, your AI-powered task automation assistant. I help streamline workflows between Zendesk and ClickUp!"
+          text: "I'm your AI-powered task automation assistant. I help streamline workflows between Zendesk and ClickUp!"
         }
       },
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: ':sparkles: *Quick Start:*\n• Mention @TaskGenie to get help or ask questions\n• I can create ClickUp tasks from Zendesk tickets\n• Get AI-powered summaries and insights\n• Type `@TaskGenie help` for all available commands'
+          text: ':sparkles: *Quick Start:*\n• Mention me to get help or ask questions\n• I can create ClickUp tasks from Zendesk tickets\n• Get AI-powered summaries and insights\n• Type `help` for all available commands'
         }
       },
       {
@@ -56,14 +55,15 @@ export const welcomeMessageTemplate: MessageTemplateRenderer<WelcomeMessageConte
           }
         ]
       },
-      ...createTaskGenieFooter({
-        version: 'v0.0.2',
-        zendeskDomain: '2damcreative.zendesk.com',
-        showSystemStatus: true
-      }).elements.map(element => ({
-        type: 'context' as const,
-        elements: [element]
-      }))
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: ':gear: *System Status:* All integrations operational | v0.0.2'
+          }
+        ]
+      }
     ]
   };
 };

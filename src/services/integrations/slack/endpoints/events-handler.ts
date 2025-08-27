@@ -75,7 +75,7 @@ export class SlackEventsHandler {
   /**
    * Handle app mention events
    */
-  private async handleAppMention(event: SlackAppMentionEvent, context: RequestContext, ctx?: ExecutionContext): Promise<Response> {
+  private async handleAppMention(event: SlackAppMentionEvent, _context: RequestContext, ctx?: ExecutionContext): Promise<Response> {
     console.log(`${LOG_CONFIG.PREFIXES.SLACK} App mention from user ${event.user} in channel ${event.channel}`);
     
     try {
@@ -101,7 +101,7 @@ export class SlackEventsHandler {
   /**
    * Handle direct message events
    */
-  private async handleMessage(event: SlackMessageEvent, context: RequestContext, ctx?: ExecutionContext): Promise<Response> {
+  private async handleMessage(event: SlackMessageEvent, _context: RequestContext, ctx?: ExecutionContext): Promise<Response> {
     // Skip bot messages and message changes
     if (event.subtype === 'bot_message' || event.subtype === 'message_changed') {
       return this.createSuccessResponse({ message: 'Bot message ignored' });
@@ -132,7 +132,7 @@ export class SlackEventsHandler {
   /**
    * Handle member joined channel events
    */
-  private async handleMemberJoined(event: SlackMemberJoinedChannelEvent, context: RequestContext, ctx?: ExecutionContext): Promise<Response> {
+  private async handleMemberJoined(event: SlackMemberJoinedChannelEvent, _context: RequestContext, ctx?: ExecutionContext): Promise<Response> {
     console.log(`${LOG_CONFIG.PREFIXES.SLACK} Member ${event.user} joined channel ${event.channel}`);
     
     try {

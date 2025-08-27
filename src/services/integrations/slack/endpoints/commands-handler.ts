@@ -34,7 +34,7 @@ export class SlackCommandsHandler {
    * @param ctx - Execution context for async operations (optional)
    * @returns Promise<Response> - The response to send back
    */
-  async handleCommand(context: RequestContext, ctx?: ExecutionContext): Promise<Response> {
+  async handleCommand(context: RequestContext, _ctx?: ExecutionContext): Promise<Response> {
     const { parsedBody } = context;
     const command = parsedBody.command;
     const text = parsedBody.text || '';
@@ -83,8 +83,8 @@ export class SlackCommandsHandler {
   private async handleZendeskCommand(
     text: string,
     userId: string,
-    channelId: string,
-    context: RequestContext
+    _channelId: string,
+    _context: RequestContext
   ): Promise<Response> {
     console.log(`${LOG_CONFIG.PREFIXES.SLACK} Processing Zendesk command for user ${userId}`);
     
@@ -106,8 +106,8 @@ export class SlackCommandsHandler {
   private async handleClickUpCommand(
     text: string,
     userId: string,
-    channelId: string,
-    context: RequestContext
+    _channelId: string,
+    _context: RequestContext
   ): Promise<Response> {
     console.log(`${LOG_CONFIG.PREFIXES.SLACK} Processing ClickUp command for user ${userId}`);
     
@@ -127,10 +127,10 @@ export class SlackCommandsHandler {
    * Handle /help command
    */
   private async handleHelpCommand(
-    text: string,
-    userId: string,
-    channelId: string,
-    context: RequestContext
+    _text: string,
+    _userId: string,
+    _channelId: string,
+    _context: RequestContext
   ): Promise<Response> {
     // Get help message from SlackService
     const helpText = this.options.slackService.getHelpMessage();
@@ -145,10 +145,10 @@ export class SlackCommandsHandler {
    * Handle /status command
    */
   private async handleStatusCommand(
-    text: string,
+    _text: string,
     userId: string,
     channelId: string,
-    context: RequestContext
+    _context: RequestContext
   ): Promise<Response> {
     try {
       // Use SlackService to handle status request
@@ -169,10 +169,10 @@ export class SlackCommandsHandler {
    */
   private async handleUnknownCommand(
     command: string,
-    text: string,
-    userId: string,
-    channelId: string,
-    context: RequestContext
+    _text: string,
+    _userId: string,
+    _channelId: string,
+    _context: RequestContext
   ): Promise<Response> {
     console.warn(`${LOG_CONFIG.PREFIXES.SLACK} Unknown command: ${command}`);
     

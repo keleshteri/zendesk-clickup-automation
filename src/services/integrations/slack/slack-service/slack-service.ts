@@ -100,7 +100,7 @@ export class SlackService {
         console.log('📡 Initializing bot user ID...');
         
         // For development, use hardcoded bot user ID to avoid API call issues
-        const DEV_BOT_USER_ID = 'U09BK3UUJJW'; // TaskGenie bot user ID
+        const DEV_BOT_USER_ID = 'U09BK3UUJJW'; // Bot user ID
         
         // Skip API call in development and use hardcoded ID directly
          console.log('🔧 Using development bot user ID (skipping API call)');
@@ -109,7 +109,7 @@ export class SlackService {
          this.eventHandler.setBotUserId(this.botUserId);
          // Initialization completed successfully
          console.log('✅ Bot user ID initialized:', this.botUserId);
-         console.log('🤖 Using TaskGenie bot user ID for development');
+         console.log('🤖 Using bot user ID for development');
          return; // Success
       } catch (error) {
         retryCount++;
@@ -152,8 +152,8 @@ export class SlackService {
   async sendIntelligentNotification(
     channel: string,
     ticketData: any,
-    clickupUrl?: string,
-    assignmentRecommendation?: any
+    _clickupUrl?: string,
+    _assignmentRecommendation?: any
   ): Promise<any> {
     const context = { isUpdate: false, previousData: null };
     return this.messagingService.sendIntelligentNotification(channel, ticketData, context);
@@ -171,9 +171,9 @@ export class SlackService {
   async sendTaskCreationMessage(
     channel: string,
     ticketId: string,
-    zendeskUrl: string,
+    _zendeskUrl: string,
     clickupUrl: string,
-    userName?: string
+    _userName?: string
   ): Promise<any> {
     // Convert parameters to match the messaging service expectations
     const ticketData = { id: ticketId };
@@ -388,7 +388,7 @@ export class SlackService {
    * @param data - The data to store (ignored, kept for compatibility)
    * @returns Promise that resolves when complete
    */
-  async storeBotJoinData(channel: string, data: any): Promise<void> {
+  async storeBotJoinData(_channel: string, _data: any): Promise<void> {
     // This method is kept for backward compatibility
     // The actual storage is now handled internally by BotManager
     console.log('📝 Legacy storeBotJoinData called - data is now managed internally');
@@ -489,15 +489,15 @@ export class SlackService {
     return {};
   }
 
-  async deployAppFromTemplate(template: any, appId?: string): Promise<any> {
+  async deployAppFromTemplate(_template: any, _appId?: string): Promise<any> {
     return { ok: false, message: 'App deployment not implemented' };
   }
 
-  async updateAppConfiguration(appId: string, updates: any, options?: any): Promise<any> {
+  async updateAppConfiguration(_appId: string, _updates: any, _options?: any): Promise<any> {
     return { ok: false, message: 'App configuration update not implemented' };
   }
 
-  async validateAppConfiguration(appId: string): Promise<any> {
+  async validateAppConfiguration(_appId: string): Promise<any> {
     return { valid: false, message: 'App configuration validation not implemented' };
   }
 
@@ -513,7 +513,7 @@ export class SlackService {
    * Set ClickUp service reference (legacy compatibility)
    * @param clickupService - The ClickUp service instance
    */
-  setClickUpService(clickupService: any): void {
+  setClickUpService(_clickupService: any): void {
     // Legacy method for setting ClickUp service reference
   }
 
@@ -625,5 +625,45 @@ export class SlackService {
    */
   getErrorReportingService(): SlackErrorReportingService {
     return this.errorReportingService;
+  }
+
+  /**
+   * Get service health status
+   * @returns Promise that resolves to health status object
+   */
+  async getHealthStatus(): Promise<{
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    services: {
+      messaging: boolean;
+      botManager: boolean;
+      eventHandler: boolean;
+      security: boolean;
+    };
+    timestamp: string;
+  }> {
+    const services = {
+      messaging: !!this.messagingService,
+      botManager: !!this.botManager,
+      eventHandler: !!this.eventHandler,
+      security: !!this.securityService
+    };
+
+    const healthyServices = Object.values(services).filter(Boolean).length;
+    const totalServices = Object.keys(services).length;
+    
+    let status: 'healthy' | 'degraded' | 'unhealthy';
+    if (healthyServices === totalServices) {
+      status = 'healthy';
+    } else if (healthyServices > totalServices / 2) {
+      status = 'degraded';
+    } else {
+      status = 'unhealthy';
+    }
+
+    return {
+      status,
+      services,
+      timestamp: new Date().toISOString()
+    };
   }
 }

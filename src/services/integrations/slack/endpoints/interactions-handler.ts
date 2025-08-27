@@ -88,152 +88,15 @@ export class SlackInteractionsHandler {
     }
   }
 
-  /**
-   * Handle block actions (buttons, select menus, etc.)
-   */
-  private async handleBlockActions(payload: any, context: RequestContext): Promise<Response> {
-    const action = payload.actions?.[0];
-    if (!action) {
-      return this.createErrorResponse('No action found in block actions');
-    }
 
-    const actionId = action.action_id;
-    const actionValue = action.value;
-    const userId = payload.user?.id;
-    const channelId = payload.channel?.id;
-
-    console.log(`${LOG_CONFIG.PREFIXES.SLACK} Block action:`, {
-      actionId,
-      actionValue,
-      userId,
-      channelId
-    });
-
-    try {
-      // Placeholder: Process block action
-      const result = { ok: true, message: 'Block action processed successfully' };
-      
-      return this.createSuccessResponse(result);
-    } catch (error) {
-      console.error(`${LOG_CONFIG.PREFIXES.SLACK} Block action error:`, error);
-      return this.createErrorResponse('Failed to process block action');
-    }
-  }
-
-  /**
-   * Handle interactive messages (legacy buttons)
-   */
-  private async handleInteractiveMessage(payload: any, context: RequestContext): Promise<Response> {
-    const action = payload.actions?.[0];
-    if (!action) {
-      return this.createErrorResponse('No action found in interactive message');
-    }
-
-    const actionName = action.name;
-    const actionValue = action.value;
-    const userId = payload.user?.id;
-    const channelId = payload.channel?.id;
-
-    console.log(`${LOG_CONFIG.PREFIXES.SLACK} Interactive message:`, {
-      actionName,
-      actionValue,
-      userId,
-      channelId
-    });
-
-    try {
-      // Placeholder: Process interactive message
-      const result = { ok: true, message: 'Interactive message processed' };
-      
-      return this.createSuccessResponse(result);
-    } catch (error) {
-      console.error(`${LOG_CONFIG.PREFIXES.SLACK} Interactive message error:`, error);
-      return this.createErrorResponse('Failed to process interactive message');
-    }
-  }
-
-  /**
-   * Handle modal submissions
-   */
-  private async handleViewSubmission(payload: any, context: RequestContext): Promise<Response> {
-    const view = payload.view;
-    const userId = payload.user?.id;
-    const callbackId = view?.callback_id;
-
-    console.log(`${LOG_CONFIG.PREFIXES.SLACK} Modal submission:`, {
-      callbackId,
-      userId,
-      viewId: view?.id
-    });
-
-    try {
-      // Placeholder: Process modal submission
-      const result = { ok: true, message: 'Modal submission processed' };
-      
-      return this.createSuccessResponse(result);
-    } catch (error) {
-      console.error(`${LOG_CONFIG.PREFIXES.SLACK} Modal submission error:`, error);
-      return this.createErrorResponse('Failed to process modal submission');
-    }
-  }
-
-  /**
-   * Handle modal closures
-   */
-  private async handleViewClosed(payload: any, context: RequestContext): Promise<Response> {
-    const view = payload.view;
-    const userId = payload.user?.id;
-    const callbackId = view?.callback_id;
-
-    console.log(`${LOG_CONFIG.PREFIXES.SLACK} Modal closed:`, {
-      callbackId,
-      userId,
-      viewId: view?.id
-    });
-
-    try {
-      // Placeholder: Process modal closure
-      const result = { ok: true, message: 'Modal closure processed' };
-      
-      return this.createSuccessResponse({ message: 'Modal closure processed' });
-    } catch (error) {
-      console.error(`${LOG_CONFIG.PREFIXES.SLACK} Modal closure error:`, error);
-      return this.createSuccessResponse({ message: 'Modal closure acknowledged' });
-    }
-  }
-
-  /**
-   * Handle shortcuts (global and message shortcuts)
-   */
-  private async handleShortcut(payload: any, context: RequestContext): Promise<Response> {
-    const callbackId = payload.callback_id;
-    const userId = payload.user?.id;
-    const triggerId = payload.trigger_id;
-
-    console.log(`${LOG_CONFIG.PREFIXES.SLACK} Shortcut triggered:`, {
-      callbackId,
-      userId,
-      triggerId
-    });
-
-    try {
-      // Placeholder: Process shortcut
-      const result = { ok: true, message: 'Shortcut processed' };
-      
-      return this.createSuccessResponse(result);
-    } catch (error) {
-      console.error(`${LOG_CONFIG.PREFIXES.SLACK} Shortcut error:`, error);
-      return this.createErrorResponse('Failed to process shortcut');
-    }
-  }
 
   /**
    * Handle unknown interactions
    */
   private async handleUnknownInteraction(
     interactionType: string,
-    payload: any,
-    context: RequestContext
+    _payload: any,
+    _context: RequestContext
   ): Promise<Response> {
     console.warn(`${LOG_CONFIG.PREFIXES.SLACK} Unknown interaction type: ${interactionType}`);
     

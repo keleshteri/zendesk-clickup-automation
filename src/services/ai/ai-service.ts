@@ -24,9 +24,9 @@
  *   - require-qa-approval-for: ["production-ready"]
  */
 
-import { AIProvider, AIResponse, Env, TicketAnalysis, TicketMetadata, DuplicateAnalysis, ZendeskTicket, AIInsights, TokenUsage } from '../../types/index.js';
-import { TokenCalculator } from '../../utils/token-calculator.js';
-import { GoogleGeminiProvider } from './gemini-service.js';
+import { AIProvider, AIResponse, Env, TicketAnalysis, TicketMetadata, DuplicateAnalysis, ZendeskTicket, AIInsights, TokenUsage } from '../../types/index';
+import { TokenCalculator } from '../../utils/token-calculator';
+import { GoogleGeminiProvider } from './gemini-service';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export class AIService {

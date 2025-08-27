@@ -1,6 +1,6 @@
-import { ClickUpTask, Env, ZendeskTicket, UserOAuthData, TicketAnalysis } from '../../../types/index.js';
-import { mapZendeskToClickUpPriority } from '../../../utils/index.js';
-import { AIService } from '../../ai/ai-service.js';
+import { ClickUpTask, ClickUpUser, Env, ZendeskTicket, UserOAuthData, TicketAnalysis } from '../../../types/index';
+import { mapZendeskToClickUpPriority } from '../../../utils/index';
+import { AIService } from '../../ai/ai-service';
 
 /**
  * ClickUp API Service
@@ -449,7 +449,7 @@ ${ticket.assignee_id ? `- Assignee ID: ${ticket.assignee_id}` : ''}
 **Zendesk URL:** https://${this.env.ZENDESK_DOMAIN}/agent/tickets/${ticket.id}
 
 ---
-*This task was automatically created by TaskGenie from a Zendesk ticket.*
+*This task was automatically created from a Zendesk ticket.*
     `.trim();
   }
 
@@ -471,6 +471,53 @@ ${ticket.assignee_id ? `- Assignee ID: ${ticket.assignee_id}` : ''}
         return 4;
       default:
         return 3; // Default to normal
+    }
+  }
+
+  /**
+   * Get current user information from ClickUp API
+   * 
+   * Fetches the current authenticated user's information from ClickUp.
+   * This is useful for testing connectivity and authentication.
+   * 
+   * @returns Promise resolving to user information or null if error
+   * 
+   * @example
+   * ```typescript
+   * const user = await clickUpService.getCurrentUser();
+   * if (user) {
+   *   console.log(`Connected as: ${user.username}`);
+   * }
+   * ```
+   */
+  async getCurrentUser(): Promise<any | null> {
+    try {
+      console.log('🔍 Fetching current ClickUp user...');
+      
+      const response = await fetch(`${this.baseUrl}/user`, {
+        headers: {
+          'Authorization': this.getAuthHeader(),
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Failed to fetch current user:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        return null;
+      }
+
+      const data = await response.json();
+      const apiResponse = data as { user: ClickUpUser };
+      console.log('✅ Current user fetched successfully:', apiResponse.user?.username || 'Unknown');
+      return apiResponse.user;
+    } catch (error) {
+      console.error('💥 Error fetching current user:', error);
+      return null;
     }
   }
 

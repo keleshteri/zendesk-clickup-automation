@@ -453,9 +453,9 @@ export class ErrorAlerting {
       //   headers: { 'Content-Type': 'application/json' },
       //   body: JSON.stringify(payload)
       // });
-    } catch (error) {
-      console.error('❌ Failed to send webhook alert:', error);
-      throw error;
+    } catch (_error) {
+      console.error('❌ Failed to send webhook alert:', _error);
+      throw _error;
     }
   }
 
@@ -541,8 +541,8 @@ export class ErrorAlerting {
         alertStatus.escalatedAt = new Date();
       }
 
-    } catch (error) {
-      console.error('❌ Failed to execute escalation:', error);
+    } catch (_error) {
+      console.error('❌ Failed to execute escalation:', _error);
     }
   }
 
@@ -605,8 +605,8 @@ export class ErrorAlerting {
 
         console.log(`✅ Alert ${alertId} acknowledged by ${acknowledgedBy}`);
       }
-    } catch (error) {
-      console.error('❌ Failed to acknowledge alert:', error);
+    } catch (_error) {
+      console.error('❌ Failed to acknowledge alert:', _error);
     }
   }
 
@@ -621,7 +621,7 @@ export class ErrorAlerting {
         return;
       }
 
-      const message = this.config.templates.resolution
+      const _message = this.config.templates.resolution
         .replace('{{severity}}', error.severity.toUpperCase())
         .replace('{{service}}', error.source.service)
         .replace('{{message}}', error.error.message)
@@ -642,8 +642,8 @@ export class ErrorAlerting {
         }
       }
 
-    } catch (error) {
-      console.error('❌ Failed to send resolution notification:', error);
+    } catch (_error) {
+      console.error('❌ Failed to send resolution notification:', _error);
     }
   }
 

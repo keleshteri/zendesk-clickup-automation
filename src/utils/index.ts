@@ -1,45 +1,8 @@
+// Import types from centralized types/index.ts
+import type { ApiResponse } from '../types/index';
+
 export type ZendeskPriority = 'low' | 'normal' | 'high' | 'urgent';
-export type ZendeskStatus = 'new' | 'open' | 'pending' | 'solved' | 'closed';
 export type ClickUpPriority = 1 | 2 | 3 | 4;
-export type ClickUpStatus = 'Open' | 'in progress' | 'review' | 'Complete' | 'Closed';
-
-export interface ApiResponse<T = any> {
-  success: boolean;
-  message: string;
-  data?: T;
-  error?: boolean;
-  context?: string;
-  timestamp: string;
-}
-
-export interface ZendeskTicket {
-  id: number;
-  subject: string;
-  description: string;
-  priority: ZendeskPriority;
-  status: ZendeskStatus;
-  requester_id: number;
-  assignee_id?: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ClickUpTask {
-  id: string;
-  name: string;
-  description: string;
-  status: {
-    status: string;
-    color: string;
-  };
-  priority?: {
-    priority: string;
-    color: string;
-  };
-  url: string;
-  date_created: string;
-  date_updated: string;
-}
 
 /**
  * Map Zendesk priority to ClickUp priority
@@ -56,33 +19,7 @@ export function mapZendeskToClickUpPriority(zendeskPriority: ZendeskPriority): C
   return mapping[zendeskPriority] || 3;
 }
 
-/**
- * Map ClickUp status to Zendesk status
- */
-export function mapClickUpToZendeskStatus(clickupStatus: string): ZendeskStatus {
-  const mapping: Record<string, ZendeskStatus> = {
-    'Open': 'open',
-    'in progress': 'pending', 
-    'review': 'pending',
-    'Complete': 'solved',
-    'Closed': 'closed'
-  };
-  return mapping[clickupStatus] || 'open';
-}
 
-/**
- * Map Zendesk status to ClickUp status
- */
-export function mapZendeskToClickUpStatus(zendeskStatus: ZendeskStatus): string {
-  const mapping: Record<ZendeskStatus, string> = {
-    'new': 'Open',
-    'open': 'Open', 
-    'pending': 'in progress',
-    'solved': 'Complete',
-    'closed': 'Closed'
-  };
-  return mapping[zendeskStatus] || 'Open';
-}
 
 /**
  * Create Zendesk API authorization header
@@ -118,59 +55,7 @@ export function formatSuccessResponse<T>(data: T, message = 'Success'): ApiRespo
   };
 }
 
-/**
- * Validate required environment variables
- */
-export function validateEnvironment(env: Record<string, any>, required: string[]): {
-  valid: boolean;
-  missing: string[];
-} {
-  const missing: string[] = [];
-  
-  for (const key of required) {
-    if (!env[key]) {
-      missing.push(key);
-    }
-  }
-  
-  return {
-    valid: missing.length === 0,
-    missing: missing
-  };
-}
 
-/**
- * Generate task mapping key for KV storage
- */
-export function createMappingKey(type: 'zendesk' | 'clickup', id: string | number): string {
-  return `${type}_${id}`;
-}
-
-/**
- * Parse Zendesk ticket URL to get domain and ID
- */
-export function parseZendeskUrl(url: string): { domain: string; ticketId: string } | null {
-  const match = url.match(/https:\/\/([^.]+)\.zendesk\.com\/.*\/tickets\/(\d+)/);
-  if (match) {
-    return {
-      domain: match[1],
-      ticketId: match[2]
-    };
-  }
-  return null;
-}
-
-/**
- * Create standard CORS headers
- */
-export function getCorsHeaders(): Record<string, string> {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Content-Type': 'application/json'
-  };
-}
 
 /**
  * Sleep utility for rate limiting

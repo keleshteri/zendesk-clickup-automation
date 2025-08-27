@@ -1,3 +1,3 @@
 // AI services exports
-export { AIService } from './ai-service.js';
-export { GoogleGeminiProvider } from './gemini-service.js';
+export { AIService } from './ai-service';
+export { GoogleGeminiProvider } from './gemini-service';

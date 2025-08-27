@@ -279,7 +279,7 @@ export interface SlackServiceConfig {
   /** Performance monitoring configuration */
   performance?: SlackPerformanceConfig;
   /** Task genie instance */
-  taskGenie?: any;
+
 }
 
 /**
@@ -491,13 +491,7 @@ export class SlackConfigBuilder {
 
   /**
    * Set task genie instance
-   * @param taskGenie - Task genie instance
-   * @returns Builder instance
-   */
-  withTaskGenie(taskGenie: any): SlackConfigBuilder {
-    this.config.taskGenie = taskGenie;
-    return this;
-  }
+   
 
   /**
    * Enable development mode with sensible defaults

@@ -20,7 +20,6 @@ import { SlackMessageBuilderService } from './slack-message-builder.service';
  */
 export class SlackMessagingService {
   private client: WebClient;
-  private env: Env;
   private emojiService: SlackEmojiService;
   private errorReportingService?: SlackErrorReportingService;
   private messageBuilder: SlackMessageBuilderService;
@@ -31,9 +30,8 @@ export class SlackMessagingService {
    * @param env - Environment configuration
    * @param errorReportingService - Optional error reporting service
    */
-  constructor(client: WebClient, env: Env, errorReportingService?: SlackErrorReportingService) {
+  constructor(client: WebClient, _env: Env, errorReportingService?: SlackErrorReportingService) {
     this.client = client;
-    this.env = env;
     this.emojiService = new SlackEmojiService();
     this.errorReportingService = errorReportingService;
     this.messageBuilder = new SlackMessageBuilderService();
@@ -98,7 +96,7 @@ export class SlackMessagingService {
   async sendIntelligentNotification(
     channel: string,
     ticketData: any,
-    context: { isUpdate?: boolean; previousData?: any } = {}
+    _context: { isUpdate?: boolean; previousData?: any } = {}
   ): Promise<any> {
     
     try {
@@ -251,9 +249,9 @@ export class SlackMessagingService {
   async sendThreadedTeamMentions(
     channel: string,
     threadTs: string,
-    mentions: string[],
+    _mentions: string[],
     enhancedMessage: string,
-    timeline?: string,
+    _timeline?: string,
     nextSteps?: string[]
   ): Promise<any> {
     try {
@@ -383,6 +381,6 @@ export class SlackMessagingService {
    * @returns The formatted help message string
    */
   getHelpMessage(): string {
-    return `🧞 *TaskGenie Help*\n\n*Available Commands:*\n• \`@TaskGenie help\` - Show this help message\n• \`@TaskGenie list tickets\` - List recent tickets\n• \`@TaskGenie summarize ticket #123\` - Get AI summary of ticket\n• \`@TaskGenie status ticket #123\` - Check ticket status\n• \`@TaskGenie analytics\` - Get analytics report\n\n*Need more help?* Just mention me with your question!`;
+    return `🧞 *Bot Help*\n\n*Available Commands:*\n• \`help\` - Show this help message\n• \`list tickets\` - List recent tickets\n• \`summarize ticket #123\` - Get AI summary of ticket\n• \`status ticket #123\` - Check ticket status\n• \`analytics\` - Get analytics report\n\n*Need more help?* Just mention me with your question!`;
   }
 }

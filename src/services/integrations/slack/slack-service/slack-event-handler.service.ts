@@ -28,7 +28,7 @@ export class SlackEventHandler {
   private client: WebClient;
   private messagingService: SlackMessagingService;
   private botManager: SlackBotManager;
-  private taskGenie?: any;
+
   private botUserId?: string;
 
   /**
@@ -36,18 +36,18 @@ export class SlackEventHandler {
    * @param client - The Slack WebClient instance
    * @param messagingService - The messaging service for sending responses
    * @param botManager - The bot manager for bot-related operations
-   * @param taskGenie - Optional task genie service for task operations
+
    */
   constructor(
     client: WebClient,
     messagingService: SlackMessagingService,
     botManager: SlackBotManager,
-    taskGenie?: any
+
   ) {
     this.client = client;
     this.messagingService = messagingService;
     this.botManager = botManager;
-    this.taskGenie = taskGenie;
+
   }
 
   /**
@@ -141,12 +141,9 @@ export class SlackEventHandler {
    * @returns True if the message directly mentions the bot
    */
   private isDirectMention(text: string): boolean {
-    // Look for @TaskGenie or direct bot mentions
+    // Look for direct bot mentions
     const mentionPatterns = [
-      /@TaskGenie/i,
-      /<@U[A-Z0-9]+>/,  // Direct user mention format
-      /hey\s+taskgenie/i,
-      /hi\s+taskgenie/i
+      /<@U[A-Z0-9]+>/  // Direct user mention format
     ];
     
     return mentionPatterns.some(pattern => pattern.test(text));
@@ -161,7 +158,7 @@ export class SlackEventHandler {
     // Remove bot mentions and clean up text
     const cleanText = text
       .replace(/<@U[A-Z0-9]+>/g, '')
-      .replace(/@TaskGenie/gi, '')
+
       .trim()
       .toLowerCase();
 
@@ -197,7 +194,7 @@ export class SlackEventHandler {
     channel: string, 
     threadTs: string, 
     command: SlackCommand, 
-    user: string
+    _user: string
   ): Promise<void> {
     switch (command.command) {
       case 'help':
@@ -209,7 +206,7 @@ export class SlackEventHandler {
         break;
         
       case 'list_tickets':
-        await this.handleListTicketsRequest(channel, threadTs);
+        await this.handleListTicketsRequest(channel, _user, threadTs);
         break;
         
       case 'summarize_ticket':
@@ -219,7 +216,7 @@ export class SlackEventHandler {
         } else {
           await this.messagingService.sendMessage(
             channel,
-            '❌ Please provide a ticket ID. Example: `@TaskGenie summarize ticket #123`',
+            '❌ Please provide a ticket ID. Example: `summarize ticket #123`',
             threadTs
           );
         }
@@ -232,20 +229,20 @@ export class SlackEventHandler {
         } else {
           await this.messagingService.sendMessage(
             channel,
-            '❌ Please provide a ticket ID. Example: `@TaskGenie status ticket #123`',
+            '❌ Please provide a ticket ID. Example: `status ticket #123`',
             threadTs
           );
         }
         break;
         
       case 'analytics':
-        await this.handleAnalyticsRequest(channel, threadTs);
+        await this.handleAnalyticsRequest(channel, _user, threadTs);
         break;
         
       default:
         await this.messagingService.sendMessage(
           channel,
-          `🤔 I didn't understand that command. Type \`@TaskGenie help\` to see available commands.`,
+          `🤔 I didn't understand that command. Type \`help\` to see available commands.`,
           threadTs
         );
     }
@@ -274,16 +271,11 @@ export class SlackEventHandler {
    * @returns Promise that resolves when summary is sent
    */
   async handleSummarizeRequest(channel: string, threadTs: string, ticketId: string): Promise<void> {
-    if (this.taskGenie) {
-      // Use TaskGenie service if available
-      await this.taskGenie.handleSlackSummarize(channel, threadTs, ticketId);
-    } else {
-      await this.messagingService.sendMessage(
-        channel,
-        `📝 Generating summary for ticket ${ticketId}... (Feature coming soon!)`,
-        threadTs
-      );
-    }
+    await this.messagingService.sendMessage(
+      channel,
+      `📝 Generating summary for ticket ${ticketId}... (Feature coming soon!)`,
+      threadTs
+    );
   }
 
   /**
@@ -327,7 +319,7 @@ export class SlackEventHandler {
         await this.handleMention(event as SlackAppMentionEvent);
         break;
       case 'message':
-        //todo: handle message event
+        // Handle message event
         console.log('message event', event);
         break;
       case 'member_joined_channel':
