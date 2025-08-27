@@ -1,4 +1,4 @@
-import { Env, OAuthTokens, ClickUpOAuthResponse, UserOAuthData } from '../../../types/index';
+import { Env, OAuthTokens, ClickUpOAuthResponse, UserOAuthData } from '../../../../types/index';
 
 /**
  * ClickUp OAuth 2.0 Service

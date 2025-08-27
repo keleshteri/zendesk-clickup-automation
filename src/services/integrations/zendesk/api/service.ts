@@ -1,7 +1,7 @@
-import { ZendeskTicket, Env } from '../../../types/index';
-import { createZendeskAuth } from '../../../utils/index';
-import { retryZendeskOperation } from './retry';
-import { withCircuitBreaker } from '../../../utils/circuit-breaker';
+import { ZendeskTicket, Env } from '../../../../types/index';
+import { createZendeskAuth } from '../../../../utils/index';
+import { retryZendeskOperation } from '../utils/retry';
+import { withCircuitBreaker } from '../../../../utils/circuit-breaker';
 
 export class ZendeskService {
   private env: Env;

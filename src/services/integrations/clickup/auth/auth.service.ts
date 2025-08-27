@@ -32,9 +32,9 @@
 
 import { Context, Next } from 'hono';
 import { MiddlewareHandler } from 'hono';
-import { Env } from '../../../types/env';
-import { AuthenticationError } from '../../../middleware/error';
-import { errorLogger, ErrorSeverity, ErrorCategory } from '../../../utils/error-logger';
+import { Env } from '../../../../types/env';
+import { AuthenticationError } from '../../../../middleware/error';
+import { errorLogger, ErrorSeverity, ErrorCategory } from '../../../../utils/error-logger';
 
 /**
  * Interface for ClickUp credential validation result

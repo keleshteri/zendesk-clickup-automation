@@ -30,24 +30,19 @@
  *   - require-qa-approval-for: ["production-ready"]
  */
 
-// Export the main Zendesk service
-export { ZendeskService } from './zendesk.service';
+// Export authentication module
+export * from './auth';
 
-// Export the webhook interface
-export { ZendeskWebhookInterface } from './webhook.interface';
+// Export API module
+export * from './api';
 
-// Export webhook types and utilities
-export {
-  ZendeskWebhookPayload,
-  ZendeskTicketDetail,
-  ZendeskTicketVia,
-  WebhookValidationResult,
-  WebhookProcessingResult,
-  isTicketCreatedEvent,
-  isTicketUpdatedEvent,
-  normalizeWebhookPriority,
-  normalizeWebhookStatus
-} from './webhook.types';
+// Export webhooks module
+export * from './webhooks';
 
-// Re-export commonly used types from the main types file
-export type { ZendeskTicket, ZendeskUser, ZendeskWebhook } from '../../../types/index';
+// Export types module
+export * from './types';
+
+// Export utils module
+export * from './utils';
+
+// Main exports are handled through the module exports above

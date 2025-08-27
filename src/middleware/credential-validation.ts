@@ -40,11 +40,11 @@ import { errorLogger, ErrorSeverity, ErrorCategory } from '../utils/error-logger
 import { 
   validateZendeskCredentials as validateZendeskCredentialsInternal,
   ZendeskCredentialValidationResult
-} from '../services/integrations/zendesk/auth';
+} from '../services/integrations/zendesk/auth/credential-validator';
 import { 
   validateClickUpCredentials as validateClickUpCredentialsInternal,
   ClickUpCredentialValidationResult
-} from '../services/integrations/clickup/auth';
+} from '../services/integrations/clickup/auth/auth.service';
 
 /**
  * Interface for credential validation result
@@ -176,8 +176,8 @@ export function validateCredentials(services: (keyof ServiceCredentials)[]): Mid
 /**
  * Re-export service-specific middleware for direct use
  */
-export { validateZendeskCredentialsMiddleware as validateZendeskCredentials } from '../services/integrations/zendesk/auth';
-export { validateClickUpCredentialsMiddleware as validateClickUpCredentials } from '../services/integrations/clickup/auth';
+export { validateZendeskCredentialsMiddleware as validateZendeskCredentials } from '../services/integrations/zendesk/auth/credential-validator';
+export { validateClickUpCredentialsMiddleware as validateClickUpCredentials } from '../services/integrations/clickup/auth/auth.service';
 
 /**
  * Middleware for validating all service credentials

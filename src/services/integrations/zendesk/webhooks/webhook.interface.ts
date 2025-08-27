@@ -31,10 +31,10 @@
  */
 
 import { Context } from 'hono';
-import { Env, ZendeskTicket } from '../../../types/index';
-import { ZendeskService } from './zendesk.service';
-import { retryZendeskOperation } from './retry';
-import { errorLogger } from '../../../utils/error-logger';
+import { Env, ZendeskTicket } from '../../../../types/index';
+import { ZendeskService } from '../api/service';
+import { retryZendeskOperation } from '../utils/retry';
+import { errorLogger } from '../../../../utils/error-logger';
 import {
   ZendeskWebhookPayload,
   ZendeskTicketDetail,

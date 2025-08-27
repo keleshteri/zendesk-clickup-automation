@@ -30,7 +30,7 @@
  *   - require-qa-approval-for: ["production-ready"]
  */
 
-import { RetryOptions, retryWithBackoff, RetryResult } from '../../../utils/retry';
+import { RetryOptions, retryWithBackoff, RetryResult } from '../../../../utils/retry';
 
 /**
  * Zendesk-specific retry configuration

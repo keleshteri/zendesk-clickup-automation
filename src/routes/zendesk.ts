@@ -42,7 +42,7 @@ import {
   ValidationError,
 } from "../middleware/error";
 
-import { ZendeskWebhookInterface } from "../services/integrations/zendesk";
+import { ZendeskWebhookInterface } from "../services/integrations/zendesk/webhooks/webhook.interface";
 
 // Webhook payload types are now imported from the webhook interface
 
