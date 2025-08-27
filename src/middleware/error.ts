@@ -32,6 +32,8 @@
 
 import type { ErrorHandler, MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
+import { errorLogger, ErrorSeverity, ErrorCategory } from '../utils/error-logger';
+import { CircuitBreakerOpenError } from '../utils/circuit-breaker';
 
 /**
  * Standard error response interface
@@ -109,8 +111,41 @@ export class NotFoundError extends APIError {
 }
 
 export class ServiceUnavailableError extends APIError {
-  constructor(service: string) {
-    super(`${service} service is currently unavailable`, 503, 'SERVICE_UNAVAILABLE');
+  constructor(
+    service: string, 
+    options?: {
+      cause?: Error;
+      retryAfter?: number;
+      healthCheckUrl?: string;
+      troubleshooting?: string[];
+      lastKnownStatus?: string;
+    }
+  ) {
+    const baseMessage = `${service} service is currently unavailable`;
+    const troubleshootingSteps = options?.troubleshooting || [
+      `Check ${service} service status and connectivity`,
+      'Verify API credentials and authentication tokens',
+      'Review rate limiting and quota usage',
+      'Check network connectivity and firewall settings'
+    ];
+    
+    const details = {
+      service,
+      cause: options?.cause?.message,
+      retryAfter: options?.retryAfter,
+      healthCheckUrl: options?.healthCheckUrl,
+      troubleshooting: troubleshootingSteps,
+      lastKnownStatus: options?.lastKnownStatus,
+      timestamp: new Date().toISOString(),
+      recoveryActions: [
+        'Wait for service to recover automatically',
+        'Check service status page for known issues',
+        'Verify configuration and credentials',
+        'Contact support if issue persists'
+      ]
+    };
+    
+    super(baseMessage, 503, 'SERVICE_UNAVAILABLE', details);
     this.name = 'ServiceUnavailableError';
   }
 }
@@ -188,6 +223,27 @@ function formatErrorResponse(
     code = error.code;
     details = sanitizeErrorDetails(error.details, isProduction);
   }
+  // Handle circuit breaker errors
+  else if (error instanceof CircuitBreakerOpenError) {
+    statusCode = 503;
+    code = 'CIRCUIT_BREAKER_OPEN';
+    details = {
+      reason: 'Circuit breaker is open due to repeated service failures',
+      nextAttempt: error.nextAttemptAt.toISOString(),
+      recommendations: [
+        'Wait for the circuit breaker to attempt service recovery',
+        'Check service status and connectivity',
+        'Verify API credentials and rate limits',
+        'Monitor service health endpoints'
+      ],
+      serviceStats: {
+        state: error.stats.state,
+        failureRate: `${(error.stats.failureRate * 100).toFixed(2)}%`,
+        totalRequests: error.stats.totalRequests,
+        lastFailure: error.stats.lastFailureTime?.toISOString()
+      }
+    };
+  }
   // Handle specific error types
   else if (error.name === 'ValidationError') {
     statusCode = 422;
@@ -257,16 +313,22 @@ export const errorMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, n
     
     // Log error if it's a server error
     if (shouldLogError(statusCode)) {
-      console.error('API Error:', {
-        requestId,
-        method,
-        path,
-        statusCode,
-        error: err.message,
-        stack: err.stack,
-        userAgent,
-        duration,
-        timestamp: new Date().toISOString()
+      // Determine error category and severity
+      const category = determineErrorCategory(err);
+      const severity = determineErrorSeverity(err);
+      
+      // Use enhanced error logging
+      await errorLogger.logError(err, severity, category, {
+        request: c,
+        operation: 'request_processing',
+        metadata: {
+          requestId,
+          method,
+          path,
+          statusCode,
+          userAgent,
+          duration
+        }
       });
     }
     
@@ -292,14 +354,32 @@ export const globalErrorHandler: ErrorHandler = (err, c) => {
   
   // Log error
   if (shouldLogError(statusCode)) {
-    console.error('Global Error Handler:', {
-      requestId,
-      method: c.req.method,
-      path,
-      statusCode,
-      error: err.message,
-      stack: err.stack,
-      timestamp: new Date().toISOString()
+    // Determine error category and severity
+    const category = determineErrorCategory(err);
+    const severity = determineErrorSeverity(err);
+    
+    // Use enhanced error logging
+    errorLogger.logError(err, severity, category, {
+      request: c,
+      operation: 'global_error_handling',
+      metadata: {
+        requestId,
+        method: c.req.method,
+        path,
+        statusCode
+      }
+    }).catch(logError => {
+      // Fallback to console if enhanced logging fails
+      console.error('Enhanced logging failed, falling back to console:', logError);
+      console.error('Global Error Handler:', {
+        requestId,
+        method: c.req.method,
+        path,
+        statusCode,
+        error: err.message,
+        stack: err.stack,
+        timestamp: new Date().toISOString()
+      });
     });
   }
   
@@ -363,10 +443,107 @@ export function validateRequired(data: any, fields: string[]): void {
 }
 
 /**
+ * Determine error category based on error type and message
+ */
+function determineErrorCategory(error: Error): ErrorCategory {
+  if (error instanceof CircuitBreakerOpenError) {
+    return ErrorCategory.SERVICE_UNAVAILABLE;
+  }
+  
+  if (error instanceof ValidationError) {
+    return ErrorCategory.VALIDATION;
+  }
+  
+  if (error instanceof AuthenticationError) {
+    return ErrorCategory.AUTHENTICATION;
+  }
+  
+  if (error instanceof ServiceUnavailableError) {
+    return ErrorCategory.SERVICE_UNAVAILABLE;
+  }
+  
+  if (error instanceof RateLimitError) {
+    return ErrorCategory.RATE_LIMIT;
+  }
+  
+  const message = error.message.toLowerCase();
+  
+  if (message.includes('webhook')) {
+    return ErrorCategory.WEBHOOK;
+  }
+  
+  if (message.includes('timeout')) {
+    return ErrorCategory.TIMEOUT;
+  }
+  
+  if (message.includes('network') || message.includes('fetch')) {
+    return ErrorCategory.NETWORK;
+  }
+  
+  return ErrorCategory.UNKNOWN;
+}
+
+/**
+ * Determine error severity based on error type and impact
+ */
+function determineErrorSeverity(error: Error): ErrorSeverity {
+  if (error instanceof CircuitBreakerOpenError) {
+    return ErrorSeverity.HIGH;
+  }
+  
+  if (error instanceof ServiceUnavailableError) {
+    return ErrorSeverity.HIGH;
+  }
+  
+  if (error instanceof AuthenticationError || error instanceof AuthorizationError) {
+    return ErrorSeverity.HIGH;
+  }
+  
+  if (error instanceof RateLimitError) {
+    return ErrorSeverity.MEDIUM;
+  }
+  
+  if (error instanceof ValidationError || error instanceof NotFoundError) {
+    return ErrorSeverity.LOW;
+  }
+  
+  // Check for critical system errors
+  const message = error.message.toLowerCase();
+  if (message.includes('critical') || message.includes('fatal')) {
+    return ErrorSeverity.CRITICAL;
+  }
+  
+  return ErrorSeverity.MEDIUM;
+}
+
+/**
  * Helper function to check service availability
  */
-export function requireService(service: any, serviceName: string): void {
+export function requireService(
+  service: any, 
+  serviceName: string,
+  options?: {
+    healthCheckUrl?: string;
+    lastKnownStatus?: string;
+    additionalContext?: string;
+  }
+): void {
   if (!service) {
-    throw new ServiceUnavailableError(serviceName);
+    const troubleshooting = [
+      `Verify ${serviceName} service initialization in dependency injection`,
+      'Check environment variables and configuration',
+      'Ensure service dependencies are properly loaded',
+      'Review service startup logs for initialization errors'
+    ];
+    
+    if (options?.additionalContext) {
+      troubleshooting.unshift(options.additionalContext);
+    }
+    
+    throw new ServiceUnavailableError(serviceName, {
+      healthCheckUrl: options?.healthCheckUrl,
+      troubleshooting,
+      lastKnownStatus: options?.lastKnownStatus || 'Service not initialized'
+    });
   }
 }

@@ -1,5 +1,7 @@
 import { ZendeskTicket, Env } from '../../../types/index';
 import { createZendeskAuth } from '../../../utils/index';
+import { retryZendeskOperation } from './retry';
+import { withCircuitBreaker } from '../../../utils/circuit-breaker';
 
 export class ZendeskService {
   private env: Env;
@@ -29,37 +31,41 @@ export class ZendeskService {
   }
 
   async getTicket(ticketId: number): Promise<ZendeskTicket | null> {
-    try {
-      const url = `${this.baseUrl}/tickets/${ticketId}.json`;
-      console.log(`🔍 Fetching Zendesk ticket ${ticketId} from: ${url}`);
-      
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': this.authHeader,
-          'Content-Type': 'application/json'
-        }
-      });
+    return withCircuitBreaker('zendesk', async () => {
+      return await retryZendeskOperation(
+        async () => {
+          const url = `${this.baseUrl}/tickets/${ticketId}.json`;
+          console.log(`🔍 Fetching Zendesk ticket ${ticketId} from: ${url}`);
+          
+          const response = await fetch(url, {
+            headers: {
+              'Authorization': this.authHeader,
+              'Content-Type': 'application/json'
+            }
+          });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ Failed to fetch ticket ${ticketId}:`, {
-          status: response.status,
-          statusText: response.statusText,
-          url: url,
-          errorBody: errorText
-        });
-        
-        // Throw error with detailed information for better debugging
-        throw new Error(`Zendesk API error: ${response.status} ${response.statusText} - ${errorText}`);
-      }
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ Failed to fetch ticket ${ticketId}:`, {
+              status: response.status,
+              statusText: response.statusText,
+              url: url,
+              errorBody: errorText
+            });
+            
+            // Throw error with detailed information for better debugging
+            const error = new Error(`Zendesk API error: ${response.status} ${response.statusText} - ${errorText}`);
+            (error as any).status = response.status;
+            throw error;
+          }
 
-      const data = await response.json() as { ticket: ZendeskTicket };
-      console.log(`✅ Successfully fetched ticket ${ticketId}: ${data.ticket.subject}`);
-      return data.ticket;
-    } catch (error) {
-      console.error('❌ Error fetching Zendesk ticket:', error);
-      throw error; // Re-throw to let the caller handle it
-    }
+          const data = await response.json() as { ticket: ZendeskTicket };
+          console.log(`✅ Successfully fetched ticket ${ticketId}: ${data.ticket.subject}`);
+          return data.ticket;
+        },
+        `get ticket ${ticketId}`
+      );
+    });
   }
 
   async getTicketComments(ticketId: number): Promise<any[]> {
@@ -86,18 +92,32 @@ export class ZendeskService {
 
   async updateTicket(ticketId: number, updates: Partial<ZendeskTicket>): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/tickets/${ticketId}.json`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': this.authHeader,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ticket: updates })
-      });
+      return withCircuitBreaker('zendesk', async () => {
+        return await retryZendeskOperation(
+          async () => {
+            const response = await fetch(`${this.baseUrl}/tickets/${ticketId}.json`, {
+              method: 'PUT',
+              headers: {
+                'Authorization': this.authHeader,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ ticket: updates })
+            });
 
-      return response.ok;
+            if (!response.ok) {
+              const errorText = await response.text();
+              const error = new Error(`Failed to update ticket ${ticketId}: ${response.status} ${response.statusText} - ${errorText}`);
+              (error as any).status = response.status;
+              throw error;
+            }
+
+            return response.ok;
+          },
+          `update ticket ${ticketId}`
+        );
+      });
     } catch (error) {
-      console.error('Error updating Zendesk ticket:', error);
+      console.error('Error updating Zendesk ticket after retries:', error);
       return false;
     }
   }

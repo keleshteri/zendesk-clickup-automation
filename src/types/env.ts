@@ -26,6 +26,7 @@ export interface Env {
   ZENDESK_API_TOKEN?: string;
 
   // ClickUp Configuration
+  CLICKUP_TOKEN?: string;
   CLICKUP_API_TOKEN?: string;
   CLICKUP_WEBHOOK_SECRET?: string;
   CLICKUP_CLIENT_ID: string;
@@ -34,6 +35,9 @@ export interface Env {
   CLICKUP_TEAM_ID?: string;
   CLICKUP_SPACE_ID?: string;
   CLICKUP_LIST_ID: string;
+
+  // General Webhook Configuration
+  WEBHOOK_SECRET: string;
 
   // Slack Configuration
   SLACK_BOT_TOKEN: string;
@@ -45,6 +49,8 @@ export interface Env {
   SLACK_NOTIFICATION_CHANNEL?: string;
 
   // AI Configuration
+  GOOGLE_GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
   AI_MODEL?: string;

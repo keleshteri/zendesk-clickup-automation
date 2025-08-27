@@ -34,6 +34,7 @@ import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { publicCORSMiddleware } from '../middleware/cors';
 import { handleAsync } from '../middleware/error';
+import { circuitBreakerRegistry, CircuitBreakerState } from '../utils/circuit-breaker';
 
 /**
  * Health check response interface
@@ -46,6 +47,20 @@ interface HealthResponse {
   environment?: string;
   services?: ServiceStatus[];
   checks?: HealthCheck[];
+  circuitBreakers?: Record<string, CircuitBreakerHealth>;
+}
+
+/**
+ * Circuit breaker health interface
+ */
+interface CircuitBreakerHealth {
+  state: CircuitBreakerState;
+  failureRate: string;
+  totalRequests: number;
+  lastFailure?: string;
+  lastSuccess?: string;
+  uptime: number;
+  nextAttempt?: string;
 }
 
 /**
@@ -143,6 +158,31 @@ healthRoutes.get('/', async (c) => {
       environment: c.env.NODE_ENV || 'development',
       services: serviceStatuses
     };
+    
+    // Add circuit breaker information
+    const circuitBreakerStats = circuitBreakerRegistry.getAllStats();
+    const circuitBreakers: Record<string, CircuitBreakerHealth> = {};
+    
+    for (const [serviceName, stats] of Object.entries(circuitBreakerStats)) {
+      circuitBreakers[serviceName] = {
+        state: stats.state,
+        failureRate: `${(stats.failureRate * 100).toFixed(2)}%`,
+        totalRequests: stats.totalRequests,
+        lastFailure: stats.lastFailureTime?.toISOString(),
+        lastSuccess: stats.lastSuccessTime?.toISOString(),
+        uptime: stats.uptime,
+        nextAttempt: stats.state === CircuitBreakerState.OPEN ? 
+          new Date(Date.now() + 30000).toISOString() : undefined
+      };
+    }
+    
+    // Check if any circuit breakers are open and adjust status
+    const hasOpenCircuits = Object.values(circuitBreakerStats).some(s => s.state === CircuitBreakerState.OPEN);
+    if (hasOpenCircuits && overallStatus === 'healthy') {
+      overallStatus = 'degraded';
+    }
+    
+    response.circuitBreakers = circuitBreakers;
     
     const statusCode = overallStatus === 'healthy' ? 200 : overallStatus === 'degraded' ? 200 : 503;
     return c.json(response, statusCode);
@@ -337,6 +377,84 @@ healthRoutes.get('/live', async (c) => {
     
     return c.json(response);
   }, 'Liveness check failed');
+});
+
+/**
+ * Circuit breaker status endpoint
+ * GET /health/circuit-breakers
+ */
+healthRoutes.get('/circuit-breakers', async (c) => {
+  return handleAsync(async () => {
+    const stats = circuitBreakerRegistry.getAllStats();
+    const circuitBreakers: Record<string, CircuitBreakerHealth> = {};
+    
+    for (const [serviceName, circuitStats] of Object.entries(stats)) {
+      circuitBreakers[serviceName] = {
+        state: circuitStats.state,
+        failureRate: `${(circuitStats.failureRate * 100).toFixed(2)}%`,
+        totalRequests: circuitStats.totalRequests,
+        lastFailure: circuitStats.lastFailureTime?.toISOString(),
+        lastSuccess: circuitStats.lastSuccessTime?.toISOString(),
+        uptime: circuitStats.uptime,
+        nextAttempt: circuitStats.state === CircuitBreakerState.OPEN ? 
+          new Date(Date.now() + 30000).toISOString() : undefined
+      };
+    }
+    
+    return c.json({
+      timestamp: new Date().toISOString(),
+      circuitBreakers,
+      summary: {
+        total: Object.keys(circuitBreakers).length,
+        closed: Object.values(stats).filter(s => s.state === CircuitBreakerState.CLOSED).length,
+        open: Object.values(stats).filter(s => s.state === CircuitBreakerState.OPEN).length,
+        halfOpen: Object.values(stats).filter(s => s.state === CircuitBreakerState.HALF_OPEN).length
+      }
+    });
+  }, 'Circuit breaker status check failed');
+});
+
+/**
+ * Service credentials validation endpoint
+ * GET /health/credentials
+ */
+healthRoutes.get('/credentials', async (c) => {
+  return handleAsync(async () => {
+    const timestamp = new Date().toISOString();
+    const credentials: Record<string, any> = {};
+    
+    // Check Zendesk credentials
+    credentials.zendesk = {
+      valid: !!(c.env.ZENDESK_SUBDOMAIN && c.env.ZENDESK_EMAIL && c.env.ZENDESK_API_TOKEN),
+      configured: !!(c.env.ZENDESK_SUBDOMAIN && c.env.ZENDESK_EMAIL && c.env.ZENDESK_API_TOKEN),
+      error: null,
+      lastCheck: timestamp
+    };
+    
+    if (!credentials.zendesk.valid) {
+      const missing = [];
+      if (!c.env.ZENDESK_SUBDOMAIN) missing.push('ZENDESK_SUBDOMAIN');
+      if (!c.env.ZENDESK_EMAIL) missing.push('ZENDESK_EMAIL');
+      if (!c.env.ZENDESK_API_TOKEN) missing.push('ZENDESK_API_TOKEN');
+      credentials.zendesk.error = `Missing required environment variables: ${missing.join(', ')}`;
+    }
+    
+    // Check ClickUp credentials
+    credentials.clickup = {
+      valid: !!c.env.CLICKUP_API_TOKEN,
+      configured: !!c.env.CLICKUP_API_TOKEN,
+      error: c.env.CLICKUP_API_TOKEN ? null : 'Missing CLICKUP_API_TOKEN environment variable',
+      lastCheck: timestamp
+    };
+    
+    const allValid = Object.values(credentials).every((cred: any) => cred.valid);
+    
+    return c.json({
+      timestamp,
+      allValid,
+      credentials
+    }, allValid ? 200 : 503);
+  }, 'Credentials validation failed');
 });
 
 /**

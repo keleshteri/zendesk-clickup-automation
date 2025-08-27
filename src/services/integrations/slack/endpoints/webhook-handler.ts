@@ -8,7 +8,6 @@
  * @stability: stable
  * @edit-permissions: "full"
  * @dependencies: ["./types", "../slack-service", "../../../../config"]
- * @tests: ["./tests/webhook-handler.test.ts"]
  * @breaking-changes-risk: low
  * @review-required: false
  * @ai-context: "Centralized Slack webhook handling with improved signature verification"

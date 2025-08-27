@@ -34,7 +34,7 @@ import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
 
 // Service imports (these will need to be created/imported from existing services)
-import { ZendeskService } from '../services/integrations/zendesk/zendesk';
+import { ZendeskService } from '../services/integrations/zendesk/zendesk.service';
 import { ClickUpService } from '../services/integrations/clickup/clickup';
 import { SlackService } from '../services/integrations/slack';
 import { AIService } from '../services/ai/ai-service';
@@ -73,9 +73,10 @@ const serviceCache = new Map<string, Services>();
 function createCacheKey(env: Env): string {
   const keys = [
     env.SLACK_BOT_TOKEN,
-    env.ZENDESK_SUBDOMAIN,
+    env.ZENDESK_DOMAIN || env.ZENDESK_SUBDOMAIN,
     env.CLICKUP_API_TOKEN,
-    env.OPENAI_API_KEY
+    env.OPENAI_API_KEY,
+    env.GOOGLE_GEMINI_API_KEY
   ].filter(Boolean);
   
   return keys.join('|');
@@ -95,24 +96,24 @@ async function initializeServices(env: Env): Promise<Services> {
   const services: Services = {};
 
   try {
+    // Initialize AI service first (required by other services)
+    if (env.OPENAI_API_KEY || env.GOOGLE_GEMINI_API_KEY) {
+      services.ai = new AIService(env);
+    }
+
     // Initialize Slack service
     if (env.SLACK_BOT_TOKEN && env.SLACK_SIGNING_SECRET) {
       services.slack = new SlackService(env);
     }
 
-    // Initialize Zendesk service
-    if (env.ZENDESK_SUBDOMAIN && env.ZENDESK_EMAIL && env.ZENDESK_API_TOKEN) {
+    // Initialize Zendesk service (check both ZENDESK_DOMAIN and ZENDESK_SUBDOMAIN)
+    if ((env.ZENDESK_DOMAIN || env.ZENDESK_SUBDOMAIN) && env.ZENDESK_EMAIL && (env.ZENDESK_API_TOKEN || env.ZENDESK_TOKEN)) {
       services.zendesk = new ZendeskService(env);
     }
 
-    // Initialize ClickUp service
+    // Initialize ClickUp service (requires AI service)
     if (env.CLICKUP_API_TOKEN && services.ai) {
       services.clickup = new ClickUpService(env, services.ai);
-    }
-
-    // Initialize AI service
-    if (env.OPENAI_API_KEY) {
-      services.ai = new AIService(env);
     }
 
     // Initialize OAuth service

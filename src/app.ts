@@ -86,8 +86,6 @@ export function createApp(): Hono<{ Bindings: Env }> {
     const availableEndpoints = [
       'GET /health',
       'GET /health/detailed',
-      '--- General Webhooks ---',
-      'POST /webhook/general',
       'POST /slack/events',
       'POST /slack/commands',
       'GET /slack/socket/status',
