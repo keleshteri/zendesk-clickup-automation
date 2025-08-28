@@ -513,11 +513,11 @@ async function handleMessageEvent(_event: any, _services: any, _env: Env): Promi
 async function handleAppMentionEvent(event: any, _services: any, _env: Env): Promise<void> {
   if (_services.slack && event.text) {
     try {
-      await _services.slack.handleAppMention({
+      await _services.slack.handleMention({
         text: event.text,
         user: event.user,
         channel: event.channel,
-        timestamp: event.ts
+        ts: event.ts
       });
     } catch (error) {
       console.warn('App mention handling failed:', error);
