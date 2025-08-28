@@ -44,30 +44,7 @@ import {
 /**
  * ClickUp webhook payload interface
  */
-interface ClickUpWebhookPayload {
-  event: string;
-  task_id?: string;
-  history_items?: Array<{
-    id: string;
-    type: number;
-    date: string;
-    field: string;
-    parent_id: string;
-    data: any;
-    source: string;
-    user: {
-      id: number;
-      username: string;
-      email: string;
-      color: string;
-      initials: string;
-      profilePicture?: string;
-    };
-    before?: any;
-    after?: any;
-  }>;
-  webhook_id: string;
-}
+import { ClickUpWebhookPayload } from '../interfaces';
 
 
 

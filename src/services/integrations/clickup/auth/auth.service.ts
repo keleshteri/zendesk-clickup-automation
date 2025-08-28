@@ -44,7 +44,7 @@ export interface ClickUpCredentialValidationResult {
   service: 'clickup';
   errors: string[];
   warnings?: string[];
-  authType?: 'oauth' | 'api_token';
+  authType: 'oauth' | 'api_token';
   lastValidated?: Date;
 }
 
@@ -81,7 +81,7 @@ export const CLICKUP_CREDENTIAL_CONFIG: ClickUpCredentialConfig = {
 export async function validateClickUpCredentials(env: Env): Promise<ClickUpCredentialValidationResult> {
   const errors: string[] = [];
   const warnings: string[] = [];
-  let authType: 'oauth' | 'api_token' | undefined;
+  let authType: 'oauth' | 'api_token' = 'api_token'; // Default to api_token
   
   // Check for OAuth configuration
   const hasOAuthConfig = env.CLICKUP_CLIENT_ID && env.CLICKUP_CLIENT_SECRET && env.CLICKUP_REDIRECT_URI;
@@ -175,7 +175,7 @@ export async function validateClickUpCredentials(env: Env): Promise<ClickUpCrede
     service: 'clickup',
     errors,
     warnings,
-    authType,
+    authType: authType!, // authType is guaranteed to be set
     lastValidated: new Date()
   };
 }

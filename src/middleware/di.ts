@@ -32,6 +32,7 @@
 
 import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
+import { Services } from '../interfaces';
 
 // Service imports (these will need to be created/imported from existing services)
 import { ZendeskService } from '../services/integrations/zendesk/api/service';
@@ -39,19 +40,6 @@ import { ClickUpService } from '../services/integrations/clickup/api/service';
 import { SlackService } from '../services/integrations/slack';
 import { AIService } from '../services/ai/ai-service';
 import { OAuthService } from '../services/integrations/clickup/oauth/oauth.service';
-
-
-/**
- * Service container interface
- */
-export interface Services {
-  zendesk?: ZendeskService;
-  clickup?: ClickUpService;
-  slack?: SlackService;
-  ai?: AIService;
-  oauth?: OAuthService;
-  
-}
 
 /**
  * Extended context with services

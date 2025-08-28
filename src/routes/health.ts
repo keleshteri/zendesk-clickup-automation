@@ -36,55 +36,12 @@ import { publicCORSMiddleware } from '../middleware/cors';
 import { handleAsync } from '../middleware/error';
 import { circuitBreakerRegistry, CircuitBreakerState } from '../utils/circuit-breaker';
 
-/**
- * Health check response interface
- */
-interface HealthResponse {
-  status: 'healthy' | 'degraded' | 'unhealthy';
-  timestamp: string;
-  uptime: number;
-  version?: string;
-  environment?: string;
-  services?: ServiceStatus[];
-  checks?: HealthCheck[];
-  circuitBreakers?: Record<string, CircuitBreakerHealth>;
-}
-
-/**
- * Circuit breaker health interface
- */
-interface CircuitBreakerHealth {
-  state: CircuitBreakerState;
-  failureRate: string;
-  totalRequests: number;
-  lastFailure?: string;
-  lastSuccess?: string;
-  uptime: number;
-  nextAttempt?: string;
-}
-
-/**
- * Service status interface
- */
-interface ServiceStatus {
-  name: string;
-  status: 'available' | 'unavailable' | 'degraded';
-  configured: boolean;
-  lastCheck?: string;
-  responseTime?: number;
-  error?: string;
-}
-
-/**
- * Health check interface
- */
-interface HealthCheck {
-  name: string;
-  status: 'pass' | 'fail' | 'warn';
-  duration: number;
-  output?: string;
-  error?: string;
-}
+import { 
+  HealthResponse, 
+  CircuitBreakerHealth, 
+  ServiceStatus, 
+  HealthCheck 
+} from '../interfaces';
 
 /**
  * Create health routes

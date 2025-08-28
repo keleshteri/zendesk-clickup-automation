@@ -26,19 +26,21 @@ import { TokenCalculator } from '../../utils/token-calculator';
 
 export class GoogleGeminiProvider implements AIProvider {
   name: 'googlegemini' = 'googlegemini';
+  model?: string;
   private genAI: GoogleGenerativeAI;
-  private model: any;
+  private geminiModel: any;
 
   constructor(apiKey: string, modelName?: string) {
+    this.model = modelName || 'gemini-1.5-flash';
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: modelName || 'gemini-1.5-flash' });
+    this.geminiModel = this.genAI.getGenerativeModel({ model: this.model });
   }
 
   async summarize(text: string): Promise<string> {
     try {
       const prompt = `Please provide a concise summary of this Zendesk ticket content. Focus on the main issue, key details, and any action items. Keep it under 200 words:\n\n${text}`;
       
-      const result = await this.model.generateContent(prompt);
+      const result = await this.geminiModel.generateContent(prompt);
       const response = await result.response;
       return response.text();
     } catch (error) {
@@ -64,7 +66,7 @@ export class GoogleGeminiProvider implements AIProvider {
         `7. Confidence score (0-100)\n\n` +
         `Format as JSON with fields: priority, category, complexity, estimatedTime, recommendedAgent, insights, reasoning, confidence`;
 
-      const result = await this.model.generateContent(prompt);
+      const result = await this.geminiModel.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
@@ -117,7 +119,7 @@ export class GoogleGeminiProvider implements AIProvider {
         `- confidence: number (0-100)\n` +
         `- reasoning: string explaining the analysis`;
 
-      const result = await this.model.generateContent(prompt);
+      const result = await this.geminiModel.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
@@ -161,7 +163,7 @@ export class GoogleGeminiProvider implements AIProvider {
         `5. Definition of done\n\n` +
         `Format as markdown for ClickUp.`;
 
-      const result = await this.model.generateContent(prompt);
+      const result = await this.geminiModel.generateContent(prompt);
       const response = await result.response;
       return response.text();
     } catch (error) {
@@ -204,7 +206,7 @@ export class GoogleGeminiProvider implements AIProvider {
         `- alerts: array of alert objects\n` +
         `- recommendations: array of actionable recommendations`;
 
-      const result = await this.model.generateContent(prompt);
+      const result = await this.geminiModel.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       

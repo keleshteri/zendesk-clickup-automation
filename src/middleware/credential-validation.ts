@@ -38,41 +38,26 @@ import { errorLogger, ErrorSeverity, ErrorCategory } from '../utils/error-logger
 
 // Import service-specific authentication modules
 import { 
-  validateZendeskCredentials as validateZendeskCredentialsInternal,
-  ZendeskCredentialValidationResult
+  validateZendeskCredentials as validateZendeskCredentialsInternal
 } from '../services/integrations/zendesk/auth/credential-validator';
 import { 
-  validateClickUpCredentials as validateClickUpCredentialsInternal,
-  ClickUpCredentialValidationResult
+  validateClickUpCredentials as validateClickUpCredentialsInternal
 } from '../services/integrations/clickup/auth/auth.service';
 
-/**
- * Interface for credential validation result
- * (Re-exported from service-specific modules for backward compatibility)
- */
-export interface CredentialValidationResult {
-  isValid: boolean;
-  service: string;
-  errors: string[];
-  warnings?: string[];
-  lastValidated?: Date;
-  authType?: string; // For ClickUp OAuth vs API token
-}
+import { 
+  CredentialValidationResult, 
+  ZendeskCredentialValidationResult, 
+  ClickUpCredentialValidationResult,
+  ServiceCredentials 
+} from '../interfaces';
 
-// Type aliases for service-specific results
-export type { ZendeskCredentialValidationResult, ClickUpCredentialValidationResult };
-
-/**
- * Interface for service credential requirements
- */
-export interface ServiceCredentials {
-  zendesk: {
-    validation: (env: Env) => Promise<ZendeskCredentialValidationResult>;
-  };
-  clickup: {
-    validation: (env: Env) => Promise<ClickUpCredentialValidationResult>;
-  };
-}
+// Re-export for backward compatibility
+export type { 
+  CredentialValidationResult, 
+  ZendeskCredentialValidationResult, 
+  ClickUpCredentialValidationResult,
+  ServiceCredentials 
+};
 
 /**
  * Service credential configurations using service-specific modules

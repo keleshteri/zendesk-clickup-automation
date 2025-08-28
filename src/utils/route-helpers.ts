@@ -25,73 +25,13 @@
  */
 
 import { Hono } from 'hono';
-import { addEndpoint, EndpointInfo } from './route-discovery';
-/**
- * Configuration for automatic route registration
- */
-export interface RouteConfig {
-  /** Base path for the route group */
-  basePath: string;
-  /** Category for grouping endpoints */
-  category: string;
-  /** Description of the route group */
-  description?: string;
-  /** Default tags to apply to all endpoints */
-  defaultTags?: string[];
-  /** Default authentication requirements */
-  defaultAuth?: string[];
-  /** Default CORS policy */
-  defaultCors?: 'public' | 'restricted' | 'webhook';
-}
-
-/**
- * Individual route configuration
- */
-export interface RouteDefinition {
-  path: string;
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  handler: any;
-  auth?: string[];
-  metadata?: RouteMetadata;
-}
-
-/**
- * Metadata for individual route endpoints
- */
-export interface RouteMetadata {
-  /** Endpoint description */
-  description: string;
-  /** HTTP method */
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  /** Relative path from base */
-  path: string;
-  /** Category for grouping endpoints */
-  category?: string;
-  /** Tags for categorization */
-  tags?: string[];
-  /** Authentication requirements */
-  auth?: string[];
-  /** CORS policy override */
-  cors?: 'public' | 'restricted' | 'webhook';
-  /** Request/response examples */
-  examples?: {
-    request?: any;
-    response?: any;
-  };
-  /** Parameter descriptions */
-  parameters?: Array<{
-    name: string;
-    type: 'query' | 'path' | 'header' | 'body';
-    required: boolean;
-    description: string;
-    example?: any;
-  }>;
-  /** Response descriptions */
-  responses?: Record<string, {
-    description: string;
-    example?: any;
-  }>;
-}
+import { addEndpoint } from './route-discovery';
+import {
+  EndpointInfo,
+  RouteConfig,
+  RouteDefinition,
+  EndpointMetadata
+} from '../interfaces';
 
 /**
  * Enhanced Hono app with automatic endpoint registration
@@ -107,7 +47,7 @@ export class EnhancedHono extends Hono {
   /**
    * Register a GET endpoint with automatic discovery
    */
-  getWithMeta(path: string, metadata: Omit<RouteMetadata, 'method' | 'path'>, handler: any) {
+  getWithMeta(path: string, metadata: Omit<EndpointMetadata, 'method' | 'path'>, handler: any) {
     this.registerEndpoint('GET', path, metadata, handler);
     return this.get(path, handler);
   }
@@ -115,7 +55,7 @@ export class EnhancedHono extends Hono {
   /**
    * Register a POST endpoint with automatic discovery
    */
-  postWithMeta(path: string, metadata: Omit<RouteMetadata, 'method' | 'path'>, handler: any) {
+  postWithMeta(path: string, metadata: Omit<EndpointMetadata, 'method' | 'path'>, handler: any) {
     this.registerEndpoint('POST', path, metadata, handler);
     return this.post(path, handler);
   }
@@ -123,7 +63,7 @@ export class EnhancedHono extends Hono {
   /**
    * Register a PUT endpoint with automatic discovery
    */
-  putWithMeta(path: string, metadata: Omit<RouteMetadata, 'method' | 'path'>, handler: any) {
+  putWithMeta(path: string, metadata: Omit<EndpointMetadata, 'method' | 'path'>, handler: any) {
     this.registerEndpoint('PUT', path, metadata, handler);
     return this.put(path, handler);
   }
@@ -131,7 +71,7 @@ export class EnhancedHono extends Hono {
   /**
    * Register a DELETE endpoint with automatic discovery
    */
-  deleteWithMeta(path: string, metadata: Omit<RouteMetadata, 'method' | 'path'>, handler: any) {
+  deleteWithMeta(path: string, metadata: Omit<EndpointMetadata, 'method' | 'path'>, handler: any) {
     this.registerEndpoint('DELETE', path, metadata, handler);
     return this.delete(path, handler);
   }
@@ -139,7 +79,7 @@ export class EnhancedHono extends Hono {
   /**
    * Register a PATCH endpoint with automatic discovery
    */
-  patchWithMeta(path: string, metadata: Omit<RouteMetadata, 'method' | 'path'>, handler: any) {
+  patchWithMeta(path: string, metadata: Omit<EndpointMetadata, 'method' | 'path'>, handler: any) {
     this.registerEndpoint('PATCH', path, metadata, handler);
     return this.patch(path, handler);
   }
@@ -148,9 +88,9 @@ export class EnhancedHono extends Hono {
    * Internal method to register endpoint with discovery system
    */
   private registerEndpoint(
-    method: RouteMetadata['method'],
+    method: EndpointMetadata['method'],
     path: string,
-    metadata: Omit<RouteMetadata, 'method' | 'path'>,
+    metadata: Omit<EndpointMetadata, 'method' | 'path'>,
     handler: any
   ) {
     const fullPath = this.config.basePath + (path === '/' ? '' : path);
@@ -163,7 +103,7 @@ export class EnhancedHono extends Hono {
       tags: [...(this.config.defaultTags || []), ...(metadata.tags || [])],
       auth: metadata.auth || this.config.defaultAuth || [],
       cors: metadata.cors || this.config.defaultCors || 'public',
-      examples: Array.isArray(metadata.examples) ? metadata.examples : [],
+      examples: metadata.examples ? [metadata.examples] : [],
       parameters: metadata.parameters
     };
 
@@ -181,7 +121,7 @@ export function createEnhancedApp(config: RouteConfig): EnhancedHono {
 /**
  * Decorator for automatic endpoint registration
  */
-export function endpoint(metadata: RouteMetadata) {
+export function endpoint(metadata: EndpointMetadata) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     // Store metadata for later registration
     if (!target._endpointMetadata) {
@@ -204,7 +144,7 @@ export function registerClassEndpoints(
 ) {
   const metadata = instance.constructor.prototype._endpointMetadata || [];
   
-  metadata.forEach((meta: RouteMetadata & { handler: Function }) => {
+  metadata.forEach((meta: EndpointMetadata & { handler: Function }) => {
     const fullPath = config.basePath + (meta.path === '/' ? '' : meta.path);
     
     // Register with discovery system
@@ -216,7 +156,7 @@ export function registerClassEndpoints(
       tags: [...(config.defaultTags || []), ...(meta.tags || [])],
       auth: meta.auth || config.defaultAuth || [],
       cors: meta.cors || config.defaultCors || 'public',
-      examples: Array.isArray(meta.examples) ? meta.examples : [],
+      examples: meta.examples ? [meta.examples] : [],
       parameters: meta.parameters
     };
     
@@ -261,7 +201,7 @@ export function registerEndpoints(app: Hono, endpoints: RouteDefinition[], baseP
         auth: endpoint.auth,
         parameters: endpoint.metadata.parameters,
         responses: endpoint.metadata.responses,
-        examples: Array.isArray(endpoint.metadata.examples) ? endpoint.metadata.examples : []
+        examples: endpoint.metadata.examples ? [endpoint.metadata.examples] : []
       });
     }
     

@@ -34,17 +34,7 @@ import { cors } from 'hono/cors';
 import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
 
-/**
- * CORS configuration options
- */
-interface CORSConfig {
-  origin: string | string[];
-  allowMethods: string[];
-  allowHeaders: string[];
-  exposeHeaders?: string[];
-  maxAge?: number;
-  credentials?: boolean;
-}
+import { CORSConfig } from '../interfaces';
 
 /**
  * Get CORS configuration based on environment
@@ -221,8 +211,8 @@ export function isOriginAllowed(origin: string, env: Env): boolean {
   const config = getCORSConfig(env);
   
   if (typeof config.origin === 'function') {
-    const result = (config.origin as (origin: string) => boolean | string)(origin);
-    return typeof result === 'string' ? true : result;
+    const result = (config.origin as (origin: string, c?: any) => string)(origin);
+    return result === origin || result === '*';
   }
   
   if (Array.isArray(config.origin)) {

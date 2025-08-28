@@ -38,15 +38,7 @@ import { CircuitBreakerOpenError } from '../utils/circuit-breaker';
 /**
  * Standard error response interface
  */
-export interface ErrorResponse {
-  error: string;
-  message: string;
-  code?: string;
-  details?: any;
-  timestamp: string;
-  requestId?: string;
-  path?: string;
-}
+import { ErrorResponse } from '../interfaces';
 
 /**
  * Custom error classes
@@ -263,22 +255,22 @@ function formatErrorResponse(
   }
 
   const response: ErrorResponse = {
-    error: code,
-    message: error.message,
-    code,
-    timestamp: new Date().toISOString(),
-    requestId,
-    path
+    error: {
+      message: error.message,
+      code,
+      timestamp: new Date().toISOString(),
+      requestId
+    }
   };
 
   if (details) {
-    response.details = details;
+    response.error.details = details;
   }
 
   // In development, include stack trace
   if (!isProduction && error.stack) {
-    response.details = {
-      ...response.details,
+    response.error.details = {
+      ...response.error.details,
       stack: error.stack
     };
   }

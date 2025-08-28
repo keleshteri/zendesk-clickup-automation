@@ -20,12 +20,9 @@
  */
 
 import { TokenUsage } from '../types';
+import { ProviderPricing } from '../interfaces';
 
-export interface ProviderPricing {
-  input_cost_per_1k: number;
-  output_cost_per_1k: number;
-  currency: string;
-}
+export { ProviderPricing };
 
 export class TokenCalculator {
   private static readonly PRICING: Record<string, ProviderPricing> = {

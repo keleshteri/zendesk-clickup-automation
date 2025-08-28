@@ -41,53 +41,7 @@ import {
   ValidationError
 } from '../middleware/error';
 
-/**
- * Slack event payload interface
- */
-interface SlackEventPayload {
-  token: string;
-  team_id: string;
-  api_app_id: string;
-  event: {
-    type: string;
-    user?: string;
-    text?: string;
-    ts: string;
-    channel?: string;
-    event_ts: string;
-    [key: string]: any;
-  };
-  type: string;
-  event_id: string;
-  event_time: number;
-  authorizations?: Array<{
-    enterprise_id: string | null;
-    team_id: string;
-    user_id: string;
-    is_bot: boolean;
-    is_enterprise_install: boolean;
-  }>;
-  is_ext_shared_channel: boolean;
-  event_context: string;
-}
-
-/**
- * Slack command payload interface
- */
-interface SlackCommandPayload {
-  token: string;
-  team_id: string;
-  team_domain: string;
-  channel_id: string;
-  channel_name: string;
-  user_id: string;
-  user_name: string;
-  command: string;
-  text: string;
-  response_url: string;
-  trigger_id: string;
-  api_app_id: string;
-}
+import { SlackEventPayload, SlackCommandPayload } from '../interfaces';
 
 /**
  * Create Slack routes
