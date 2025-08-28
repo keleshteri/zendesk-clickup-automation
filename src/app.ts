@@ -47,6 +47,10 @@ import { slackRoutes } from './routes/slack';
 // Auth routes have been moved to /routes/clickup.ts for better organization
 import { clickupRoutes } from './routes/clickup';
 import { zendeskRoutes } from './routes/zendesk';
+import { docsRoutes } from './routes/docs';
+
+// Route discovery utility
+import { createRouteDiscovery } from './utils/route-discovery';
 
 
 // Types
@@ -81,47 +85,67 @@ export function createApp(): Hono<{ Bindings: Env }> {
   // Test routes (from original index.ts)
   app.route('/test', createTestRoutes());
 
-  // 404 handler with available endpoints
+  // Documentation routes
+  app.route('/docs', docsRoutes);
+
+  // Root route with API documentation
+  app.get('/', (c) => {
+    const routeDiscovery = createRouteDiscovery({
+      metadata: {
+        title: 'Zendesk-ClickUp Automation API',
+        version: c.env.APP_VERSION || '1.0.0',
+        description: 'Bidirectional synchronization between Zendesk and ClickUp platforms',
+        baseUrl: c.req.url.replace(c.req.path, '')
+      }
+    });
+
+    const documentation = routeDiscovery.getApiDocumentation();
+    
+    return c.json({
+      message: 'Welcome to the Zendesk-ClickUp Automation API',
+      ...documentation,
+      links: {
+        health: '/health',
+        detailedHealth: '/health/detailed',
+        openapi: '/docs/openapi.json',
+        documentation: '/docs'
+      },
+      usage: {
+        authentication: {
+          bearer: 'Use Authorization: Bearer <token> for protected endpoints',
+          webhook: 'Webhook endpoints use signature verification',
+          oauth: 'OAuth endpoints require valid OAuth tokens'
+        },
+        cors: {
+          public: 'Public endpoints allow cross-origin requests',
+          restricted: 'Restricted endpoints have limited CORS policy',
+          webhook: 'Webhook endpoints have specific CORS configuration'
+        }
+      }
+    });
+  });
+
+  // 404 handler with dynamic endpoint discovery
   app.notFound((c) => {
-    const availableEndpoints = [
-      '--- Health & Status ---',
-      'GET /health',
-      'GET /health/detailed',
-      'GET /health/ready',
-      'GET /health/live',
-      'GET /health/circuit-breakers',
-      'GET /health/credentials',
-      '--- Slack Integration ---',
-      'POST /slack/events',
-      'POST /slack/commands',
-      'GET /slack/socket/status',
-      'POST /slack/socket/reconnect',
-      'POST /slack/socket/shutdown',
-      'GET /slack/manifest/templates',
-      'POST /slack/manifest/deploy',
-      '--- ClickUp Integration ---',
-      'GET /clickup/auth',
-      'GET /clickup/auth/callback',
-      'GET /clickup/user',
-      'GET /clickup/test',
-      'GET /clickup/oauth/test',
-      'GET /clickup/oauth/debug',
-      'GET /clickup/oauth/connections',
-      '--- Zendesk Integration ---',
-      'POST /zendesk/webhook',
-      'GET /zendesk/validate',
-      '--- Test Endpoints ---',
-      'GET /test',
-      'POST /test/ai',
-      'POST /test/zendesk-ai',
-      'POST /test/clickup',
-      'POST /test/slack'
-    ];
+    const routeDiscovery = createRouteDiscovery();
+    const availableEndpoints = routeDiscovery.getFormattedEndpoints();
+    const documentation = routeDiscovery.getApiDocumentation();
 
     return c.json({
       error: 'Not Found',
       message: `The requested endpoint '${c.req.path}' was not found.`,
       availableEndpoints,
+      suggestion: 'Visit the root endpoint (/) for complete API documentation',
+      links: {
+        documentation: '/',
+        health: '/health',
+        openapi: '/docs/openapi.json'
+      },
+      categories: documentation.categories.map(cat => ({
+        name: cat.name,
+        description: cat.description,
+        endpointCount: cat.endpoints.length
+      })),
       timestamp: new Date().toISOString()
     }, 404);
   });
