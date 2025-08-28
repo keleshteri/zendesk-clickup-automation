@@ -36,6 +36,7 @@ import { ZendeskTicket } from '../interfaces';
 import { ZendeskService } from '../api/service';
 import { retryZendeskOperation } from '../utils/retry';
 import { errorLogger } from '../../../../utils/error-logger';
+import { requireService } from '../../../../middleware/di';
 import {
   ZendeskWebhookPayload,
   ZendeskTicketDetail,
@@ -55,9 +56,11 @@ import {
 export class ZendeskWebhook {
   private zendeskService: ZendeskService;
   private env: Env;
+  private context: Context;
 
-  constructor(env: Env) {
+  constructor(env: Env, context: Context) {
     this.env = env;
+    this.context = context;
     this.zendeskService = new ZendeskService(env);
   }
 
@@ -323,16 +326,11 @@ export class ZendeskWebhook {
       // Process ticket creation with retry logic for external service calls
       await retryZendeskOperation(
         async () => {
-          // Here you would typically:
-          // 1. Store the ticket information
-          // 2. Trigger any automated workflows
-          // 3. Create corresponding tasks in ClickUp
-          // 4. Send notifications to relevant teams
-          
-          // Simulate processing that might fail due to service unavailability
           console.log(`🔄 Processing ticket creation workflow for ticket ${ticket.id}`);
           
-          // Add actual processing logic here
+          // Create ClickUp task using Service Locator pattern
+          await this.createClickUpTask(ticket, webhookId);
+          
           return true;
         },
         `ticket creation processing for ticket ${ticket.id}`
@@ -444,6 +442,50 @@ export class ZendeskWebhook {
   }
 
   /**
+   * Create a ClickUp task from a Zendesk ticket using Service Locator pattern
+   * @param ticket - The Zendesk ticket to create a ClickUp task from
+   * @param webhookId - Webhook ID for tracking
+   * @returns Promise<void>
+   */
+  private async createClickUpTask(ticket: ZendeskTicket, webhookId: string): Promise<void> {
+    try {
+      console.log(`🎯 Creating ClickUp task for Zendesk ticket ${ticket.id}`);
+      
+      // Use Service Locator to get ClickUp service
+      const clickUpService = requireService(this.context, 'clickup');
+      
+      if (!clickUpService) {
+        console.warn(`⚠️  ClickUp service not available, skipping task creation for ticket ${ticket.id}`);
+        return;
+      }
+      
+      // Create the ClickUp task
+      const clickUpTask = await clickUpService.createTaskFromTicket(ticket);
+      
+      if (clickUpTask) {
+        console.log(`✅ ClickUp task created successfully:`, {
+          clickUpTaskId: clickUpTask.id,
+          clickUpTaskUrl: clickUpTask.url,
+          zendeskTicketId: ticket.id,
+          webhookId
+        });
+      } else {
+        console.warn(`⚠️  ClickUp task creation returned null for ticket ${ticket.id}`);
+      }
+      
+    } catch (error) {
+      console.error(`❌ Failed to create ClickUp task for ticket ${ticket.id}:`, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        webhookId,
+        ticketId: ticket.id
+      });
+      
+      // Don't throw the error - we want the webhook to continue processing
+      // even if ClickUp task creation fails
+    }
+  }
+
+  /**
    * Get webhook processing statistics
    * @returns Object with processing stats
    */
@@ -458,7 +500,8 @@ export class ZendeskWebhook {
       features: {
         signatureVerification: !!this.env.WEBHOOK_SECRET,
         payloadValidation: true,
-        errorHandling: true
+        errorHandling: true,
+        clickUpIntegration: true
       }
     };
   }

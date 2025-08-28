@@ -74,7 +74,7 @@ function createCacheKey(env: Env): string {
   const keys = [
     env.SLACK_BOT_TOKEN,
     env.ZENDESK_DOMAIN || env.ZENDESK_SUBDOMAIN,
-    env.CLICKUP_API_TOKEN,
+    env.CLICKUP_TOKEN,
     env.OPENAI_API_KEY,
     env.GOOGLE_GEMINI_API_KEY
   ].filter(Boolean);
@@ -112,7 +112,7 @@ async function initializeServices(env: Env): Promise<Services> {
     }
 
     // Initialize ClickUp service (requires AI service)
-    if (env.CLICKUP_API_TOKEN && services.ai) {
+    if (env.CLICKUP_TOKEN && services.ai) {
       services.clickup = new ClickUpService(env, services.ai);
     }
 

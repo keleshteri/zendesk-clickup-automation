@@ -63,9 +63,11 @@ zendeskRoutes.post("/webhook", async (c) => {
 
     // Verify required services
     requireService(services.zendesk, "Zendesk");
+    requireService(services.clickup, "ClickUp");
     
-    // Initialize webhook interface
-    const webhookInterface = new ZendeskWebhook(c.env);
+    
+    // Initialize webhook interface with context for Service Locator pattern
+    const webhookInterface = new ZendeskWebhook(c.env, c);
 
     // Process the webhook
     return await webhookInterface.handleWebhook(c);
