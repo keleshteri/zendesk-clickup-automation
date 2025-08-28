@@ -24,7 +24,9 @@
  *   - require-qa-approval-for: ["production-ready"]
  */
 
-import { AIProvider, AIResponse, Env, TicketAnalysis, TicketMetadata, DuplicateAnalysis, ZendeskTicket, AIInsights, TokenUsage } from '../../types/index';
+import { Env } from '../../types/env';
+import { AIProvider, AIResponse, TicketAnalysis, TicketMetadata, DuplicateAnalysis, AIInsights, TokenUsage } from '../../types';
+import { ZendeskTicket } from '../integrations/zendesk/interfaces';
 import { TokenCalculator } from '../../utils/token-calculator';
 import { GoogleGeminiProvider } from './gemini-service';
 import { GoogleGenerativeAI } from '@google/generative-ai';

@@ -19,7 +19,7 @@
  *   - qa-approved: false
  */
 
-import { TokenUsage } from '../types/index';
+import { TokenUsage } from '../types';
 
 export interface ProviderPricing {
   input_cost_per_1k: number;

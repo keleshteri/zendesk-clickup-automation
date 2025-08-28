@@ -1,4 +1,7 @@
-import { ClickUpTask, ClickUpUser, Env, ZendeskTicket, UserOAuthData, TicketAnalysis } from '../../../../types/index';
+import { Env } from '../../../../types/env';
+import { TicketAnalysis } from '../../../../types';
+import { ClickUpTask, ClickUpUser, UserOAuthData } from '../interfaces';
+import { ZendeskTicket } from '../../zendesk/interfaces';
 import { mapZendeskToClickUpPriority } from '../../../../utils/index';
 import { AIService } from '../../../ai/ai-service';
 

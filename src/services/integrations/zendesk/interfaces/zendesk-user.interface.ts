@@ -1,17 +1,17 @@
 /**
  * @ai-metadata
- * @component: ClickUpTypesModule
- * @description: Barrel export for ClickUp TypeScript type definitions
+ * @component: ZendeskUserInterface
+ * @description: Zendesk User interface definition
  * @last-update: 2025-01-17
- * @last-editor: ai-assistant
- * @changelog: ./docs/changelog/clickup-types-module.md
- * @stability: experimental
+ * @last-editor: ai-assistant@trae.ai
+ * @changelog: ./docs/changelog/zendesk-user-interface.md
+ * @stability: stable
  * @edit-permissions: "full"
- * @dependencies: ["./api.types.ts", "./auth.types.ts", "./oauth.types.ts"]
+ * @dependencies: []
  * @tests: []
- * @breaking-changes-risk: medium
- * @review-required: true
- * @ai-context: "Exports all ClickUp TypeScript type definitions"
+ * @breaking-changes-risk: low
+ * @review-required: false
+ * @ai-context: "Defines the ZendeskUser interface for representing users in the Zendesk system"
  * 
  * @approvals:
  *   - dev-approved: false
@@ -30,5 +30,12 @@
  *   - require-qa-approval-for: ["production-ready"]
  */
 
-// Re-export all ClickUp interfaces from the new interfaces folder
-export * from '../interfaces';
+/**
+ * Zendesk User interface
+ * Represents a user in the Zendesk system
+ */
+export interface ZendeskUser {
+  id: number;
+  name: string;
+  email: string;
+}

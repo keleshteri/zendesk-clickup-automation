@@ -31,7 +31,8 @@
  */
 
 import { Context } from 'hono';
-import { Env, ZendeskTicket } from '../../../../types/index';
+import { Env } from '../../../../types/env';
+import { ZendeskTicket } from '../interfaces';
 import { ZendeskService } from '../api/service';
 import { retryZendeskOperation } from '../utils/retry';
 import { errorLogger } from '../../../../utils/error-logger';
@@ -44,14 +45,14 @@ import {
   isTicketUpdatedEvent,
   normalizeWebhookPriority,
   normalizeWebhookStatus
-} from './webhook.types';
+} from '../interfaces/zendesk-webhook.interface';
 
 /**
- * Zendesk Webhook Interface
+ * Zendesk Webhook
  * Handles incoming webhook events from Zendesk, validates signatures,
  * and processes ticket creation/update events
  */
-export class ZendeskWebhookInterface {
+export class ZendeskWebhook {
   private zendeskService: ZendeskService;
   private env: Env;
 

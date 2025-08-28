@@ -1,11 +1,11 @@
 /**
  * @ai-metadata
  * @component: ZendeskRoutes
- * @description: Zendesk integration routes including webhook handling and API operations
- * @last-update: 2025-01-16
+ * @description: Zendesk integration routes with comprehensive validation, webhook handling and API operations
+ * @last-update: 2025-01-17
  * @last-editor: ai-assistant@trae.ai
  * @changelog: ./docs/changelog/zendesk-routes.md
- * @stability: experimental
+ * @stability: stable
  * @edit-permissions: "full"
  * @dependencies: ["hono", "../middleware/error.ts", "../middleware/cors.ts"]
  * @tests: ["./tests/routes/zendesk.test.ts"]
@@ -32,19 +32,15 @@
 
 import { Hono } from "hono";
 import type { Env } from "../types/env";
-import type { ZendeskTicket } from "../types";
 import { webhookCORSMiddleware } from "../middleware/cors";
 import {
   handleAsync,
   requireService,
-  validateRequired,
-  AuthenticationError,
-  ValidationError,
 } from "../middleware/error";
 
-import { ZendeskWebhookInterface } from "../services/integrations/zendesk/webhooks/webhook.interface";
+import { ZendeskWebhook } from "../services/integrations/zendesk/webhooks/zendesk-webhook";
 
-// Webhook payload types are now imported from the webhook interface
+// Webhook payload types are now imported from the webhook 
 
 /**
  * Create Zendesk routes
@@ -68,13 +64,8 @@ zendeskRoutes.post("/webhook", async (c) => {
     // Verify required services
     requireService(services.zendesk, "Zendesk");
     
-    // Get request headers and body
-    const signature = c.req.header("X-Zendesk-Webhook-Signature");
-    const timestamp = c.req.header("X-Zendesk-Webhook-Signature-Timestamp");
-    const body = await c.req.text();
-
     // Initialize webhook interface
-    const webhookInterface = new ZendeskWebhookInterface(c.env);
+    const webhookInterface = new ZendeskWebhook(c.env);
 
     // Process the webhook
     return await webhookInterface.handleWebhook(c);
@@ -90,12 +81,56 @@ zendeskRoutes.post("/webhook", async (c) => {
 zendeskRoutes.get("/validate", async (c) => {
   return handleAsync(async () => {
     const env = c.env;
-    const isValid = !!(env.ZENDESK_SUBDOMAIN && env.ZENDESK_EMAIL && env.ZENDESK_API_TOKEN);
+    
+    // Check for ZENDESK_SUBDOMAIN (preferred) or ZENDESK_DOMAIN (backward compatibility)
+    const zendeskSubdomain = env.ZENDESK_SUBDOMAIN || env.ZENDESK_DOMAIN;
     
     const missing = [];
-    if (!env.ZENDESK_SUBDOMAIN) missing.push('ZENDESK_SUBDOMAIN');
-    if (!env.ZENDESK_EMAIL) missing.push('ZENDESK_EMAIL');
-    if (!env.ZENDESK_API_TOKEN) missing.push('ZENDESK_API_TOKEN');
+    const errors = [];
+    const warnings = [];
+    
+    // Validate required environment variables
+    if (!zendeskSubdomain) {
+      missing.push('ZENDESK_SUBDOMAIN (or ZENDESK_DOMAIN for backward compatibility)');
+    } else {
+      // Validate subdomain format (alphanumeric, hyphens, no spaces)
+      const subdomainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/;
+      if (!subdomainRegex.test(zendeskSubdomain)) {
+        errors.push('ZENDESK_SUBDOMAIN must be a valid subdomain (alphanumeric characters and hyphens only)');
+      }
+    }
+    
+    if (!env.ZENDESK_EMAIL) {
+      missing.push('ZENDESK_EMAIL');
+    } else {
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(env.ZENDESK_EMAIL)) {
+        errors.push('ZENDESK_EMAIL must be a valid email address');
+      }
+    }
+    
+    if (!env.ZENDESK_TOKEN) {
+      missing.push('ZENDESK_TOKEN');
+    } else {
+      // Validate token format (should be non-empty and reasonable length)
+      if (env.ZENDESK_TOKEN.length < 10) {
+        errors.push('ZENDESK_TOKEN appears to be too short (minimum 10 characters expected)');
+      }
+    }
+    
+    // Warn about deprecated ZENDESK_DOMAIN usage
+    if (env.ZENDESK_DOMAIN && !env.ZENDESK_SUBDOMAIN) {
+      warnings.push('ZENDESK_DOMAIN is deprecated. Please use ZENDESK_SUBDOMAIN instead.');
+    }
+    
+    // Check for optional but recommended variables
+    if (!env.ZENDESK_WEBHOOK_SECRET) {
+      warnings.push('ZENDESK_WEBHOOK_SECRET is not set. Webhook signature verification will be disabled.');
+    }
+    
+    const allErrors = [...missing.map(m => `Missing required environment variable: ${m}`), ...errors];
+    const isValid = allErrors.length === 0;
     
     return c.json({
       status: isValid ? 'success' : 'error',
@@ -104,7 +139,15 @@ zendeskRoutes.get("/validate", async (c) => {
         service: 'zendesk',
         isValid,
         lastValidated: new Date().toISOString(),
-        errors: missing.length > 0 ? [`Missing required environment variables: ${missing.join(', ')}`] : []
+        errors: allErrors,
+        warnings: warnings,
+        checkedVariables: {
+          ZENDESK_SUBDOMAIN: !!env.ZENDESK_SUBDOMAIN,
+          ZENDESK_DOMAIN: !!env.ZENDESK_DOMAIN,
+          ZENDESK_EMAIL: !!env.ZENDESK_EMAIL,
+          ZENDESK_TOKEN: !!env.ZENDESK_TOKEN,
+          ZENDESK_WEBHOOK_SECRET: !!env.ZENDESK_WEBHOOK_SECRET
+        }
       },
       timestamp: new Date().toISOString()
     }, isValid ? 200 : 400);

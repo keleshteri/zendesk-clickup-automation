@@ -1,5 +1,5 @@
 // Import types from centralized types/index.ts
-import type { ApiResponse } from '../types/index';
+import type { ApiResponse } from '../types';
 
 export type ZendeskPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type ClickUpPriority = 1 | 2 | 3 | 4;

@@ -1,242 +1,24 @@
-// Cloudflare Workers KV Namespace type
-declare global {
-  interface KVNamespace {
-    get(key: string): Promise<string | null>;
-    put(key: string, value: string): Promise<void>;
-    delete(key: string): Promise<void>;
-    list(): Promise<{ keys: Array<{ name: string }> }>;
-  }
-}
+/**
+ * @ai-metadata
+ * @component: Shared Types
+ * @description: Shared TypeScript type definitions used across the application
+ * @last-update: 2025-01-17
+ * @stability: stable
+ * @edit-permissions: "full"
+ * @dependencies: ["./env.ts", "../services/integrations/zendesk/interfaces", "../services/integrations/clickup/interfaces"]
+ * @tests: []
+ * @breaking-changes-risk: medium
+ * @review-required: true
+ * @ai-context: "Central barrel export for shared types and re-exports from domain-specific interfaces"
+ */
 
-export interface Env {
-  // Zendesk Configuration
-  ZENDESK_DOMAIN: string;
-  ZENDESK_EMAIL: string;
-  ZENDESK_TOKEN: string;
-  
-  // ClickUp Configuration  
-  CLICKUP_TOKEN?: string; // Optional - for direct API token usage
-  CLICKUP_LIST_ID: string;
-  CLICKUP_TEAM_ID?: string;
-  CLICKUP_SPACE_ID?: string;
-  
-  // ClickUp OAuth Configuration
-  CLICKUP_CLIENT_ID: string;
-  CLICKUP_CLIENT_SECRET: string;
-  CLICKUP_REDIRECT_URI: string;
-  
-  // Slack Configuration
-  SLACK_BOT_TOKEN: string;
-  SLACK_SIGNING_SECRET: string;
-  SLACK_APP_TOKEN?: string;
-  
-  // Phase 1: Enhanced Slack Channels
-  SLACK_MANAGEMENT_CHANNEL?: string;
-  SLACK_DEVELOPMENT_CHANNEL?: string;
-  SLACK_SUPPORT_CHANNEL?: string;
-  SLACK_BILLING_CHANNEL?: string;
-  SLACK_DEFAULT_CHANNEL?: string;
-  
-  // Slack Token Rotation Configuration
-  SLACK_TOKEN_ROTATION_ENABLED?: string;
-  SLACK_TOKEN_ROTATION_INTERVAL_HOURS?: string;
-  SLACK_TOKEN_GRACE_PERIOD_HOURS?: string;
-  SLACK_TOKEN_NOTIFY_BEFORE_HOURS?: string;
-  SLACK_BACKUP_TOKEN_COUNT?: string;
-  
-  // AI Provider Configuration
-  AI_PROVIDER: 'googlegemini' | 'openai' | 'openrouter';
-  GOOGLE_GEMINI_API_KEY?: string;
-  GEMINI_MODEL?: string;
-  
-  // Worker URL Configuration
-  WORKER_BASE_URL?: string;
-  SLACK_EVENTS_ENDPOINT?: string;
-  SLACK_AUTH_CALLBACK_ENDPOINT?: string;
-  OPENAI_API_KEY?: string;
-  OPENROUTER_API_KEY?: string;
-  OPENROUTER_MODEL?: string;
-  
-  // KV Storage
-  TASK_MAPPING?: KVNamespace;
-  SLACK_ERROR_REPORTS?: KVNamespace;
-  
-  // Optional
-  ENVIRONMENT?: string;
-  WEBHOOK_SECRET?: string;
-}
+// Re-export environment types
+export { Env } from './env';
 
-// Zendesk Types
-export interface ZendeskUser {
-  id: number;
-  name: string;
-  email: string;
-}
-
-export interface ZendeskTicket {
-  id: number;
-  url: string;
-  subject: string;
-  description: string;
-  raw_subject: string;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
-  status: 'new' | 'open' | 'pending' | 'solved' | 'closed';
-  requester_id: number;
-  assignee_id?: number;
-  organization_id?: number;
-  group_id?: number;
-  tags: string[];
-  created_at: string;
-  updated_at: string;
-  external_id?: string;
-}
-
-export interface ZendeskWebhook {
-  type: string;
-  ticket?: ZendeskTicket;
-  detail?: ZendeskTicket; // New webhook format uses 'detail' instead of 'ticket'
-  current_user?: ZendeskUser;
-  account?: {
-    subdomain: string;
-  };
-}
-
-export interface ZendeskWebhookPayload {
-  type: string;
-  ticket?: ZendeskTicket;
-  current_user?: ZendeskUser;
-  account?: {
-    subdomain: string;
-  };
-}
-
-export interface ZendeskApiResponse<T = any> {
-  ticket?: T;
-  tickets?: T[];
-  users?: ZendeskUser[];
-  count?: number;
-  next_page?: string;
-  previous_page?: string;
-}
-
-// ClickUp Types
-export interface ClickUpUser {
-  id: number;
-  username: string;
-  email: string;
-  color: string;
-  initials?: string;
-  profilePicture?: string;
-}
-
-export interface ClickUpStatus {
-  id: string;
-  status: string;
-  color: string;
-  orderindex: number;
-  type: 'open' | 'closed' | 'custom';
-}
-
-export interface ClickUpPriority {
-  id: string;
-  priority: string;
-  color: string;
-  orderindex: string;
-}
-
-export interface ClickUpTask {
-  id: string;
-  custom_id?: string;
-  name: string;
-  text_content?: string;
-  description: string;
-  status: ClickUpStatus;
-  orderindex: string;
-  date_created: string;
-  date_updated: string;
-  date_closed?: string;
-  creator: ClickUpUser;
-  assignees: ClickUpUser[];
-  tags: Array<{
-    name: string;
-    tag_fg?: string;
-    tag_bg?: string;
-  }>;
-  priority?: ClickUpPriority;
-  due_date?: string;
-  start_date?: string;
-  time_estimate?: number;
-  time_spent?: number;
-  custom_fields: Array<{
-    id: string;
-    name: string;
-    type: string;
-    value: any;
-  }>;
-  list: {
-    id: string;
-    name: string;
-  };
-  folder: {
-    id: string;
-    name: string;
-  };
-  space: {
-    id: string;
-  };
-  url: string;
-}
-
-export interface ClickUpWebhook {
-  event: string;
-  task_id: string;
-  webhook_id: string;
-  history_items?: Array<{
-    id: string;
-    type: number;
-    date: string;
-    field: string;
-    parent_id: string;
-    data: any;
-    source: string;
-    user: ClickUpUser;
-    before?: any;
-    after?: any;
-  }>;
-}
-
-export interface ClickUpWebhookPayload {
-  event: string;
-  task_id: string;
-  webhook_id: string;
-  history_items?: Array<{
-    id: string;
-    type: number;
-    date: string;
-    field: string;
-    parent_id: string;
-    data: any;
-    source: string;
-    user: ClickUpUser;
-    before?: any;
-    after?: any;
-  }>;
-}
-
-export interface ClickUpComment {
-  id: string;
-  comment: Array<{
-    text: string;
-  }>;
-  comment_text: string;
-  user: {
-    id: number;
-    username: string;
-    email?: string;
-    source?: string;
-  };
-  date: string;
-}
+// Re-export domain-specific types
+export type { ZendeskUser, ZendeskTicket, ZendeskWebhookPayload, ZendeskApiResponse } from '../services/integrations/zendesk/interfaces';
+export type { ClickUpUser, ClickUpTask, ClickUpWebhook } from '../services/integrations/clickup/interfaces';
+export type { OAuthTokens, ClickUpOAuthResponse, UserOAuthData } from '../services/integrations/clickup/interfaces';
 
 // Task Mapping Types
 export interface TaskMapping {
@@ -406,29 +188,4 @@ export interface PriorityAdjustment {
   suggested_priority: string;
   reason: string;
   confidence: number;
-}
-
-// OAuth Types
-export interface OAuthTokens {
-  access_token: string;
-  refresh_token?: string;
-  expires_in?: number;
-  token_type: string;
-  scope?: string;
-  expires_at?: number; // calculated expiration timestamp
-}
-
-export interface ClickUpOAuthResponse {
-  access_token: string;
-  token_type: string;
-}
-
-export interface UserOAuthData {
-  user_id: string;
-  team_id?: string;
-  access_token: string;
-  refresh_token?: string;
-  expires_at?: number;
-  authorized_at: string;
-  scopes?: string[];
 }

@@ -1,4 +1,5 @@
-import { ZendeskTicket, Env } from '../../../../types/index';
+import { Env } from '../../../../types/env';
+import { ZendeskTicket } from '../interfaces';
 import { createZendeskAuth } from '../../../../utils/index';
 import { retryZendeskOperation } from '../utils/retry';
 import { withCircuitBreaker } from '../../../../utils/circuit-breaker';

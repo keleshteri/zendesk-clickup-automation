@@ -2,7 +2,7 @@
  * @ai-metadata
  * @component: Environment Types
  * @description: TypeScript type definitions for Cloudflare Workers environment variables
- * @last-update: 2025-01-16
+ * @last-update: 2025-01-17
  * @stability: stable
  * @edit-permissions: "full"
  * @dependencies: []
@@ -12,14 +12,40 @@
  * @ai-context: "Defines the Env interface for Cloudflare Workers environment variables used throughout the application"
  */
 
+// Cloudflare Workers types
+declare global {
+  interface KVNamespace {
+    get(key: string): Promise<string | null>;
+    put(key: string, value: string): Promise<void>;
+    delete(key: string): Promise<void>;
+  }
+  
+  interface D1Database {
+    prepare(query: string): any;
+    exec(query: string): Promise<any>;
+  }
+  
+  interface R2Bucket {
+    get(key: string): Promise<any>;
+    put(key: string, value: any): Promise<any>;
+    delete(key: string): Promise<void>;
+  }
+  
+  interface DurableObjectNamespace {
+    get(id: any): any;
+    idFromName(name: string): any;
+    idFromString(id: string): any;
+  }
+}
+
 /**
  * Environment variables interface for Cloudflare Workers
  * Defines all required and optional environment variables used by the application
  */
 export interface Env {
   // Zendesk Configuration
-  ZENDESK_DOMAIN: string;
-  ZENDESK_SUBDOMAIN?: string;
+  ZENDESK_SUBDOMAIN: string;
+  ZENDESK_DOMAIN?: string; // Deprecated: Use ZENDESK_SUBDOMAIN instead
   ZENDESK_EMAIL: string;
   ZENDESK_TOKEN: string;
   ZENDESK_WEBHOOK_SECRET?: string;
@@ -80,6 +106,8 @@ export interface Env {
   CACHE_STORAGE?: KVNamespace;
   SESSION_STORAGE?: KVNamespace;
   OAUTH_KV?: KVNamespace;
+  TASK_MAPPING?: KVNamespace;
+  SLACK_ERROR_REPORTS?: KVNamespace;
 
   // D1 Database (if using Cloudflare D1)
   DB?: D1Database;

@@ -20,7 +20,8 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { AIProvider, TicketAnalysis, DuplicateAnalysis, ZendeskTicket, AIInsights, TokenUsage } from '../../types/index';
+import { AIProvider, TicketAnalysis, DuplicateAnalysis, AIInsights, TokenUsage } from '../../types';
+import { ZendeskTicket } from '../integrations/zendesk/interfaces';
 import { TokenCalculator } from '../../utils/token-calculator';
 
 export class GoogleGeminiProvider implements AIProvider {

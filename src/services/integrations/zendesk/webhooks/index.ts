@@ -7,7 +7,7 @@
  * @changelog: ./docs/changelog/zendesk-webhooks-module.md
  * @stability: experimental
  * @edit-permissions: "full"
- * @dependencies: ["./webhook.interface.ts", "./webhook.types.ts", "./webhook.validator.ts"]
+ * @dependencies: ["./zendesk-webhook.ts", "../interfaces/zendesk-webhook.interface.ts"]
  * @tests: []
  * @breaking-changes-risk: medium
  * @review-required: true
@@ -31,7 +31,7 @@
  */
 
 // Export webhook interface
-export { ZendeskWebhookInterface } from './webhook.interface';
+export { ZendeskWebhook } from './zendesk-webhook';
 
 // Export webhook types and utilities
 export {
@@ -44,4 +44,4 @@ export {
   isTicketUpdatedEvent,
   normalizeWebhookPriority,
   normalizeWebhookStatus
-} from './webhook.types';
+} from '../interfaces/zendesk-webhook.interface';

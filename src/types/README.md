@@ -266,227 +266,101 @@ interface EventMetadata {
 ### Integration Types
 
 #### Zendesk Types
+Zendesk-related types are now organized in dedicated interface files:
+- **Location**: `src/services/integrations/zendesk/interfaces/`
+- **Import**: `import { ZendeskTicket, ZendeskUser, ZendeskWebhook } from '../services/integrations/zendesk/interfaces';`
+
+Key interfaces include:
+- `ZendeskTicket`: Complete ticket structure with all fields
+- `ZendeskUser`: User information and permissions
+- `ZendeskWebhook`: Webhook payload structure
+
+#### ClickUp Types
+ClickUp-related types are now organized in dedicated interface files:
+- **Location**: `src/services/integrations/clickup/interfaces/`
+- **Import**: `import { ClickUpTask, ClickUpUser, ClickUpWebhook } from '../services/integrations/clickup/interfaces';`
+
+Key interfaces include:
+- `ClickUpTask`: Complete task structure with all fields
+- `ClickUpUser`: User information and workspace access
+- `ClickUpWebhook`: Webhook payload structure
+- `OAuthTokens`: OAuth authentication tokens
+
+#### Shared Types
+Shared types that are used across multiple domains remain in `src/types/index.ts`:
+
 ```typescript
-interface ZendeskTicket {
-  id: number;
-  url: string;
-  external_id?: string;
-  type: TicketType;
-  subject: string;
-  raw_subject: string;
-  description: string;
-  priority: TicketPriority;
-  status: TicketStatus;
-  recipient?: string;
-  requester_id: number;
-  submitter_id: number;
-  assignee_id?: number;
-  organization_id?: number;
-  group_id?: number;
-  collaborator_ids: number[];
-  follower_ids: number[];
-  email_cc_ids: number[];
-  forum_topic_id?: number;
-  problem_id?: number;
-  has_incidents: boolean;
-  is_public: boolean;
-  due_at?: string;
-  tags: string[];
-  custom_fields: ZendeskCustomField[];
-  satisfaction_rating?: ZendeskSatisfactionRating;
-  sharing_agreement_ids: number[];
-  fields: ZendeskTicketField[];
-  followup_ids: number[];
-  ticket_form_id?: number;
-  brand_id: number;
-  allow_channelback: boolean;
-  allow_attachments: boolean;
+// Example of shared types that remain in index.ts
+interface TaskMapping {
+  zendesk_ticket_id: number;
+  clickup_task_id: string;
   created_at: string;
   updated_at: string;
+  status: 'active' | 'archived';
 }
 
-enum TicketType {
-  PROBLEM = 'problem',
-  INCIDENT = 'incident',
-  QUESTION = 'question',
-  TASK = 'task'
+interface ApiResponse<T = any> {
+  success: boolean;
+  message: string;
+  data?: T;
+  error?: boolean;
+  context?: string;
+  timestamp: string;
 }
 
-enum TicketPriority {
-  LOW = 'low',
-  NORMAL = 'normal',
-  HIGH = 'high',
-  URGENT = 'urgent'
-}
-
-enum TicketStatus {
-  NEW = 'new',
-  OPEN = 'open',
-  PENDING = 'pending',
-  HOLD = 'hold',
-  SOLVED = 'solved',
-  CLOSED = 'closed'
-}
-
-interface ZendeskUser {
-  id: number;
-  url: string;
-  name: string;
-  email: string;
-  created_at: string;
-  updated_at: string;
-  time_zone: string;
-  iana_time_zone: string;
-  phone?: string;
-  shared_phone_number?: string;
-  photo?: ZendeskPhoto;
-  locale_id: number;
-  locale: string;
-  organization_id?: number;
-  role: UserRole;
-  verified: boolean;
-  external_id?: string;
-  tags: string[];
-  alias?: string;
-  active: boolean;
-  shared: boolean;
-  shared_agent: boolean;
-  last_login_at?: string;
-  two_factor_auth_enabled: boolean;
-  signature?: string;
-  details?: string;
-  notes?: string;
-  role_type: number;
-  custom_role_id?: number;
-  moderator: boolean;
-  ticket_restriction?: TicketRestriction;
-  only_private_comments: boolean;
-  restricted_agent: boolean;
-  suspended: boolean;
-  default_group_id?: number;
-  report_csv: boolean;
-  user_fields: Record<string, any>;
-}
-
-enum UserRole {
-  END_USER = 'end-user',
-  AGENT = 'agent',
-  ADMIN = 'admin'
-}
-
-interface ZendeskOrganization {
-  id: number;
-  url: string;
-  name: string;
-  shared_tickets: boolean;
-  shared_comments: boolean;
-  external_id?: string;
-  created_at: string;
-  updated_at: string;
-  domain_names: string[];
-  details?: string;
-  notes?: string;
-  group_id?: number;
-  tags: string[];
-  organization_fields: Record<string, any>;
+interface TicketAnalysis {
+  summary: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  urgency: 'low' | 'medium' | 'high' | 'critical';
+  category: 'technical' | 'billing' | 'general' | 'account' | 'bug' | 'feature';
+  sentiment: 'frustrated' | 'neutral' | 'happy' | 'angry';
+  // ... other analysis fields
 }
 ```
 
-#### ClickUp Types
+### Type Organization Benefits
+
+The new modular type organization provides several advantages:
+
+1. **Domain Separation**: Types are organized by their business domain (Zendesk, ClickUp, etc.)
+2. **Reduced Coupling**: Changes to integration-specific types don't affect other parts of the system
+3. **Better Maintainability**: Each service owns its type definitions
+4. **Cleaner Imports**: Import only the types you need from specific domains
+5. **Scalability**: Easy to add new integrations without cluttering shared types
+
+### Migration Guide
+
+When updating imports in existing files:
+
+**Before:**
 ```typescript
-interface ClickUpTask {
-  id: string;
-  custom_id?: string;
-  name: string;
-  text_content: string;
-  description: string;
-  status: ClickUpTaskStatus;
-  orderindex: string;
-  date_created: string;
-  date_updated: string;
-  date_closed?: string;
-  date_done?: string;
-  archived: boolean;
-  creator: ClickUpUser;
-  assignees: ClickUpUser[];
-  watchers: ClickUpUser[];
-  checklists: ClickUpChecklist[];
-  tags: ClickUpTag[];
-  parent?: string;
-  priority?: ClickUpPriority;
-  due_date?: string;
-  start_date?: string;
-  points?: number;
-  time_estimate?: number;
-  time_spent?: number;
-  custom_fields: ClickUpCustomField[];
-  dependencies: ClickUpDependency[];
-  linked_tasks: ClickUpLinkedTask[];
-  team_id: string;
-  url: string;
-  permission_level: string;
-  list: ClickUpList;
-  project: ClickUpProject;
-  folder: ClickUpFolder;
-  space: ClickUpSpace;
-}
+import { ZendeskTicket, ClickUpTask, Env } from '../types';
+```
 
-interface ClickUpTaskStatus {
-  id: string;
-  status: string;
-  color: string;
-  orderindex: number;
-  type: 'open' | 'closed' | 'custom';
-}
+**After:**
+```typescript
+import { Env } from '../types/env';
+import { ZendeskTicket } from '../services/integrations/zendesk/interfaces';
+import { ClickUpTask } from '../services/integrations/clickup/interfaces';
+```
 
-interface ClickUpUser {
-  id: number;
-  username: string;
-  color: string;
-  email: string;
-  profilePicture?: string;
-}
+### File Structure
 
-interface ClickUpWorkspace {
-  id: string;
-  name: string;
-  color: string;
-  avatar?: string;
-  members: ClickUpMember[];
-}
+```
+src/types/
+├── index.ts              # Shared types and barrel exports
+├── env.ts               # Environment variables
+└── README.md            # This documentation
 
-interface ClickUpSpace {
-  id: string;
-  name: string;
-  color?: string;
-  private: boolean;
-  avatar?: string;
-  admin_can_manage?: boolean;
-  statuses: ClickUpTaskStatus[];
-  multiple_assignees: boolean;
-  features: ClickUpSpaceFeatures;
-  archived: boolean;
-}
-
-interface ClickUpList {
-  id: string;
-  name: string;
-  orderindex: number;
-  status?: string;
-  priority?: ClickUpPriority;
-  assignee?: ClickUpUser;
-  task_count?: number;
-  due_date?: string;
-  due_date_time?: boolean;
-  start_date?: string;
-  start_date_time?: boolean;
-  folder: ClickUpFolder;
-  space: ClickUpSpace;
-  archived: boolean;
-  override_statuses?: boolean;
-  statuses: ClickUpTaskStatus[];
-  permission_level: string;
-}
+src/services/integrations/
+├── zendesk/interfaces/
+│   ├── index.ts         # Barrel export
+│   ├── core.ts          # Core Zendesk types
+│   └── webhook.ts       # Webhook types
+└── clickup/interfaces/
+    ├── index.ts         # Barrel export
+    ├── core.ts          # Core ClickUp types
+    └── oauth.ts         # OAuth types
 ```
 
 #### Slack Types
