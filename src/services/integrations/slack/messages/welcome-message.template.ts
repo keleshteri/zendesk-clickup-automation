@@ -24,6 +24,7 @@ export const welcomeMessageTemplate: MessageTemplateRenderer<WelcomeMessageConte
 
   return {
     channel,
+    text: `Welcome to the channel, <@${userId}>! I'm your AI-powered task automation assistant.`, // Fallback text for notifications
     blocks: [
       {
         type: 'section',

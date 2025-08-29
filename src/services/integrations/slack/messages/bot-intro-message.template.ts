@@ -24,6 +24,7 @@ export const botIntroMessageTemplate: MessageTemplateRenderer<BotIntroMessageCon
 
   return {
     channel,
+    text: "Bot has joined! I'm your AI-powered task automation assistant here to help streamline your workflow.", // Fallback text for notifications
     blocks: [
       {
         type: 'section',

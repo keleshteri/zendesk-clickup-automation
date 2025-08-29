@@ -256,6 +256,16 @@ export class SlackService {
   }
 
   /**
+   * Send welcome message to a user who joined a channel
+   * @param channel - The channel ID where the user joined
+   * @param userId - The user ID of the new member
+   * @returns Promise that resolves when message is sent
+   */
+  async sendUserWelcomeMessage(channel: string, userId: string): Promise<void> {
+    return this.messagingService.sendUserWelcomeMessage(channel, userId);
+  }
+
+  /**
    * Get category emoji
    */
   /**

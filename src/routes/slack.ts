@@ -495,6 +495,10 @@ async function handleSlackEvent(payload: SlackEventPayload, _services: any, _env
       await handleTeamJoinEvent(event, _services, _env);
       break;
       
+    case 'member_joined_channel':
+      await handleMemberJoinedChannelEvent(event, _services, _env);
+      break;
+      
     default:
       console.log(`Unhandled Slack event type: ${event.type}`);
   }
@@ -529,11 +533,29 @@ async function handleAppMentionEvent(event: any, _services: any, _env: Env): Pro
  * Handle Slack team join events
  */
 async function handleTeamJoinEvent(event: any, _services: any, _env: Env): Promise<void> {
+  console.log('Team join event:', event);
   if (_services.slack) {
     try {
-      await _services.slack.sendWelcomeMessage(event.user.id);
+      // For team join, we can send a DM or use a default channel
+      // Using the user ID as channel for DM
+      await _services.slack.sendUserWelcomeMessage(event.user.id, event.user.id);
     } catch (error) {
       console.warn('Welcome message failed:', error);
+    }
+  }
+}
+
+/**
+ * Handle Slack member joined channel events
+ */
+async function handleMemberJoinedChannelEvent(event: any, _services: any, _env: Env): Promise<void> {
+  console.log('Member joined channel event:', event);
+  if (_services.slack && event.user) {
+    try {
+      // Send welcome message when someone joins a channel
+      await _services.slack.sendUserWelcomeMessage(event.channel, event.user);
+    } catch (error) {
+      console.warn('Channel welcome message failed:', error);
     }
   }
 }
