@@ -171,7 +171,17 @@ export class SlackEventHandler {
       /show\s+(recent|latest)\s+tickets/,
       /list\s+(urgent|high\s+priority)\s+tickets/,
       /create\s+(task|ticket)/,
-      /make\s+a\s+(task|ticket)/
+      /make\s+a\s+(task|ticket)/,
+      // Help and search-related queries
+      /how\s+(do\s+i|to)\s+search\s+(for\s+)?tickets?/,
+      /how\s+(do\s+i|to)\s+(find|look\s+up)\s+tickets?/,
+      /how\s+(do\s+i|to)\s+use\s+(this|the\s+bot)/,
+      /what\s+can\s+(i|you)\s+do/,
+      /search\s+(for\s+)?tickets?/,
+      /find\s+tickets?/,
+      /help\s+(with\s+)?(searching|finding)\s+tickets?/,
+      /show\s+me\s+how\s+to/,
+      /what\s+commands\s+(are\s+)?available/
     ];
     
     return naturalLanguagePatterns.some(pattern => pattern.test(cleanText));
@@ -192,6 +202,16 @@ export class SlackEventHandler {
     user: string
   ): Promise<void> {
     try {
+      // Remove bot mentions from the text for processing
+      const cleanText = originalText.replace(/<@U[A-Z0-9]+>/g, '').trim().toLowerCase();
+      
+      // Check for help-related queries first (fallback mechanism)
+      if (this.isHelpQuery(cleanText)) {
+        console.log(`Detected help query: "${originalText}"`);
+        await this.handleDirectHelpQuery(cleanText, channel, threadTs, user);
+        return;
+      }
+      
       // Get AI service from the service container
       const aiService = this.getAIService();
       
@@ -212,9 +232,6 @@ export class SlackEventHandler {
 
       console.log(`Processing natural language query from user ${user}: "${originalText}"`);
       
-      // Remove bot mentions from the text for AI processing
-      const cleanText = originalText.replace(/<@U[A-Z0-9]+>/g, '').trim();
-      
       // Classify user intent using AI
       const nlpResponse = await aiService.classifyIntent(cleanText);
       const { intent, confidence, entities } = nlpResponse;
@@ -224,8 +241,14 @@ export class SlackEventHandler {
       console.log(`Original text: "${originalText}", Clean text: "${cleanText}"`);
       
       
-      // Handle low confidence responses
+      // Handle low confidence responses with fallback help detection
       if (confidence < 0.6) {
+        // Check again for help queries in case AI missed it
+        if (this.isHelpQuery(cleanText)) {
+          await this.handleDirectHelpQuery(cleanText, channel, threadTs, user);
+          return;
+        }
+        
         await this.messagingService.sendMessage(
           channel,
           "I'm not sure I understand. You can try using specific commands like `help` to see available options, or be more specific about what you're looking for.",
@@ -235,10 +258,18 @@ export class SlackEventHandler {
       }
       
       // Route to appropriate handler based on intent
-       await this.routeNaturalLanguageIntent({ intent, confidence, entities }, channel, threadTs, user);
+       await this.routeNaturalLanguageIntent({ intent, confidence, entities, originalText }, channel, threadTs, user);
        
      } catch (error) {
        console.error('Error processing natural language query:', error);
+       
+       // Final fallback - check for help queries even in error cases
+       const cleanText = originalText.replace(/<@U[A-Z0-9]+>/g, '').trim().toLowerCase();
+       if (this.isHelpQuery(cleanText)) {
+         await this.handleDirectHelpQuery(cleanText, channel, threadTs, user);
+         return;
+       }
+       
        await this.messagingService.sendMessage(
          channel,
          'Sorry, I encountered an error processing your request. Please try again or use `help` to see available commands.',
@@ -284,6 +315,12 @@ export class SlackEventHandler {
             
           case 'clickup_query':
             await this.handleClickUpQueryNaturalLanguage(intent, channel, threadTs);
+            break;
+            
+          case 'help':
+          case 'help_search':
+          case 'help_general':
+            await this.handleHelpNaturalLanguage(intent, channel, threadTs);
             break;
             
           case 'general':
@@ -491,6 +528,112 @@ export class SlackEventHandler {
      );
    }
 
+   /**
+     * Check if a query is help-related (fallback detection)
+     * @param cleanText - The cleaned text to check
+     * @returns True if the query appears to be help-related
+     */
+    private isHelpQuery(cleanText: string): boolean {
+      // First check if this is an actual search command with a query
+      const searchCommandPattern = /^search\s+tickets?\s+.+/;
+      if (searchCommandPattern.test(cleanText)) {
+        return false; // This is an actual search command, not a help query
+      }
+      
+      const helpPatterns = [
+        /how\s+(do\s+i|to)\s+search\s+(for\s+)?tickets?/,
+        /how\s+(do\s+i|to)\s+(find|look\s+up)\s+tickets?/,
+        /how\s+(do\s+i|to)\s+use\s+(this|the\s+bot)/,
+        /what\s+can\s+(i|you)\s+do/,
+        /^search\s+(for\s+)?tickets?$/,  // Only "search tickets" without query is help
+        /^find\s+tickets?$/,            // Only "find tickets" without query is help
+        /help\s+(with\s+)?(searching|finding)\s+tickets?/,
+        /show\s+me\s+how\s+to/,
+        /what\s+commands\s+(are\s+)?available/,
+        /\bhelp\b/,
+        /how\s+does\s+(this|it)\s+work/,
+        /what\s+(can|should)\s+i\s+(do|ask)/
+      ];
+      
+      return helpPatterns.some(pattern => pattern.test(cleanText));
+    }
+
+    /**
+     * Handle help queries directly without AI processing
+     * @param cleanText - The cleaned text of the query
+     * @param channel - The channel ID where the query was issued
+     * @param threadTs - The thread timestamp for replies
+     * @returns Promise that resolves when help is provided
+     */
+    private async handleDirectHelpQuery(cleanText: string, channel: string, threadTs: string, user?: string): Promise<void> {
+      let helpType: 'general' | 'ticket_commands' | 'search_tips' | 'troubleshooting' = 'general';
+      
+      // Determine help type based on keywords
+      if (cleanText.includes('search') || cleanText.includes('find')) {
+        helpType = 'search_tips';
+      } else if (cleanText.includes('troubleshoot') || cleanText.includes('problem') || cleanText.includes('issue')) {
+        helpType = 'troubleshooting';
+      } else if (cleanText.includes('command') || cleanText.includes('ticket')) {
+        helpType = 'ticket_commands';
+      }
+      
+      console.log(`Providing direct help with type: ${helpType} for query: "${cleanText}"`);
+      
+      // Create user mention if user ID is provided
+      const userMention = user ? `<@${user}>` : undefined;
+      
+      // Send the appropriate help message
+      await this.messagingService.sendHelpMessage(channel, helpType, userMention, threadTs);
+    }
+
+    /**
+     * Handle help-related natural language queries
+     * @param intent - The classified intent with entities
+     * @param channel - The channel ID where the query was issued
+     * @param threadTs - The thread timestamp for replies
+     * @returns Promise that resolves when help is provided
+     */
+    private async handleHelpNaturalLanguage(intent: any, channel: string, threadTs: string): Promise<void> {
+      const { entities } = intent;
+      
+      // Determine the type of help requested based on entities or intent
+      let helpType: 'general' | 'ticket_commands' | 'search_tips' | 'troubleshooting' = 'general';
+      
+      if (entities && entities.length > 0) {
+        const helpEntity = entities.find((entity: any) => 
+          entity.type === 'help_topic' || 
+          entity.value.includes('search') || 
+          entity.value.includes('find') ||
+          entity.value.includes('ticket')
+        );
+        
+        if (helpEntity) {
+          if (helpEntity.value.includes('search') || helpEntity.value.includes('find')) {
+            helpType = 'search_tips';
+          } else if (helpEntity.value.includes('troubleshoot')) {
+            helpType = 'troubleshooting';
+          } else if (helpEntity.value.includes('ticket') || helpEntity.value.includes('command')) {
+            helpType = 'ticket_commands';
+          }
+        }
+      }
+      
+      // If the original query contains specific keywords, override helpType
+      const originalText = intent.originalText?.toLowerCase() || '';
+      if (originalText.includes('search') || originalText.includes('find')) {
+        helpType = 'search_tips';
+      } else if (originalText.includes('troubleshoot')) {
+        helpType = 'troubleshooting';
+      } else if (originalText.includes('command')) {
+        helpType = 'ticket_commands';
+      }
+      
+      console.log(`Providing help with type: ${helpType}`);
+      
+      // Send the appropriate help message
+      await this.messagingService.sendHelpMessage(channel, helpType, threadTs);
+    }
+
   /**
    * Check if the text contains a direct mention of the bot
    * @param text - The message text to check
@@ -520,6 +663,11 @@ export class SlackEventHandler {
     // Parse different command types
     if (cleanText.includes('help')) {
       return { isCommand: true, command: 'help', args: [], originalText: text };
+    } else if (cleanText.includes('search tickets')) {
+      // Extract search query after 'search tickets'
+      const searchMatch = cleanText.match(/search\s+tickets\s+(.+)/);
+      const searchQuery = searchMatch ? searchMatch[1].trim() : '';
+      return { isCommand: true, command: 'search_tickets', args: [searchQuery], originalText: text };
     } else if (cleanText.includes('list tickets')) {
       return { isCommand: true, command: 'list_tickets', args: [], originalText: text };
     } else if (cleanText.includes('summarize ticket')) {
@@ -566,6 +714,24 @@ export class SlackEventHandler {
         
       case 'list_tickets':
         await this.handleListTicketsRequest(channel, _user, threadTs);
+        break;
+        
+      case 'search_tickets':
+        const searchQuery = command.args[0]; // Extract search query from args
+        if (searchQuery && searchQuery.trim()) {
+          await this.handleSearchTicketsRequest(channel, searchQuery.trim(), threadTs);
+        } else {
+          await this.messagingService.sendErrorMessage(
+             channel,
+             'invalid_input',
+             {
+               errorMessage: 'Please provide a search query.',
+               suggestions: ['Example: `search tickets password reset`'],
+               showHelpAction: true
+             },
+             threadTs
+           );
+        }
         break;
         
       case 'summarize_ticket':
@@ -669,6 +835,83 @@ export class SlackEventHandler {
       '📋 Fetching recent tickets... (Feature coming soon!)',
       threadTs
     );
+  }
+
+  /**
+   * Handle search tickets request commands
+   * @param channel - The channel ID to send the response to
+   * @param searchQuery - The search query to use
+   * @param threadTs - The thread timestamp for replies
+   * @returns Promise that resolves when search results are sent
+   */
+  async handleSearchTicketsRequest(channel: string, searchQuery: string, threadTs?: string): Promise<void> {
+    try {
+      console.log(`Searching tickets with query: "${searchQuery}"`);
+      
+      // Get Zendesk service
+      if (!this.zendeskService) {
+        await this.messagingService.sendErrorMessage(
+          channel,
+          'service_unavailable',
+          {
+            errorMessage: 'Zendesk service is not available.',
+            suggestions: ['Please try again later.'],
+            showHelpAction: true
+          },
+          threadTs
+        );
+        return;
+      }
+
+      // Perform the search
+      const searchResults = await this.zendeskService.searchTickets(searchQuery);
+      
+      if (!searchResults || searchResults.length === 0) {
+        await this.messagingService.sendErrorMessage(
+          channel,
+          'search_failed',
+          {
+            searchQuery,
+            errorMessage: `No tickets found matching "${searchQuery}".`,
+            suggestions: [
+              'Try different keywords',
+              'Check spelling',
+              'Use broader search terms'
+            ],
+            showHelpAction: true
+          },
+          threadTs
+        );
+        return;
+      }
+
+      // Send search results
+      await this.messagingService.sendTicketSummaryMessage(
+        channel,
+        searchResults,
+        {
+          title: `🔍 Search Results for "${searchQuery}"`,
+          totalCount: searchResults.length,
+          searchQuery,
+          showActions: true
+        },
+        threadTs
+      );
+      
+    } catch (error) {
+      console.error('Error searching tickets:', error);
+      await this.messagingService.sendErrorMessage(
+        channel,
+        'search_failed',
+        {
+          searchQuery,
+          errorMessage: 'Failed to search tickets.',
+          suggestions: ['Please try again later.'],
+          showHelpAction: true
+        },
+        threadTs
+      );
+    }
   }
 
   /**
