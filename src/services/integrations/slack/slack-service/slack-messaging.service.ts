@@ -14,6 +14,16 @@ import type { Env } from '../../../../types';
 import { SlackEmojiService } from './slack-emoji.service';
 import { SlackErrorReportingService } from './slack-error-reporting.service';
 import { SlackMessageBuilderService } from './slack-message-builder.service';
+import {
+  ticketInfoMessageTemplate,
+  ticketSummaryMessageTemplate,
+  errorMessageTemplate,
+  helpMessageTemplate,
+  type TicketInfoMessageContext,
+  type TicketSummaryMessageContext,
+  type ErrorMessageContext,
+  type HelpMessageContext
+} from '../messages';
 
 /**
  * Service responsible for all Slack messaging operations
@@ -96,76 +106,51 @@ export class SlackMessagingService {
   async sendIntelligentNotification(
     channel: string,
     ticketData: any,
-    _context: { isUpdate?: boolean; previousData?: any } = {}
+    context: { isUpdate?: boolean; previousData?: any } = {},
+    threadTs?: string
   ): Promise<any> {
-    
     try {
-      const blocks = [
-        {
-          type: 'header',
-          text: {
-            type: 'plain_text',
-            text: `🎫 New Ticket: ${ticketData.subject}`,
-            emoji: true
-          }
+      // Create context for the ticket info template
+      const templateContext: TicketInfoMessageContext = {
+        channel,
+        threadTs,
+        ticket: {
+          id: ticketData.id,
+          subject: ticketData.subject,
+          description: ticketData.description,
+          status: ticketData.status || 'open',
+          priority: ticketData.priority || 'normal',
+          category: ticketData.category,
+          assignedTeam: ticketData.assignedTeam,
+          assignee: ticketData.assignee,
+          requester: ticketData.requester ? {
+            name: ticketData.requester.name,
+            email: ticketData.requester.email
+          } : undefined,
+          createdAt: ticketData.createdAt,
+          updatedAt: ticketData.updatedAt,
+          url: ticketData.url,
+          tags: ticketData.tags
         },
-        {
-          type: 'section',
-          fields: [
-            {
-              type: 'mrkdwn',
-              text: `*Ticket ID:*\n${ticketData.id}`
-            },
-            {
-              type: 'mrkdwn',
-              text: `*Priority:*\n${ticketData.priority || 'Medium'}`
-            },
-            {
-              type: 'mrkdwn',
-              text: `*Category:*\n${ticketData.category || 'General'}`
-            },
-            {
-              type: 'mrkdwn',
-              text: `*Assigned Team:*\n${ticketData.assignedTeam || 'Unassigned'}`
-            }
-          ]
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*AI Summary:*\n${ticketData.summary || 'Processing...'}`
-          }
-        },
-        {
-          type: 'actions',
-          elements: [
-            {
-              type: 'button',
-              text: {
-                type: 'plain_text',
-                text: 'View in Zendesk',
-                emoji: true
-              },
-              url: ticketData.url
-            },
-            {
-              type: 'button',
-              text: {
-                type: 'plain_text',
-                text: 'View in ClickUp',
-                emoji: true
-              },
-              url: ticketData.clickupUrl || '#'
-            }
-          ]
-        }
-      ];
+        clickupTask: ticketData.clickupTask ? {
+          id: ticketData.clickupTask.id,
+          name: ticketData.clickupTask.name,
+          status: ticketData.clickupTask.status,
+          assignee: ticketData.clickupTask.assignee,
+          url: ticketData.clickupTask.url || ticketData.clickupUrl
+        } : undefined,
+        aiSummary: ticketData.summary || ticketData.aiSummary,
+        showActions: true
+      };
+
+      // Generate the message using the template
+      const messageTemplate = ticketInfoMessageTemplate(templateContext);
 
       return await this.client.chat.postMessage({
         channel,
-        blocks,
-        text: `New ticket: ${ticketData.subject}` // Fallback text
+        blocks: messageTemplate.blocks,
+        text: messageTemplate.text,
+        thread_ts: threadTs
       });
     } catch (error) {
       console.error('Failed to send intelligent notification:', error);
@@ -192,6 +177,147 @@ export class SlackMessagingService {
   ): Promise<any> {
     const message = `✅ Task created for ticket #${ticketData.id}\n📋 Zendesk: ${ticketData.url}\n🎯 ClickUp: ${taskData.url}\n👤 Assigned to: ${taskData.assignee}`;
     return this.sendMessage(channel, message, threadTs);
+  }
+
+  /**
+   * Send a ticket summary message with multiple tickets
+   * @param channel - The channel ID to send the message to
+   * @param tickets - Array of ticket summary items
+   * @param options - Additional options for the summary
+   * @param threadTs - Optional thread timestamp for threaded replies
+   * @returns Promise that resolves to the sent message object
+   */
+  async sendTicketSummaryMessage(
+    channel: string,
+    tickets: any[],
+    options: {
+      title?: string;
+      totalCount?: number;
+      searchQuery?: string;
+      aiInsight?: string;
+      showActions?: boolean;
+    } = {},
+    threadTs?: string
+  ): Promise<any> {
+    try {
+      const templateContext: TicketSummaryMessageContext = {
+        channel,
+        threadTs,
+        title: options.title,
+        tickets: tickets.map(ticket => ({
+          id: ticket.id,
+          subject: ticket.subject,
+          status: ticket.status,
+          priority: ticket.priority,
+          assignee: ticket.assignee,
+          requester: ticket.requester?.name || ticket.requester,
+          createdAt: ticket.createdAt,
+          updatedAt: ticket.updatedAt,
+          url: ticket.url,
+          hasClickUpTask: !!ticket.clickupTask || !!ticket.hasClickUpTask
+        })),
+        totalCount: options.totalCount || tickets.length,
+        searchQuery: options.searchQuery,
+        showActions: options.showActions !== false,
+        aiInsight: options.aiInsight
+      };
+
+      const messageTemplate = ticketSummaryMessageTemplate(templateContext);
+
+      return await this.client.chat.postMessage({
+        channel,
+        blocks: messageTemplate.blocks,
+        text: messageTemplate.text,
+        thread_ts: threadTs
+      });
+    } catch (error) {
+      console.error('Failed to send ticket summary message:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send an error message with helpful suggestions
+   * @param channel - The channel ID to send the message to
+   * @param errorType - The type of error that occurred
+   * @param options - Additional error context and options
+   * @param threadTs - Optional thread timestamp for threaded replies
+   * @returns Promise that resolves to the sent message object
+   */
+  async sendErrorMessage(
+    channel: string,
+    errorType: 'ticket_not_found' | 'search_failed' | 'api_error' | 'permission_denied' | 'invalid_input' | 'service_unavailable' | 'general_error',
+    options: {
+      ticketId?: string;
+      searchQuery?: string;
+      errorMessage?: string;
+      suggestions?: string[];
+      showRetryAction?: boolean;
+      showHelpAction?: boolean;
+    } = {},
+    threadTs?: string
+  ): Promise<any> {
+    try {
+      const templateContext: ErrorMessageContext = {
+        channel,
+        threadTs,
+        errorType,
+        ticketId: options.ticketId,
+        searchQuery: options.searchQuery,
+        errorMessage: options.errorMessage,
+        suggestions: options.suggestions,
+        showRetryAction: options.showRetryAction !== false,
+        showHelpAction: options.showHelpAction !== false
+      };
+
+      const messageTemplate = errorMessageTemplate(templateContext);
+
+      return await this.client.chat.postMessage({
+        channel,
+        blocks: messageTemplate.blocks,
+        text: messageTemplate.text,
+        thread_ts: threadTs
+      });
+    } catch (error) {
+      console.error('Failed to send error message:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send a help message with available commands and tips
+   * @param channel - The channel ID to send the message to
+   * @param helpType - The type of help to display
+   * @param userMention - Optional user mention for personalization
+   * @param threadTs - Optional thread timestamp for threaded replies
+   * @returns Promise that resolves to the sent message object
+   */
+  async sendHelpMessage(
+    channel: string,
+    helpType: 'general' | 'ticket_commands' | 'search_tips' | 'troubleshooting' = 'general',
+    userMention?: string,
+    threadTs?: string
+  ): Promise<any> {
+    try {
+      const templateContext: HelpMessageContext = {
+        channel,
+        threadTs,
+        helpType,
+        userMention
+      };
+
+      const messageTemplate = helpMessageTemplate(templateContext);
+
+      return await this.client.chat.postMessage({
+        channel,
+        blocks: messageTemplate.blocks,
+        text: messageTemplate.text,
+        thread_ts: threadTs
+      });
+    } catch (error) {
+      console.error('Failed to send help message:', error);
+      throw error;
+    }
   }
 
   /**

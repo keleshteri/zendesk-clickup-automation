@@ -15,10 +15,18 @@ import type {
   SlackMessageTemplate,
   MessageTemplateContext,
   WelcomeMessageContext,
-  BotIntroMessageContext
+  BotIntroMessageContext,
+  TicketInfoMessageContext,
+  TicketSummaryMessageContext,
+  ErrorMessageContext,
+  HelpMessageContext
 } from '../messages/types';
 import { welcomeMessageTemplate } from '../messages/welcome-message.template';
 import { botIntroMessageTemplate } from '../messages/bot-intro-message.template';
+import { ticketInfoMessageTemplate } from '../messages/ticket-info-message.template';
+import { ticketSummaryMessageTemplate } from '../messages/ticket-summary-message.template';
+import { errorMessageTemplate } from '../messages/error-message.template';
+import { helpMessageTemplate } from '../messages/error-message.template';
 
 /**
  * Service for building Slack messages from templates
@@ -76,5 +84,91 @@ export class SlackMessageBuilderService {
   buildBotIntroMessageSafe(context: BotIntroMessageContext): SlackMessageTemplate {
     this.validateContext(context, ['channel']);
     return this.buildBotIntroMessage(context);
+  }
+
+  /**
+   * Build a ticket information message
+   * @param context - Ticket info message context
+   * @returns Rendered Slack message template
+   */
+  buildTicketInfoMessage(context: TicketInfoMessageContext): SlackMessageTemplate {
+    return ticketInfoMessageTemplate(context);
+  }
+
+  /**
+   * Build a ticket summary message
+   * @param context - Ticket summary message context
+   * @returns Rendered Slack message template
+   */
+  buildTicketSummaryMessage(context: TicketSummaryMessageContext): SlackMessageTemplate {
+    return ticketSummaryMessageTemplate(context);
+  }
+
+  /**
+   * Build an error message
+   * @param context - Error message context
+   * @returns Rendered Slack message template
+   */
+  buildErrorMessage(context: ErrorMessageContext): SlackMessageTemplate {
+    return errorMessageTemplate(context);
+  }
+
+  /**
+   * Build a help message
+   * @param context - Help message context
+   * @returns Rendered Slack message template
+   */
+  buildHelpMessage(context: HelpMessageContext): SlackMessageTemplate {
+    return helpMessageTemplate(context);
+  }
+
+  /**
+   * Build ticket info message with validation
+   * @param context - Ticket info message context
+   * @returns Rendered Slack message template
+   * @throws Error if required context fields are missing
+   */
+  buildTicketInfoMessageSafe(context: TicketInfoMessageContext): SlackMessageTemplate {
+    this.validateContext(context, ['channel', 'ticket']);
+    if (!context.ticket.id || !context.ticket.subject) {
+      throw new Error('Missing required ticket fields: id, subject');
+    }
+    return this.buildTicketInfoMessage(context);
+  }
+
+  /**
+   * Build ticket summary message with validation
+   * @param context - Ticket summary message context
+   * @returns Rendered Slack message template
+   * @throws Error if required context fields are missing
+   */
+  buildTicketSummaryMessageSafe(context: TicketSummaryMessageContext): SlackMessageTemplate {
+    this.validateContext(context, ['channel', 'tickets']);
+    if (!Array.isArray(context.tickets)) {
+      throw new Error('Tickets must be an array');
+    }
+    return this.buildTicketSummaryMessage(context);
+  }
+
+  /**
+   * Build error message with validation
+   * @param context - Error message context
+   * @returns Rendered Slack message template
+   * @throws Error if required context fields are missing
+   */
+  buildErrorMessageSafe(context: ErrorMessageContext): SlackMessageTemplate {
+    this.validateContext(context, ['channel', 'errorType']);
+    return this.buildErrorMessage(context);
+  }
+
+  /**
+   * Build help message with validation
+   * @param context - Help message context
+   * @returns Rendered Slack message template
+   * @throws Error if required context fields are missing
+   */
+  buildHelpMessageSafe(context: HelpMessageContext): SlackMessageTemplate {
+    this.validateContext(context, ['channel']);
+    return this.buildHelpMessage(context);
   }
 }

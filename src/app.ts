@@ -48,6 +48,7 @@ import { slackRoutes } from './routes/slack';
 import { clickupRoutes } from './routes/clickup';
 import { zendeskRoutes } from './routes/zendesk';
 import { docsRoutes } from './routes/docs';
+import { monitoringRoutes } from './routes/monitoring';
 
 // Route discovery utility
 import { createRouteDiscovery } from './utils/route-discovery';
@@ -80,6 +81,7 @@ export function createApp(): Hono<{ Bindings: Env }> {
   // Auth routes have been moved to /clickup/oauth/* endpoints
   app.route('/clickup', clickupRoutes);
   app.route('/zendesk', zendeskRoutes);
+  app.route('/monitoring', monitoringRoutes);
   
 
   // Test routes (from original index.ts)

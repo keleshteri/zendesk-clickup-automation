@@ -4,6 +4,28 @@ import { ZendeskPriority, ClickUpPriority } from '../interfaces';
 
 export { ZendeskPriority, ClickUpPriority };
 
+// Export event deduplication service
+export { 
+  EventDeduplicationService, 
+  getEventDeduplicationService, 
+  resetEventDeduplicationService,
+  type ProcessedEvent,
+  type EventDeduplicationOptions
+} from './event-deduplication';
+
+// Export processing lock service
+export { ProcessingLockService, getProcessingLockService, withProcessingLock } from './processing-locks';
+export type { ProcessingLockOptions } from './processing-locks';
+
+// Export duplicate event monitor
+export {
+  DuplicateEventMonitor,
+  getDuplicateEventMonitor,
+  type DuplicateEventStats,
+  type DuplicateEventInfo,
+  type MonitoringOptions
+} from './duplicate-event-monitor';
+
 /**
  * Map Zendesk priority to ClickUp priority
  * Zendesk: low, normal, high, urgent

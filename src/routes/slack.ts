@@ -42,6 +42,9 @@ import {
 } from '../middleware/error';
 
 import { SlackEventPayload, SlackCommandPayload } from '../interfaces';
+import { UserIntent, NLPResponse, ContextualResponse } from '../types';
+import { AIService } from '../services/ai/ai-service';
+import { SlackWebhookHandler } from '../services/integrations/slack/endpoints/webhook-handler';
 
 /**
  * Create Slack routes
@@ -57,47 +60,29 @@ slackRoutes.post('/events', webhookCORSMiddleware, async (c) => {
     const services = c.get('services');
     requireService(services.slack, 'Slack');
     
-    // Get request body
-    const body = await c.req.text();
+    // Create webhook handler instance
+    const webhookHandler = new SlackWebhookHandler({
+      env: c.env,
+      slackService: services.slack!,
+      corsHeaders: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Slack-Signature, X-Slack-Request-Timestamp'
+      },
+      enableSignatureVerification: true
+    });
     
-    // Verify Slack signature
-    const signature = c.req.header('X-Slack-Signature');
-    const timestamp = c.req.header('X-Slack-Request-Timestamp');
+    // Handle the request through the centralized webhook handler
+    const response = await webhookHandler.handle(c.req.raw);
     
-    if (!signature || !timestamp) {
-      throw new AuthenticationError('Missing Slack signature headers');
-    }
+    // Convert Response to Hono response format
+    const responseBody = await response.text();
+    const responseHeaders = Object.fromEntries(response.headers.entries());
     
-    const isValidSignature = await services.slack!.verifyRequest(
-      signature,
-      body,
-      timestamp
-    );
-    
-    if (!isValidSignature) {
-      throw new AuthenticationError('Invalid Slack signature');
-    }
-    
-    // Parse payload
-    let payload: SlackEventPayload | { type: string; challenge?: string };
-    try {
-      payload = JSON.parse(body);
-    } catch (error) {
-      throw new ValidationError('Invalid JSON payload');
-    }
-    
-    // Handle URL verification challenge
-    if (payload.type === 'url_verification' && 'challenge' in payload) {
-      return c.text(payload.challenge!);
-    }
-    
-    // Handle event callbacks
-    if (payload.type === 'event_callback') {
-      const eventPayload = payload as SlackEventPayload;
-      await handleSlackEvent(eventPayload, services, c.env);
-    }
-    
-    return c.json({ ok: true });
+    return new Response(responseBody, {
+      status: response.status,
+      headers: responseHeaders
+    });
     
   }, 'Slack events processing failed');
 });
@@ -487,9 +472,8 @@ async function handleSlackEvent(payload: SlackEventPayload, _services: any, _env
       }
       break;
       
-    case 'app_mention':
-      await handleAppMentionEvent(event, _services, _env);
-      break;
+    // app_mention events are now handled exclusively through webhook handler
+    // to prevent duplicate processing and race conditions
       
     case 'team_join':
       await handleTeamJoinEvent(event, _services, _env);
@@ -505,10 +489,309 @@ async function handleSlackEvent(payload: SlackEventPayload, _services: any, _env
 }
 
 /**
- * Handle Slack message events
+ * Handle Slack message events with natural language processing
  */
-async function handleMessageEvent(_event: any, _services: any, _env: Env): Promise<void> {
-  
+async function handleMessageEvent(event: any, services: any, env: Env): Promise<void> {
+  try {
+    const { text, user, channel, ts } = event;
+    
+    // Skip if no text or if it's a bot message
+    if (!text || event.bot_id) {
+      return;
+    }
+    
+    // Skip if message starts with slash command (handled separately)
+    if (text.trim().startsWith('/')) {
+      return;
+    }
+    
+    console.log(`Processing natural language message from user ${user}: "${text}"`);
+    
+    // Check if AI service is available
+    if (!services.ai) {
+      console.warn('AI service not available for natural language processing');
+      return;
+    }
+    
+    // Classify user intent using Gemini
+    const nlpResponse: NLPResponse = await services.ai.classifyUserIntent(text);
+    const { intent } = nlpResponse;
+    
+    console.log(`Intent classified: ${intent.category} (confidence: ${intent.confidence})`);
+    
+    // Handle low confidence responses
+    if (intent.confidence < 0.6) {
+      await sendSlackMessage(services.slack, channel, {
+        text: "I'm not sure I understand. You can try using slash commands like `/zendesk` or `/clickup` for specific actions, or `/help` for available commands.",
+        thread_ts: ts
+      });
+      return;
+    }
+    
+    // Process based on intent category
+    switch (intent.category) {
+      case 'zendesk_query':
+        await handleZendeskNaturalLanguage(intent, services, channel, ts);
+        break;
+        
+      case 'zendesk_action':
+        await handleZendeskActionNaturalLanguage(intent, services, channel, ts);
+        break;
+        
+      case 'clickup_create':
+        await handleClickUpCreateNaturalLanguage(intent, services, channel, ts);
+        break;
+        
+      case 'clickup_query':
+        await handleClickUpQueryNaturalLanguage(intent, services, channel, ts);
+        break;
+        
+      case 'general':
+        await handleGeneralNaturalLanguage(intent, services, channel, ts);
+        break;
+        
+      default:
+        console.log(`Unhandled intent category: ${intent.category}`);
+        await sendSlackMessage(services.slack, channel, {
+          text: "I understand your message but I'm not sure how to help with that. Try using `/help` to see available commands.",
+          thread_ts: ts
+        });
+    }
+    
+  } catch (error) {
+    console.error('Error processing natural language message:', error);
+    // Don't send error messages to users for failed NLP processing
+  }
+}
+
+/**
+ * Utility function to send Slack messages
+ */
+async function sendSlackMessage(slackService: any, channel: string, message: any): Promise<void> {
+  if (slackService && slackService.sendMessage) {
+    try {
+      await slackService.sendMessage(channel, message);
+    } catch (error) {
+      console.error('Failed to send Slack message:', error);
+    }
+  }
+}
+
+/**
+ * Handle Zendesk queries from natural language
+ */
+async function handleZendeskNaturalLanguage(intent: UserIntent, services: any, channel: string, threadTs: string): Promise<void> {
+  if (!services.zendesk) {
+    await sendSlackMessage(services.slack, channel, {
+      text: "Zendesk service is not available.",
+      thread_ts: threadTs
+    });
+    return;
+  }
+
+  try {
+    const { entities } = intent;
+    
+    if (entities.ticketId) {
+      // Query specific ticket
+      const ticket = await services.zendesk.getTicket(entities.ticketId);
+      const response = await services.ai.generateContextualResponse('zendesk_query', { ticket, intent });
+      
+      await sendSlackMessage(services.slack, channel, {
+        text: response.text,
+        thread_ts: threadTs
+      });
+    } else if (entities.timeframe || entities.priority) {
+      // Query tickets by criteria
+      const tickets = await services.zendesk.getTicketsByCriteria({
+        timeframe: entities.timeframe,
+        priority: entities.priority,
+        status: entities.status
+      });
+      
+      const response = await services.ai.generateContextualResponse('zendesk_query', { tickets, intent });
+      
+      await sendSlackMessage(services.slack, channel, {
+        text: response.text,
+        thread_ts: threadTs
+      });
+    } else {
+      // General ticket query
+      const tickets = await services.zendesk.getRecentTickets(5);
+      const response = await services.ai.generateContextualResponse('zendesk_query', { tickets, intent });
+      
+      await sendSlackMessage(services.slack, channel, {
+        text: response.text,
+        thread_ts: threadTs
+      });
+    }
+  } catch (error) {
+    console.error('Error handling Zendesk query:', error);
+    await sendSlackMessage(services.slack, channel, {
+      text: "Sorry, I encountered an error while querying Zendesk. Please try again or use `/zendesk` commands.",
+      thread_ts: threadTs
+    });
+  }
+}
+
+/**
+ * Handle Zendesk actions from natural language
+ */
+async function handleZendeskActionNaturalLanguage(intent: UserIntent, services: any, channel: string, threadTs: string): Promise<void> {
+  if (!services.zendesk) {
+    await sendSlackMessage(services.slack, channel, {
+      text: "Zendesk service is not available.",
+      thread_ts: threadTs
+    });
+    return;
+  }
+
+  try {
+    const { entities, action } = intent;
+    
+    if (action.includes('reply') && entities.ticketId) {
+      // Generate AI reply for ticket
+      const ticket = await services.zendesk.getTicket(entities.ticketId);
+      const aiReply = await services.ai.generateTicketReply(ticket);
+      
+      const response = await services.ai.generateContextualResponse('zendesk_action', { 
+        ticket, 
+        aiReply, 
+        action: 'reply_generated',
+        intent 
+      });
+      
+      await sendSlackMessage(services.slack, channel, {
+        text: response.text,
+        thread_ts: threadTs
+      });
+    } else {
+      await sendSlackMessage(services.slack, channel, {
+        text: "I understand you want to perform a Zendesk action, but I need more specific information. Try using `/zendesk` commands for actions.",
+        thread_ts: threadTs
+      });
+    }
+  } catch (error) {
+    console.error('Error handling Zendesk action:', error);
+    await sendSlackMessage(services.slack, channel, {
+      text: "Sorry, I encountered an error while performing the Zendesk action. Please try again or use `/zendesk` commands.",
+      thread_ts: threadTs
+    });
+  }
+}
+
+/**
+ * Handle ClickUp task creation from natural language
+ */
+async function handleClickUpCreateNaturalLanguage(intent: UserIntent, services: any, channel: string, threadTs: string): Promise<void> {
+  if (!services.clickup) {
+    await sendSlackMessage(services.slack, channel, {
+      text: "ClickUp service is not available.",
+      thread_ts: threadTs
+    });
+    return;
+  }
+
+  try {
+    const { entities } = intent;
+    
+    if (entities.taskName) {
+      // Create task with extracted information
+      const taskData = {
+        name: entities.taskName,
+        description: entities.description || '',
+        priority: entities.priority,
+        assignee: entities.assignee
+      };
+      
+      const task = await services.clickup.createTask(taskData);
+      const response = await services.ai.generateContextualResponse('clickup_create', { task, intent });
+      
+      await sendSlackMessage(services.slack, channel, {
+        text: response.text,
+        thread_ts: threadTs
+      });
+    } else {
+      await sendSlackMessage(services.slack, channel, {
+        text: "I understand you want to create a ClickUp task, but I need a task name. Try something like 'Create task: Fix login bug' or use `/clickup` commands.",
+        thread_ts: threadTs
+      });
+    }
+  } catch (error) {
+    console.error('Error creating ClickUp task:', error);
+    await sendSlackMessage(services.slack, channel, {
+      text: "Sorry, I encountered an error while creating the ClickUp task. Please try again or use `/clickup` commands.",
+      thread_ts: threadTs
+    });
+  }
+}
+
+/**
+ * Handle ClickUp queries from natural language
+ */
+async function handleClickUpQueryNaturalLanguage(intent: UserIntent, services: any, channel: string, threadTs: string): Promise<void> {
+  if (!services.clickup) {
+    await sendSlackMessage(services.slack, channel, {
+      text: "ClickUp service is not available.",
+      thread_ts: threadTs
+    });
+    return;
+  }
+
+  try {
+    const { entities } = intent;
+    
+    if (entities.assignee || entities.status || entities.timeframe) {
+      // Query tasks by criteria
+      const tasks = await services.clickup.getTasksByCriteria({
+        assignee: entities.assignee,
+        status: entities.status,
+        timeframe: entities.timeframe
+      });
+      
+      const response = await services.ai.generateContextualResponse('clickup_query', { tasks, intent });
+      
+      await sendSlackMessage(services.slack, channel, {
+        text: response.text,
+        thread_ts: threadTs
+      });
+    } else {
+      // General task query
+      const tasks = await services.clickup.getRecentTasks(5);
+      const response = await services.ai.generateContextualResponse('clickup_query', { tasks, intent });
+      
+      await sendSlackMessage(services.slack, channel, {
+        text: response.text,
+        thread_ts: threadTs
+      });
+    }
+  } catch (error) {
+    console.error('Error querying ClickUp:', error);
+    await sendSlackMessage(services.slack, channel, {
+      text: "Sorry, I encountered an error while querying ClickUp. Please try again or use `/clickup` commands.",
+      thread_ts: threadTs
+    });
+  }
+}
+
+/**
+ * Handle general conversation from natural language
+ */
+async function handleGeneralNaturalLanguage(intent: UserIntent, services: any, channel: string, threadTs: string): Promise<void> {
+  try {
+    const response = await services.ai.generateContextualResponse('general', { intent });
+    
+    await sendSlackMessage(services.slack, channel, {
+      text: response.text,
+      thread_ts: threadTs
+    });
+  } catch (error) {
+    console.error('Error handling general conversation:', error);
+    await sendSlackMessage(services.slack, channel, {
+      text: "Hello! I can help you with Zendesk tickets and ClickUp tasks. Try asking me something like 'Show me urgent tickets' or 'Create a task for bug fixes'. You can also use `/help` for available commands.",
+      thread_ts: threadTs
+    });
+  }
 }
 
 /**

@@ -13,7 +13,11 @@
 
 export * from './welcome-message.template';
 export * from './bot-intro-message.template';
+export * from './ticket-info-message.template';
+export * from './ticket-summary-message.template';
+export * from './error-message.template';
 export * from './types';
+export * from './footers';
 
-// Re-export the message builder service for convenience
+// Re-export the SlackMessageBuilderService
 export { SlackMessageBuilderService } from '../slack-service/slack-message-builder.service';

@@ -18,7 +18,7 @@ import { SlackEventsHandler } from './events-handler';
 import { SlackCommandsHandler } from './commands-handler';
 import { SlackInteractionsHandler } from './interactions-handler';
 import { HTTP_STATUS, LOG_CONFIG, ERROR_MESSAGES } from '../../../../config';
-import { formatErrorResponse, formatSuccessResponse } from '../../../../utils';
+import { formatErrorResponse, formatSuccessResponse, getDuplicateEventMonitor } from '../../../../utils';
 
 /**
  * Centralized Slack webhook handler
@@ -176,19 +176,51 @@ export class SlackWebhookHandler {
    */
   private async routeRequest(context: RequestContext, ctx?: ExecutionContext): Promise<Response> {
     const { parsedBody } = context;
+    const monitor = getDuplicateEventMonitor();
 
     // Handle Slack events
     if (parsedBody.type === 'event_callback' && parsedBody.event) {
+      const eventType = parsedBody.event.type;
+      const eventKey = `${eventType}:${parsedBody.event.ts || 'unknown'}:${parsedBody.event.channel || 'unknown'}`;
+      
+      console.log(`${LOG_CONFIG.PREFIXES.SLACK} Routing event: ${eventType} (${eventKey})`);
+      monitor.recordEvent(eventKey, eventType, {
+        source: 'webhook-handler',
+        channel: parsedBody.event.channel,
+        user: parsedBody.event.user,
+        timestamp: parsedBody.event.ts
+      });
+      
       return await this.eventsHandler.handleEvent(context, ctx);
     }
 
     // Handle Slack commands
     if (parsedBody.command) {
+      const commandKey = `command:${parsedBody.command}:${parsedBody.user_id}:${Date.now()}`;
+      
+      console.log(`${LOG_CONFIG.PREFIXES.SLACK} Routing command: ${parsedBody.command}`);
+      monitor.recordEvent(commandKey, 'slack_command', {
+        source: 'webhook-handler',
+        command: parsedBody.command,
+        user: parsedBody.user_id,
+        channel: parsedBody.channel_id
+      });
+      
       return await this.commandsHandler.handleCommand(context, ctx);
     }
 
     // Handle Slack interactions (buttons, modals, etc.)
     if (parsedBody.type === 'interactive_message' || parsedBody.type === 'block_actions') {
+      const interactionKey = `interaction:${parsedBody.type}:${parsedBody.user?.id || 'unknown'}:${Date.now()}`;
+      
+      console.log(`${LOG_CONFIG.PREFIXES.SLACK} Routing interaction: ${parsedBody.type}`);
+      monitor.recordEvent(interactionKey, 'slack_interaction', {
+        source: 'webhook-handler',
+        interactionType: parsedBody.type,
+        user: parsedBody.user?.id,
+        channel: parsedBody.channel?.id
+      });
+      
       return await this.interactionsHandler.handleInteraction(context, ctx);
     }
 

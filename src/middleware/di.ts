@@ -40,6 +40,7 @@ import { ClickUpService } from '../services/integrations/clickup/api/service';
 import { SlackService } from '../services/integrations/slack';
 import { AIService } from '../services/ai/ai-service';
 import { OAuthService } from '../services/integrations/clickup/oauth/oauth.service';
+import { IAIService, IZendeskService, IClickUpService } from '../interfaces/service-interfaces';
 
 /**
  * Extended context with services
@@ -109,8 +110,20 @@ async function initializeServices(env: Env): Promise<Services> {
       services.oauth = new OAuthService(env);
     }
 
+    // Configure Slack service with external services for natural language processing
+    if (services.slack) {
+      const externalServices: {
+        ai?: IAIService;
+        zendesk?: IZendeskService;
+        clickup?: IClickUpService;
+      } = {};
 
-    
+      if (services.ai) externalServices.ai = services.ai;
+      if (services.zendesk) externalServices.zendesk = services.zendesk;
+      if (services.clickup) externalServices.clickup = services.clickup;
+
+      services.slack.setExternalServices(externalServices);
+    }
 
     // Cache the initialized services
     serviceCache.set(cacheKey, services);

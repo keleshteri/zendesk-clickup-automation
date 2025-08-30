@@ -20,7 +20,7 @@ import type { SlackAppMentionEvent } from '../interfaces/slack-app-mention-event
 import type { SlackMemberJoinedChannelEvent } from '../interfaces/slack-member-joined-channel-event.interface';
 import type { SlackMessageEvent } from '../interfaces/slack-message-event.interface';
 import { HTTP_STATUS, LOG_CONFIG } from '../../../../config';
-import { formatSuccessResponse } from '../../../../utils';
+import { formatSuccessResponse, getEventDeduplicationService, withProcessingLock, getDuplicateEventMonitor } from '../../../../utils';
 import type { ExecutionContext } from '@cloudflare/workers-types';
 
 /**
@@ -78,21 +78,86 @@ export class SlackEventsHandler {
   private async handleAppMention(event: SlackAppMentionEvent, _context: RequestContext, ctx?: ExecutionContext): Promise<Response> {
     console.log(`${LOG_CONFIG.PREFIXES.SLACK} App mention from user ${event.user} in channel ${event.channel}`);
     
+    // Check for duplicate events using deduplication service
+    const deduplicationService = getEventDeduplicationService();
+    const monitor = getDuplicateEventMonitor();
+    const eventId = event.ts;
+    const eventType = 'app_mention';
+    const eventKey = `app_mention:${eventId}:${event.channel}:${event.user}`;
+    
+    if (deduplicationService.isEventProcessed(eventId, eventType, { 
+      channel: event.channel, 
+      user: event.user 
+    })) {
+      console.log(`${LOG_CONFIG.PREFIXES.SLACK} Duplicate app mention detected, skipping processing: ${eventId}`);
+      monitor.recordDuplicate(eventKey, 'app_mention', 'deduplication', {
+        channel: event.channel,
+        user: event.user,
+        timestamp: event.ts
+      });
+      return this.createSuccessResponse({ 
+        message: 'Duplicate event ignored',
+        eventId: eventId,
+        duplicate: true
+      });
+    }
+    
     try {
-      // Process app mention event using SlackService
-      const mentionPromise = this.options.slackService.handleMention(event);
-      
-      if (ctx) {
-        ctx.waitUntil(mentionPromise);
-      } else {
-        await mentionPromise;
-      }
+      // Use processing lock to prevent concurrent handling of the same event
+      await withProcessingLock(eventKey, async () => {
+        // Double-check deduplication inside the lock
+        if (deduplicationService.isEventProcessed(eventId, eventType, {
+          channel: event.channel,
+          user: event.user
+        })) {
+          console.log(`${LOG_CONFIG.PREFIXES.SLACK} Event already processed during lock acquisition: ${eventKey}`);
+          monitor.recordDuplicate(eventKey, 'app_mention', 'processing-lock', {
+            channel: event.channel,
+            user: event.user,
+            timestamp: event.ts
+          });
+          return;
+        }
+        
+        // Mark event as being processed
+        deduplicationService.markEventProcessed(eventId, eventType, {
+          channel: event.channel,
+          user: event.user
+        });
+        
+        // Record successful event processing
+        monitor.recordEvent(eventKey, 'app_mention', {
+          channel: event.channel,
+          user: event.user,
+          timestamp: event.ts
+        });
+        
+        // Process app mention event using SlackService
+        const mentionPromise = this.options.slackService.handleMention(event);
+        
+        if (ctx) {
+          ctx.waitUntil(mentionPromise);
+        } else {
+          await mentionPromise;
+        }
+      }, 30000); // 30 second timeout for processing
       
       return this.createSuccessResponse({ 
         message: 'App mention processed',
-        eventId: event.ts
+        eventId: eventId
       });
     } catch (error) {
+      if (error instanceof Error && error.message?.includes('Failed to acquire processing lock')) {
+        console.log(`${LOG_CONFIG.PREFIXES.SLACK} Event already being processed: ${eventKey}`);
+        monitor.recordDuplicate(eventKey, 'app_mention', 'processing-lock', {
+          channel: event.channel,
+          user: event.user,
+          timestamp: event.ts,
+          reason: 'lock_acquisition_failed'
+        });
+        return this.createSuccessResponse({ message: 'Event already being processed' });
+      }
+      
       console.error(`${LOG_CONFIG.PREFIXES.SLACK} App mention processing error:`, error);
       return this.createSuccessResponse({ message: 'App mention acknowledged' });
     }

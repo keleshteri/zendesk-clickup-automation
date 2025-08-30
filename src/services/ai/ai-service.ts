@@ -173,7 +173,10 @@ export class AIService {
       console.log('🤖 Generating AI response...');
       console.log(`📝 Prompt length: ${prompt.length} characters`);
       
-      const result = await this.model.generateContent(prompt);
+      // Enhance prompt with TaskGenie context and 2dc team information
+      const enhancedPrompt = this.enhancePromptWithContext(prompt);
+      
+      const result = await this.model.generateContent(enhancedPrompt);
       const response = await result.response;
       const text = response.text();
       
@@ -201,6 +204,37 @@ export class AIService {
       
       throw new Error(`AI response generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Enhance user prompts with TaskGenie context and 2dc team information
+   * @param userPrompt - The original user prompt
+   * @returns Enhanced prompt with proper context
+   */
+  private enhancePromptWithContext(userPrompt: string): string {
+    const contextualPrompt = `You are TaskGenie, an AI assistant for the 2dc team's support and development operations.
+
+CONTEXT:
+- You are part of the 2dc team's automated workflow system
+- You help with Zendesk ticket management, ClickUp task creation, and team coordination
+- You have access to Zendesk tickets, ClickUp tasks, and team processes
+- You should provide helpful, accurate, and actionable responses
+- When discussing tickets or tasks, reference specific IDs when available
+- Be concise but thorough in your responses
+- If you need more information to provide a complete answer, ask specific questions
+
+TEAM CONTEXT:
+- 2dc team handles WordPress development, technical support, and client services
+- Common tools: Zendesk (support tickets), ClickUp (project management), Slack (communication)
+- Focus areas: WordPress plugins/themes, technical troubleshooting, client support
+- Team values efficiency, clear communication, and proactive problem-solving
+
+USER QUERY:
+${userPrompt}
+
+Please provide a helpful response as TaskGenie, keeping the 2dc team context in mind. Be specific and actionable in your recommendations.`;
+
+    return contextualPrompt;
   }
 
   // Generate AI responses with token usage tracking
@@ -703,5 +737,175 @@ ${analysis.action_items.map(item => `- ${item}`).join('\n')}
       alerts: [],
       recommendations: ['Review ticket trends and adjust team capacity as needed']
     };
+  }
+
+  /**
+   * Classify user intent from natural language queries
+   * @param query - The user's natural language query
+   * @returns Promise resolving to classified intent with confidence and entities
+   */
+  async classifyIntent(query: string): Promise<{
+    intent: 'zendesk_query' | 'zendesk_action' | 'clickup_create' | 'clickup_query' | 'general';
+    confidence: number;
+    entities: Array<{ type: string; value: string; }>;
+  }> {
+    if (!this.provider || !this.model) {
+      throw new Error('AI service not properly initialized');
+    }
+
+    try {
+      const prompt = `You are TaskGenie, an AI assistant for the 2dc team. Analyze this user query and classify the intent.
+
+USER QUERY: "${query}"
+
+Classify the intent and extract entities. Respond with ONLY a JSON object in this format:
+{
+  "intent": "zendesk_query|zendesk_action|clickup_create|clickup_query|general",
+  "confidence": 0.95,
+  "entities": [
+    {"type": "ticket_id", "value": "12345"},
+    {"type": "action", "value": "status"},
+    {"type": "keyword", "value": "urgent"}
+  ]
+}
+
+Intent Guidelines:
+- zendesk_query: Asking about ticket status, details, or searching tickets
+- zendesk_action: Requesting to update, close, or modify tickets
+- clickup_create: Requesting to create tasks or projects
+- clickup_query: Asking about task status, project details
+- general: General questions, greetings, or unclear requests
+
+Entity Types:
+- ticket_id: Zendesk ticket numbers
+- task_id: ClickUp task IDs
+- action: Actions like "status", "update", "close", "create"
+- priority: Priority levels like "urgent", "high", "low"
+- keyword: Important keywords related to the request`;
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      try {
+        // Clean and parse the JSON response
+        const cleanedResponse = this.cleanAIResponse(text);
+        const classification = JSON.parse(cleanedResponse);
+
+        // Validate and return the classification
+        return {
+          intent: this.validateIntent(classification.intent) || 'general',
+          confidence: typeof classification.confidence === 'number' ? 
+            Math.max(0, Math.min(1, classification.confidence)) : 0.5,
+          entities: Array.isArray(classification.entities) ? classification.entities : []
+        };
+      } catch (parseError) {
+        console.warn('Failed to parse intent classification:', parseError);
+        // Fallback classification based on keywords
+        return this.createFallbackClassification(query);
+      }
+    } catch (error) {
+      console.error('Intent classification error:', error);
+      return this.createFallbackClassification(query);
+    }
+  }
+
+  /**
+   * Validate intent classification result
+   */
+  private validateIntent(intent: any): 'zendesk_query' | 'zendesk_action' | 'clickup_create' | 'clickup_query' | 'general' | null {
+    const validIntents = ['zendesk_query', 'zendesk_action', 'clickup_create', 'clickup_query', 'general'];
+    return validIntents.includes(intent) ? intent : null;
+  }
+
+  /**
+   * Create fallback classification when AI parsing fails
+   */
+  private createFallbackClassification(query: string): {
+    intent: 'zendesk_query' | 'zendesk_action' | 'clickup_create' | 'clickup_query' | 'general';
+    confidence: number;
+    entities: Array<{ type: string; value: string; }>;
+  } {
+    const lowerQuery = query.toLowerCase();
+    const entities: Array<{ type: string; value: string; }> = [];
+
+    // Extract ticket IDs
+    const ticketMatch = query.match(/\b(?:ticket|#)\s*(\d+)\b/i);
+    if (ticketMatch) {
+      entities.push({ type: 'ticket_id', value: ticketMatch[1] });
+    }
+
+    // Extract task IDs
+    const taskMatch = query.match(/\b(?:task|clickup)\s*(?:id)?\s*(\w+)\b/i);
+    if (taskMatch) {
+      entities.push({ type: 'task_id', value: taskMatch[1] });
+    }
+
+    // Determine intent based on keywords
+    if (lowerQuery.includes('ticket') || lowerQuery.includes('zendesk')) {
+      if (lowerQuery.includes('status') || lowerQuery.includes('show') || lowerQuery.includes('find')) {
+        return { intent: 'zendesk_query', confidence: 0.7, entities };
+      } else if (lowerQuery.includes('update') || lowerQuery.includes('close') || lowerQuery.includes('assign')) {
+        return { intent: 'zendesk_action', confidence: 0.7, entities };
+      }
+      return { intent: 'zendesk_query', confidence: 0.6, entities };
+    }
+
+    if (lowerQuery.includes('task') || lowerQuery.includes('clickup') || lowerQuery.includes('create')) {
+      if (lowerQuery.includes('create') || lowerQuery.includes('new')) {
+        return { intent: 'clickup_create', confidence: 0.7, entities };
+      }
+      return { intent: 'clickup_query', confidence: 0.6, entities };
+    }
+
+    return { intent: 'general', confidence: 0.5, entities };
+  }
+
+  /**
+   * Generate enhanced AI response with TaskGenie context
+   * @param prompt - The user's natural language query
+   * @returns Promise resolving to contextual AI response
+   */
+  async generateContextualResponse(prompt: string): Promise<string> {
+    if (!this.provider || !this.model) {
+      console.error('❌ AI Service not properly initialized for contextual response');
+      throw new Error('AI service not properly initialized - check GOOGLE_GEMINI_API_KEY');
+    }
+
+    try {
+      console.log('🤖 Generating contextual AI response...');
+      console.log(`📝 Prompt length: ${prompt.length} characters`);
+      
+      // Enhance prompt with TaskGenie context and 2dc team information
+      const enhancedPrompt = this.enhancePromptWithContext(prompt);
+      
+      const result = await this.model.generateContent(enhancedPrompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      console.log('✅ Contextual AI response generated successfully');
+      console.log(`📝 Response length: ${text.length} characters`);
+      
+      return text;
+    } catch (error) {
+      console.error('❌ Contextual AI response generation failed:');
+      console.error('Error details:', error);
+      
+      // Check for specific Google AI errors
+      if (error instanceof Error) {
+        if (error.message.includes('API_KEY')) {
+          console.error('🔑 API Key issue detected - check GOOGLE_GEMINI_API_KEY environment variable');
+          throw new Error('Google Gemini API key is invalid or missing');
+        } else if (error.message.includes('RATE_LIMIT')) {
+          console.error('⏱️ Rate limit exceeded - please try again later');
+          throw new Error('AI service rate limit exceeded');
+        } else if (error.message.includes('QUOTA')) {
+          console.error('💰 Quota exceeded - check your Google AI billing');
+          throw new Error('AI service quota exceeded');
+        }
+      }
+      
+      throw new Error(`Failed to generate contextual response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }

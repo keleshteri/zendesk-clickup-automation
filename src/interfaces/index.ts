@@ -64,3 +64,9 @@ export * from './middleware-interfaces';
 export * from './retry-interfaces';
 export * from './token-calculator-interfaces';
 export * from './utility-interfaces';
+
+// Domain-specific service interfaces
+export * from './ai-interfaces';
+export * from './zendesk-interfaces';
+export * from './clickup-interfaces';
+export * from './service-interfaces';

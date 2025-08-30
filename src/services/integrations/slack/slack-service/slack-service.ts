@@ -24,6 +24,7 @@ import { SlackBotManager } from './slack-bot-manager.service';
 import { SlackSecurityService } from './slack-security.service';
 import { SlackErrorReportingService } from './slack-error-reporting.service';
 import { initializeErrorReporter } from '../utils/slack-error-reporter.util';
+import { IExternalServices } from '../../../../interfaces/service-interfaces';
 
 /**
  * Main Slack service that orchestrates all Slack-related functionality
@@ -525,6 +526,15 @@ export class SlackService {
    */
   setClickUpService(_clickupService: any): void {
     // Legacy method for setting ClickUp service reference
+  }
+
+  /**
+   * Set external services for natural language processing
+   * @param services - Object containing AI, Zendesk, and ClickUp service instances
+   */
+  setExternalServices(services: IExternalServices): void {
+    // Inject services into the event handler for natural language processing
+    this.eventHandler.setServices(services);
   }
 
   /**
