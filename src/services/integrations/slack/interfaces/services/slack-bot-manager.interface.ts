@@ -44,4 +44,11 @@ export interface ISlackBotManager {
    * @returns The bot join tracker object
    */
   getBotJoinTracker(): BotJoinTracker;
+
+  /**
+   * Get bot join data for a specific channel
+   * @param channelId - The channel ID to get data for
+   * @returns Promise that resolves to bot join data or null if not found
+   */
+  getBotJoinData(channelId: string): Promise<any>;
 }

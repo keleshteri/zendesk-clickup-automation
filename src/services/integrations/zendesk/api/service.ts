@@ -468,4 +468,13 @@ export class ZendeskService {
       }
     }
   }
+
+  /**
+   * Get recent tickets from Zendesk
+   * @param limit - Maximum number of tickets to retrieve (default: 25)
+   * @returns Promise that resolves to an array of recent tickets
+   */
+  async getRecentTickets(limit: number = 25): Promise<ZendeskTicket[]> {
+    return this.getTicketsByStatus(['new', 'open', 'pending'], limit);
+  }
 }

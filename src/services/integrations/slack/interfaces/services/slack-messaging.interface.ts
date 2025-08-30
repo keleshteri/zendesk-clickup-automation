@@ -139,6 +139,64 @@ export interface ISlackMessagingService {
   getHelpMessage(): string;
 
   /**
+   * Send a ticket summary message with multiple tickets
+   * @param channel - The channel ID to send the message to
+   * @param tickets - Array of ticket summary items
+   * @param options - Additional options for the summary
+   * @param threadTs - Optional thread timestamp for threaded replies
+   * @returns Promise that resolves to the sent message object
+   */
+  sendTicketSummaryMessage(
+    channel: string,
+    tickets: any[],
+    options?: {
+      title?: string;
+      totalCount?: number;
+      searchQuery?: string;
+      aiInsight?: string;
+      showActions?: boolean;
+    },
+    threadTs?: string
+  ): Promise<any>;
+
+  /**
+   * Send an error message with helpful suggestions
+   * @param channel - The channel ID to send the message to
+   * @param errorType - The type of error that occurred
+   * @param options - Additional error context and options
+   * @param threadTs - Optional thread timestamp for threaded replies
+   * @returns Promise that resolves to the sent message object
+   */
+  sendErrorMessage(
+    channel: string,
+    errorType: 'ticket_not_found' | 'search_failed' | 'api_error' | 'permission_denied' | 'invalid_input' | 'service_unavailable' | 'general_error',
+    options?: {
+      ticketId?: string;
+      searchQuery?: string;
+      errorMessage?: string;
+      suggestions?: string[];
+      showRetryAction?: boolean;
+      showHelpAction?: boolean;
+    },
+    threadTs?: string
+  ): Promise<any>;
+
+  /**
+   * Send a help message with available commands and tips
+   * @param channel - The channel ID to send the message to
+   * @param helpType - The type of help to display
+   * @param userMention - Optional user mention for personalization
+   * @param threadTs - Optional thread timestamp for threaded replies
+   * @returns Promise that resolves to the sent message object
+   */
+  sendHelpMessage(
+    channel: string,
+    helpType?: 'general' | 'ticket_commands' | 'search_tips' | 'troubleshooting',
+    userMention?: string,
+    threadTs?: string
+  ): Promise<any>;
+
+  /**
    * Get the emoji service instance
    * @returns The SlackEmojiService instance
    */

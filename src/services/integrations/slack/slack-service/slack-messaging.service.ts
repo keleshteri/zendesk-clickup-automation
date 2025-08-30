@@ -11,6 +11,7 @@
 
 import { WebClient } from '@slack/web-api';
 import type { Env } from '../../../../types';
+import type { ISlackMessagingService } from '../interfaces';
 import { SlackEmojiService } from './slack-emoji.service';
 import { SlackErrorReportingService } from '../slack-error-reporting';
 import { SlackMessageBuilderService } from './slack-message-builder.service';
@@ -27,8 +28,9 @@ import {
 
 /**
  * Service responsible for all Slack messaging operations
+ * Implements ISlackMessagingService for LSP compliance
  */
-export class SlackMessagingService {
+export class SlackMessagingService implements ISlackMessagingService {
   private client: WebClient;
   private emojiService: SlackEmojiService;
   private errorReportingService?: SlackErrorReportingService;

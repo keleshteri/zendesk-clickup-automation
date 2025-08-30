@@ -18,4 +18,7 @@ export type SlackCommand = {
   command: string;
   args: string[];
   originalText: string;
+  type?: string;
+  ticketId?: string;
+  searchQuery?: string;
 };

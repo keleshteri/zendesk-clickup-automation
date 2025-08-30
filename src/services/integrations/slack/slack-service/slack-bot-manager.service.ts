@@ -23,6 +23,7 @@
 
 import { WebClient } from "@slack/web-api";
 import type { Env } from "../../../../types";
+import type { ISlackBotManager } from "../interfaces";
 import type { BotJoinTracker, PersistentBotJoinData } from "../types";
 import { logSlackError } from "../utils";
 import { SlackMessagingService } from "./slack-messaging.service";
@@ -43,7 +44,7 @@ import { SlackMessagingService } from "./slack-messaging.service";
  * await botManager.handleBotJoinedChannel('C1234567890');
  * ```
  */
-export class SlackBotManager {
+export class SlackBotManager implements ISlackBotManager {
   private client: WebClient;
   private messagingService: SlackMessagingService;
   private env: Env;
@@ -169,52 +170,7 @@ export class SlackBotManager {
     }
   }
 
-  /**
-   * Get bot join data from KV storage
-   * @param channelId - The channel ID to get data for
-   * @returns Promise that resolves to bot join data or null if not found
-   */
-  private async getBotJoinData(
-    channelId: string
-  ): Promise<PersistentBotJoinData | null> {
-    if (!this.env.TASK_MAPPING) {
-      console.warn(
-        "⚠️ KV storage not available - using in-memory tracking only"
-      );
-      const hasChannel = this.botJoinTracker.channelsJoined.has(channelId);
-      const lastJoinTime = this.botJoinTracker.lastJoinTime.get(channelId);
 
-      if (hasChannel && lastJoinTime) {
-        return {
-          channelId,
-          lastJoinTime,
-          messagesSent: 1,
-          botUserId: this.botUserId || "unknown",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      return null;
-    }
-
-    try {
-      const key = `${this.KV_BOT_JOIN_PREFIX}${channelId}`;
-      const data = await this.env.TASK_MAPPING.get(key);
-
-      if (!data) {
-        return null;
-      }
-
-      return JSON.parse(data) as PersistentBotJoinData;
-    } catch (error: unknown) {
-      logSlackError(
-        error,
-        `SlackBotManager.getBotJoinData(${channelId})`,
-        "retrieving bot join data"
-      );
-      return null;
-    }
-  }
 
   /**
    * Store bot join data to KV storage
@@ -304,13 +260,51 @@ export class SlackBotManager {
   }
 
   /**
-   * Get the bot join tracker instance
-   * @returns The current BotJoinTracker object
+   * Get the current bot join tracker data
+   * @returns The bot join tracker object
    */
   getBotJoinTracker(): BotJoinTracker {
     return this.botJoinTracker;
   }
 
+  /**
+   * Get bot join data for a specific channel
+   * @param channelId - The channel ID to get data for
+   * @returns Promise that resolves to bot join data or null if not found
+   */
+  public async getBotJoinData(channelId: string): Promise<PersistentBotJoinData | null> {
+    if (!this.env.TASK_MAPPING) {
+      console.warn(
+        "⚠️ KV storage not available - using in-memory tracking only"
+      );
+      const hasChannel = this.botJoinTracker.channelsJoined.has(channelId);
+      const lastJoinTime = this.botJoinTracker.lastJoinTime.get(channelId);
+
+      if (hasChannel && lastJoinTime) {
+        return {
+          channelId,
+          lastJoinTime,
+          messagesSent: 1,
+          botUserId: this.botUserId || 'unknown',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return null;
+    }
+
+    try {
+      const key = `${this.KV_BOT_JOIN_PREFIX}${channelId}`;
+      const stored = await this.env.TASK_MAPPING.get(key);
+      return stored ? JSON.parse(stored) : null;
+    } catch (error) {
+      console.error(
+        `❌ Error retrieving bot join data for channel ${channelId}:`,
+        error
+      );
+      return null;
+    }
+  }
 
   // These methods were not being used anywhere in the codebase and can be re-added if needed
 }

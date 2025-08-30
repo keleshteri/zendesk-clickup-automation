@@ -36,6 +36,12 @@ export interface ISlackSecurityService {
   verifyRequestWithAudit(signature: string, body: string, timestamp: string): Promise<boolean>;
 
   /**
+   * Perform security audit operations
+   * @returns Promise that resolves when audit is complete
+   */
+  auditSecurity(): Promise<void>;
+
+  /**
    * Get security metrics and statistics
    * @returns Promise that resolves to security metrics object
    */

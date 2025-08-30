@@ -329,6 +329,39 @@ export class AIService {
   }
 
   /**
+   * Extract intent from natural language text with context
+   * @param text - The text to analyze
+   * @param context - Additional context for intent extraction
+   * @returns Promise resolving to extracted intent
+   */
+  async extractIntent(text: string, context?: any): Promise<any> {
+    const operation = this.performanceMonitor.startOperation('extractIntent');
+    
+    try {
+      if (!this.isAvailable()) {
+        return this.createFallbackIntent(text);
+      }
+
+      const prompt = this.buildIntentExtractionPrompt(text, context);
+      
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const responseText = response.text();
+
+      const intent = this.parseIntentExtractionResponse(responseText, text);
+      
+      this.performanceMonitor.endOperation(operation, true);
+      return intent;
+      
+    } catch (error) {
+      this.performanceMonitor.endOperation(operation, false, {
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
+      return this.createFallbackIntent(text);
+    }
+  }
+
+  /**
    * Generate contextual AI response
    */
   async generateContextualResponse(prompt: string): Promise<string> {
@@ -569,6 +602,54 @@ export class AIService {
     }
 
     return { intent: 'general', confidence: 0.5, entities };
+  }
+
+  /**
+   * Create fallback intent when AI is unavailable
+   */
+  private createFallbackIntent(text: string): any {
+    return {
+      intent: 'general',
+      confidence: 0.1,
+      entities: [],
+      text: text
+    };
+  }
+
+  /**
+   * Build prompt for intent extraction
+   */
+  private buildIntentExtractionPrompt(text: string, context?: any): string {
+    let prompt = `Extract the intent from the following text:\n\n"${text}"\n\n`;
+    
+    if (context) {
+      prompt += `Context: ${JSON.stringify(context)}\n\n`;
+    }
+    
+    prompt += `Please identify the main intent, confidence level (0-1), and any relevant entities.\n`;
+    prompt += `Return the result as JSON with fields: intent, confidence, entities, summary.`;
+    
+    return prompt;
+  }
+
+  /**
+   * Parse intent extraction response
+   */
+  private parseIntentExtractionResponse(responseText: string, originalText: string): any {
+    try {
+      // Try to parse as JSON first
+      const parsed = JSON.parse(responseText);
+      return parsed;
+    } catch {
+      // Fallback to simple parsing
+      return {
+        intent: 'general',
+        confidence: 0.5,
+        entities: [],
+        summary: responseText.substring(0, 100),
+        originalText: originalText
+      };
+    }
   }
 
   private generateBasicSummary(ticketContent: string): string {

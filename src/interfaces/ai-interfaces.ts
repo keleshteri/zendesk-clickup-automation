@@ -93,6 +93,14 @@ export interface IAIService {
   }>;
 
   /**
+   * Extract intent from natural language text with context
+   * @param text - The text to analyze
+   * @param context - Additional context for intent extraction
+   * @returns Promise resolving to extracted intent
+   */
+  extractIntent(text: string, context?: any): Promise<any>;
+
+  /**
    * Generate enhanced AI response with TaskGenie context
    * @param prompt - The user's natural language query
    * @returns Promise resolving to contextual AI response

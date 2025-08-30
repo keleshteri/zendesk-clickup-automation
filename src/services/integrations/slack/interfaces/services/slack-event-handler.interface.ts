@@ -17,6 +17,7 @@ import type {
   SlackMemberJoinedChannelEvent
 } from '..';
 import type { SlackEventType } from '../../types';
+import type { IExternalServices } from '../../../../../interfaces/service-interfaces';
 
 /**
  * Interface for Slack event handler operations
@@ -85,4 +86,10 @@ export interface ISlackEventHandler {
    * @returns Promise that resolves when handling is complete
    */
   handleAnalyticsRequest(channel: string, user: string, threadTs?: string): Promise<void>;
+
+  /**
+   * Set external services for the event handler
+   * @param services - External services object
+   */
+  setServices(services: IExternalServices): void;
 }

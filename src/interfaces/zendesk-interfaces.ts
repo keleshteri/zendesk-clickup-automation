@@ -83,6 +83,19 @@ export interface IZendeskService {
    * @returns Promise resolving to array of matching tickets
    */
   searchTickets?(query: string, limit?: number): Promise<ZendeskTicket[]>;
+
+  /**
+   * Get analytics data for tickets
+   * @returns Promise resolving to analytics data
+   */
+  getAnalytics?(): Promise<any>;
+
+  /**
+   * Get recent tickets from Zendesk
+   * @param limit - Maximum number of tickets to retrieve
+   * @returns Promise that resolves to an array of recent tickets
+   */
+  getRecentTickets?(limit: number): Promise<any[]>;
 }
 
 /**

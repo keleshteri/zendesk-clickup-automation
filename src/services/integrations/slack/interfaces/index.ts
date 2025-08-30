@@ -9,12 +9,16 @@
  * @dependencies: ["./slack-service.interface", "./slack-messaging.interface", "./slack-bot-manager.interface", "./slack-event-handler.interface", "./slack-security.interface", "./slack-event.interface", "./slack-app-mention-event.interface", "./slack-member-joined-channel-event.interface", "./slack-message-event.interface", "./slack-error.interface", "./slack-error-reporting.interface"]
  */
 
-// Core service interfaces for dependency injection
+// Core service interfaces
 export * from './services/slack-service.interface';
+export * from './services/slack-service-orchestrator.interface';
 export * from './services/slack-messaging.interface';
 export * from './services/slack-bot-manager.interface';
 export * from './services/slack-event-handler.interface';
 export * from './services/slack-security.interface';
+export * from './services/slack-health-monitor.interface';
+export * from './services/slack-command-handler.interface';
+export * from './services/slack-nlp-processor.interface';
 
 // Event interfaces
 export * from './slack-app-mention-event.interface';

@@ -11,6 +11,7 @@
 
 import { WebClient } from '@slack/web-api';
 import type {
+  ISlackEventHandler,
   SlackAppMentionEvent,
   SlackMemberJoinedChannelEvent
 } from '../interfaces';
@@ -20,15 +21,20 @@ import type {
 } from '../types';
 import { SlackMessagingService } from './slack-messaging.service';
 import { SlackBotManager } from './slack-bot-manager.service';
+import { SlackCommandHandler } from './slack-command-handler.service';
+import { SlackNLPProcessor } from './slack-nlp-processor.service';
 import { IAIService, IZendeskService, IClickUpService, IExternalServices } from '../../../../interfaces/service-interfaces';
 
 /**
  * Service responsible for handling Slack events
+ * Implements ISlackEventHandler for LSP compliance
  */
-export class SlackEventHandler {
+export class SlackEventHandler implements ISlackEventHandler {
   private client: WebClient;
   private messagingService: SlackMessagingService;
   private botManager: SlackBotManager;
+  private commandHandler: SlackCommandHandler;
+  private nlpProcessor: SlackNLPProcessor;
   private aiService?: IAIService;
   private zendeskService?: IZendeskService;
   private clickupService?: IClickUpService;
@@ -54,6 +60,16 @@ export class SlackEventHandler {
     this.aiService = services?.ai;
     this.zendeskService = services?.zendesk;
     this.clickupService = services?.clickup;
+    
+    // Initialize command handler and NLP processor
+    this.commandHandler = new SlackCommandHandler(client, messagingService);
+    this.nlpProcessor = new SlackNLPProcessor(client, messagingService);
+    
+    // Set services if available
+    if (services) {
+      this.commandHandler.setServices(services.ai, services.zendesk, services.clickup);
+      this.nlpProcessor.setServices(services.ai, services.zendesk, services.clickup);
+    }
   }
 
   /**
@@ -64,6 +80,10 @@ export class SlackEventHandler {
     this.aiService = services.ai;
     this.zendeskService = services.zendesk;
     this.clickupService = services.clickup;
+    
+    // Set services for command handler and NLP processor
+    this.commandHandler.setServices(services.ai, services.zendesk, services.clickup);
+    this.nlpProcessor.setServices(services.ai, services.zendesk, services.clickup);
   }
 
   /**
@@ -89,11 +109,45 @@ export class SlackEventHandler {
         return;
       }
 
-      // Parse the command from the mention
-      const command = this.parseSlackCommand(event.text);
+      // Clean the text by removing the bot mention
+      const cleanText = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
       
-      // Handle the command
-      await this.handleSlackCommand(event.channel, event.ts, command, event.user);
+      if (!cleanText) {
+        await this.messagingService.sendMessage(
+          event.channel,
+          '👋 Hi there! How can I help you today? Type "help" to see what I can do.',
+          event.ts
+        );
+        return;
+      }
+      
+      console.log('🧹 Cleaned text:', cleanText);
+      
+      // Check if it's a help query first
+      if (this.nlpProcessor.isHelpQuery(cleanText)) {
+        await this.nlpProcessor.handleDirectHelpQuery(cleanText, event.channel, event.ts, event.user);
+        return;
+      }
+      
+      // Try to parse as a command first
+      const command = this.commandHandler.parseCommand(cleanText);
+      
+      if (command.isCommand) {
+        // Handle as a structured command
+        await this.commandHandler.handleCommand(event.channel, event.ts, command, event.user);
+      } else if (this.nlpProcessor.isNaturalLanguageQuery(cleanText)) {
+        // Handle as natural language query
+        const intent = await this.nlpProcessor.processNaturalLanguageQuery(cleanText, event.user);
+        await this.nlpProcessor.routeNaturalLanguageIntent(intent, event.channel, event.ts, event.user);
+      } else {
+        // Fallback to general help
+        await this.messagingService.sendMessage(
+          event.channel,
+          '🤔 I\'m not sure how to help with that. Type "help" to see what I can do!',
+          event.ts
+        );
+      }
+      
     } catch (error) {
       console.error('Error handling mention:', error);
       await this.messagingService.sendMessage(
@@ -153,486 +207,23 @@ export class SlackEventHandler {
     }
   }
 
-  /**
-   * Check if the text appears to be a natural language query
-   * @param cleanText - The cleaned message text to check
-   * @returns True if the message appears to be a natural language query
-   */
-  private isNaturalLanguageQuery(cleanText: string): boolean {
-    // Patterns that indicate natural language queries
-    const naturalLanguagePatterns = [
-      /show\s+me\s+ticket/,
-      /get\s+(details|info)\s+for\s+ticket/,
-      /what'?s\s+the\s+status\s+of\s+ticket/,
-      /find\s+ticket/,
-      /look\s+up\s+ticket/,
-      /display\s+ticket/,
-      /ticket\s*#?\d+/,
-      /show\s+(recent|latest)\s+tickets/,
-      /list\s+(urgent|high\s+priority)\s+tickets/,
-      /create\s+(task|ticket)/,
-      /make\s+a\s+(task|ticket)/,
-      // Help and search-related queries
-      /how\s+(do\s+i|to)\s+search\s+(for\s+)?tickets?/,
-      /how\s+(do\s+i|to)\s+(find|look\s+up)\s+tickets?/,
-      /how\s+(do\s+i|to)\s+use\s+(this|the\s+bot)/,
-      /what\s+can\s+(i|you)\s+do/,
-      /search\s+(for\s+)?tickets?/,
-      /find\s+tickets?/,
-      /help\s+(with\s+)?(searching|finding)\s+tickets?/,
-      /show\s+me\s+how\s+to/,
-      /what\s+commands\s+(are\s+)?available/
-    ];
-    
-    return naturalLanguagePatterns.some(pattern => pattern.test(cleanText));
-  }
 
-  /**
-   * Handle natural language queries using AI service
-   * @param channel - The channel ID where the query was issued
-   * @param threadTs - The thread timestamp for replies
-   * @param originalText - The original message text
-   * @param user - The user ID who issued the query
-   * @returns Promise that resolves when query is handled
-   */
-  private async handleNaturalLanguageQuery(
-    channel: string,
-    threadTs: string,
-    originalText: string,
-    user: string
-  ): Promise<void> {
-    try {
-      // Remove bot mentions from the text for processing
-      const cleanText = originalText.replace(/<@U[A-Z0-9]+>/g, '').trim().toLowerCase();
-      
-      // Check for help-related queries first (fallback mechanism)
-      if (this.isHelpQuery(cleanText)) {
-        console.log(`Detected help query: "${originalText}"`);
-        await this.handleDirectHelpQuery(cleanText, channel, threadTs, user);
-        return;
-      }
-      
-      // Get AI service from the service container
-      const aiService = this.getAIService();
-      
-      if (!aiService) {
-        console.warn('AI service not available for natural language processing');
-        await this.messagingService.sendErrorMessage(
-           channel,
-           'service_unavailable',
-           {
-             errorMessage: 'Natural language processing is currently unavailable.',
-             suggestions: ['Please try using specific commands like `help` to see available options.'],
-             showHelpAction: true
-           },
-           threadTs
-         );
-        return;
-      }
 
-      console.log(`Processing natural language query from user ${user}: "${originalText}"`);
-      
-      // Classify user intent using AI
-      const nlpResponse = await aiService.classifyIntent(cleanText);
-      const { intent, confidence, entities } = nlpResponse;
-      
-      console.log(`Intent classified: ${intent} (confidence: ${confidence})`);
-      console.log(`Entities found:`, JSON.stringify(entities, null, 2));
-      console.log(`Original text: "${originalText}", Clean text: "${cleanText}"`);
-      
-      
-      // Handle low confidence responses with fallback help detection
-      if (confidence < 0.6) {
-        // Check again for help queries in case AI missed it
-        if (this.isHelpQuery(cleanText)) {
-          await this.handleDirectHelpQuery(cleanText, channel, threadTs, user);
-          return;
-        }
-        
-        await this.messagingService.sendMessage(
-          channel,
-          "I'm not sure I understand. You can try using specific commands like `help` to see available options, or be more specific about what you're looking for.",
-          threadTs
-        );
-        return;
-      }
-      
-      // Route to appropriate handler based on intent
-       await this.routeNaturalLanguageIntent({ intent, confidence, entities, originalText }, channel, threadTs, user);
-       
-     } catch (error) {
-       console.error('Error processing natural language query:', error);
-       
-       // Final fallback - check for help queries even in error cases
-       const cleanText = originalText.replace(/<@U[A-Z0-9]+>/g, '').trim().toLowerCase();
-       if (this.isHelpQuery(cleanText)) {
-         await this.handleDirectHelpQuery(cleanText, channel, threadTs, user);
-         return;
-       }
-       
-       await this.messagingService.sendMessage(
-         channel,
-         'Sorry, I encountered an error processing your request. Please try again or use `help` to see available commands.',
-         threadTs
-       );
-     }
-   }
 
-   /**
-    * Get the AI service instance
-    * @returns The AI service instance or undefined if not available
-    */
-   private getAIService(): IAIService | undefined {
-     return this.aiService;
-   }
 
-   /**
-    * Route natural language intent to appropriate handler
-    * @param intent - The classified user intent
-    * @param channel - The channel ID
-    * @param threadTs - The thread timestamp
-    * @param user - The user ID
-    */
-   private async routeNaturalLanguageIntent(
-     intent: any,
-     channel: string,
-     threadTs: string,
-     user: string
-   ): Promise<void> {
-     try {
-       switch (intent.intent) {
-          case 'zendesk_query':
-            await this.handleZendeskNaturalLanguage(intent, channel, threadTs);
-            break;
-            
-          case 'zendesk_action':
-            await this.handleZendeskActionNaturalLanguage(intent, channel, threadTs);
-            break;
-            
-          case 'clickup_create':
-            await this.handleClickUpCreateNaturalLanguage(intent, channel, threadTs);
-            break;
-            
-          case 'clickup_query':
-            await this.handleClickUpQueryNaturalLanguage(intent, channel, threadTs);
-            break;
-            
-          case 'help':
-          case 'help_search':
-          case 'help_general':
-            await this.handleHelpNaturalLanguage(intent, channel, threadTs);
-            break;
-            
-          case 'general':
-            await this.handleGeneralNaturalLanguage(intent, channel, threadTs);
-            break;
-            
-          default:
-            console.log(`Unhandled intent category: ${intent.intent}`);
-            await this.messagingService.sendMessage(
-              channel,
-              "I understand your message but I'm not sure how to help with that. Try using `help` to see available commands.",
-              threadTs
-            );
-       }
-     } catch (error) {
-       console.error('Error routing natural language intent:', error);
-       await this.messagingService.sendMessage(
-         channel,
-         'Sorry, I encountered an error processing your request. Please try again.',
-         threadTs
-       );
-     }
-   }
 
-   /**
-    * Handle Zendesk queries from natural language
-    */
-   private async handleZendeskNaturalLanguage(intent: any, channel: string, threadTs: string): Promise<void> {
-     if (!this.zendeskService) {
-       await this.messagingService.sendErrorMessage(
-         channel,
-         'service_unavailable',
-         {
-           errorMessage: 'Zendesk service is not available.',
-           suggestions: ['Please try again later or contact support.'],
-           showRetryAction: true
-         },
-         threadTs
-       );
-       return;
-     }
 
-     try {
-       const { entities } = intent;
-       
-       if (entities?.find(e => e.type === 'ticket_id' || e.type === 'ticketId')) {
-         // Query specific ticket
-         const ticketIdEntity = entities.find(e => e.type === 'ticket_id' || e.type === 'ticketId');
-         const ticketId = ticketIdEntity ? parseInt(ticketIdEntity.value) : null;
-         
-         if (ticketId) {
-           const ticket = await this.zendeskService.getTicket(ticketId);
-           
-           if (ticket) {
-             // Use the intelligent notification method for ticket information
-             await this.messagingService.sendIntelligentNotification(
-               channel,
-               {
-                 id: ticket.id.toString(),
-                 subject: ticket.subject,
-                 status: ticket.status,
-                 priority: ticket.priority,
-                 assignee: 'Unassigned', // TODO: Fetch assignee name from assignee_id
-                 requester: {
-                   name: 'Unknown', // TODO: Fetch requester name from requester_id
-                   email: 'unknown@example.com' // TODO: Fetch requester email from requester_id
-                 },
-                 createdAt: ticket.created_at,
-                 updatedAt: ticket.updated_at,
-                 description: ticket.description || 'No description available',
-                 tags: ticket.tags || [],
-                 url: ticket.url
-               },
-               { isUpdate: false, previousData: null },
-               threadTs
-             );
-           } else {
-             // Use error message template for ticket not found
-             await this.messagingService.sendErrorMessage(
-               channel,
-               'ticket_not_found',
-               {
-                 ticketId: ticketId.toString(),
-                 errorMessage: `No Zendesk ticket matching ID ${ticketId} was found.`,
-                 suggestions: ['Please verify the ticket ID and try again.'],
-                 showRetryAction: true
-               },
-               threadTs
-             );
-           }
-         }
-       } else {
-         // General ticket query
-         const tickets = await this.zendeskService.searchTickets?.('') || [];
-         
-         if (tickets.length > 0) {
-           // Use ticket summary template for multiple tickets
-           const ticketSummaries = tickets.slice(0, 5).map(ticket => ({
-             id: ticket.id.toString(),
-             subject: ticket.subject,
-             status: ticket.status,
-             priority: ticket.priority,
-             requester: 'Unknown', // TODO: Fetch requester name from requester_id
-             assignee: 'Unassigned', // TODO: Fetch assignee name from assignee_id
-             createdAt: ticket.created_at,
-             url: ticket.url
-           }));
-           
-           await this.messagingService.sendTicketSummaryMessage(
-             channel,
-             ticketSummaries,
-             {
-               totalCount: tickets.length,
-               title: 'Recent Tickets',
-               searchQuery: 'recent tickets'
-             },
-             threadTs
-           );
-         } else {
-           await this.messagingService.sendErrorMessage(
-             channel,
-             'search_failed',
-             {
-               searchQuery: 'recent tickets',
-               errorMessage: 'No tickets were found matching your query.',
-               suggestions: ['Try creating a new ticket or check if there are any filters applied.'],
-               showHelpAction: true
-             },
-             threadTs
-           );
-         }
-       }
-     } catch (error) {
-       console.error('❌ Error handling Zendesk query:', error);
-       
-       // Provide more specific error messages based on error type
-       let errorMessage = 'Sorry, I encountered an error while querying Zendesk. Please try again or use specific commands.';
-       
-       if (error instanceof Error) {
-         console.error('Error details:', {
-           message: error.message,
-           stack: error.stack,
-           name: error.name
-         });
-         
-         // Check for specific AI service errors
-         if (error.message.includes('AI service not properly initialized')) {
-           errorMessage = '🤖 AI service is not properly configured. Please contact the administrator.';
-           console.error('🚨 AI Service Configuration Issue: Check GOOGLE_GEMINI_API_KEY environment variable');
-         } else if (error.message.includes('API key')) {
-           errorMessage = '🔑 AI service authentication failed. Please contact the administrator.';
-           console.error('🚨 AI Service Authentication Issue: Invalid or missing API key');
-         } else if (error.message.includes('rate limit')) {
-           errorMessage = '⏱️ AI service is temporarily busy. Please try again in a moment.';
-           console.error('🚨 AI Service Rate Limit: Too many requests');
-         } else if (error.message.includes('quota')) {
-           errorMessage = '💰 AI service quota exceeded. Please contact the administrator.';
-           console.error('🚨 AI Service Quota Issue: Usage limits exceeded');
-         } else if (error.message.includes('generateContextualResponse is not a function')) {
-           errorMessage = '🔧 AI service method not available. Please contact the administrator.';
-           console.error('🚨 AI Service Method Missing: generateContextualResponse method not implemented');
-         }
-       }
-       
-       await this.messagingService.sendMessage(
-         channel,
-         errorMessage,
-         threadTs
-       );
-     }
-   }
 
-   /**
-    * Handle other natural language categories with basic responses
-    */
-   private async handleZendeskActionNaturalLanguage(intent: any, channel: string, threadTs: string): Promise<void> {
-     await this.messagingService.sendMessage(
-       channel,
-       'I understand you want to perform a Zendesk action. Please use specific commands like `help` for available options.',
-       threadTs
-     );
-   }
 
-   private async handleClickUpCreateNaturalLanguage(intent: any, channel: string, threadTs: string): Promise<void> {
-     await this.messagingService.sendMessage(
-       channel,
-       'I understand you want to create a ClickUp task. Please use specific commands like `help` for available options.',
-       threadTs
-     );
-   }
 
-   private async handleClickUpQueryNaturalLanguage(intent: any, channel: string, threadTs: string): Promise<void> {
-     await this.messagingService.sendMessage(
-       channel,
-       'I understand you want to query ClickUp. Please use specific commands like `help` for available options.',
-       threadTs
-     );
-   }
 
-   private async handleGeneralNaturalLanguage(intent: any, channel: string, threadTs: string): Promise<void> {
-     await this.messagingService.sendMessage(
-       channel,
-       'Hello! I can help you with Zendesk tickets and ClickUp tasks. Try asking me something like "Show me ticket #12345" or use `help` for available commands.',
-       threadTs
-     );
-   }
 
-   /**
-     * Check if a query is help-related (fallback detection)
-     * @param cleanText - The cleaned text to check
-     * @returns True if the query appears to be help-related
-     */
-    private isHelpQuery(cleanText: string): boolean {
-      // First check if this is an actual search command with a query
-      const searchCommandPattern = /^search\s+tickets?\s+.+/;
-      if (searchCommandPattern.test(cleanText)) {
-        return false; // This is an actual search command, not a help query
-      }
-      
-      const helpPatterns = [
-        /how\s+(do\s+i|to)\s+search\s+(for\s+)?tickets?/,
-        /how\s+(do\s+i|to)\s+(find|look\s+up)\s+tickets?/,
-        /how\s+(do\s+i|to)\s+use\s+(this|the\s+bot)/,
-        /what\s+can\s+(i|you)\s+do/,
-        /^search\s+(for\s+)?tickets?$/,  // Only "search tickets" without query is help
-        /^find\s+tickets?$/,            // Only "find tickets" without query is help
-        /help\s+(with\s+)?(searching|finding)\s+tickets?/,
-        /show\s+me\s+how\s+to/,
-        /what\s+commands\s+(are\s+)?available/,
-        /\bhelp\b/,
-        /how\s+does\s+(this|it)\s+work/,
-        /what\s+(can|should)\s+i\s+(do|ask)/
-      ];
-      
-      return helpPatterns.some(pattern => pattern.test(cleanText));
-    }
 
-    /**
-     * Handle help queries directly without AI processing
-     * @param cleanText - The cleaned text of the query
-     * @param channel - The channel ID where the query was issued
-     * @param threadTs - The thread timestamp for replies
-     * @returns Promise that resolves when help is provided
-     */
-    private async handleDirectHelpQuery(cleanText: string, channel: string, threadTs: string, user?: string): Promise<void> {
-      let helpType: 'general' | 'ticket_commands' | 'search_tips' | 'troubleshooting' = 'general';
-      
-      // Determine help type based on keywords
-      if (cleanText.includes('search') || cleanText.includes('find')) {
-        helpType = 'search_tips';
-      } else if (cleanText.includes('troubleshoot') || cleanText.includes('problem') || cleanText.includes('issue')) {
-        helpType = 'troubleshooting';
-      } else if (cleanText.includes('command') || cleanText.includes('ticket')) {
-        helpType = 'ticket_commands';
-      }
-      
-      console.log(`Providing direct help with type: ${helpType} for query: "${cleanText}"`);
-      
-      // Create user mention if user ID is provided
-      const userMention = user ? `<@${user}>` : undefined;
-      
-      // Send the appropriate help message
-      await this.messagingService.sendHelpMessage(channel, helpType, userMention, threadTs);
-    }
 
-    /**
-     * Handle help-related natural language queries
-     * @param intent - The classified intent with entities
-     * @param channel - The channel ID where the query was issued
-     * @param threadTs - The thread timestamp for replies
-     * @returns Promise that resolves when help is provided
-     */
-    private async handleHelpNaturalLanguage(intent: any, channel: string, threadTs: string): Promise<void> {
-      const { entities } = intent;
-      
-      // Determine the type of help requested based on entities or intent
-      let helpType: 'general' | 'ticket_commands' | 'search_tips' | 'troubleshooting' = 'general';
-      
-      if (entities && entities.length > 0) {
-        const helpEntity = entities.find((entity: any) => 
-          entity.type === 'help_topic' || 
-          entity.value.includes('search') || 
-          entity.value.includes('find') ||
-          entity.value.includes('ticket')
-        );
-        
-        if (helpEntity) {
-          if (helpEntity.value.includes('search') || helpEntity.value.includes('find')) {
-            helpType = 'search_tips';
-          } else if (helpEntity.value.includes('troubleshoot')) {
-            helpType = 'troubleshooting';
-          } else if (helpEntity.value.includes('ticket') || helpEntity.value.includes('command')) {
-            helpType = 'ticket_commands';
-          }
-        }
-      }
-      
-      // If the original query contains specific keywords, override helpType
-      const originalText = intent.originalText?.toLowerCase() || '';
-      if (originalText.includes('search') || originalText.includes('find')) {
-        helpType = 'search_tips';
-      } else if (originalText.includes('troubleshoot')) {
-        helpType = 'troubleshooting';
-      } else if (originalText.includes('command')) {
-        helpType = 'ticket_commands';
-      }
-      
-      console.log(`Providing help with type: ${helpType}`);
-      
-      // Send the appropriate help message
-      await this.messagingService.sendHelpMessage(channel, helpType, threadTs);
-    }
+
+
+
+
 
   /**
    * Check if the text contains a direct mention of the bot
@@ -648,149 +239,9 @@ export class SlackEventHandler {
     return mentionPatterns.some(pattern => pattern.test(text));
   }
 
-  /**
-   * Parse Slack command from mention text
-   * @param text - The message text to parse
-   * @returns Parsed SlackCommand object with action and parameters
-   */
-  private parseSlackCommand(text: string): SlackCommand {
-    // Remove bot mentions and clean up text
-    const cleanText = text
-      .replace(/<@U[A-Z0-9]+>/g, '')
-      .trim()
-      .toLowerCase();
 
-    // Parse different command types
-    if (cleanText.includes('help')) {
-      return { isCommand: true, command: 'help', args: [], originalText: text };
-    } else if (cleanText.includes('search tickets')) {
-      // Extract search query after 'search tickets'
-      const searchMatch = cleanText.match(/search\s+tickets\s+(.+)/);
-      const searchQuery = searchMatch ? searchMatch[1].trim() : '';
-      return { isCommand: true, command: 'search_tickets', args: [searchQuery], originalText: text };
-    } else if (cleanText.includes('list tickets')) {
-      return { isCommand: true, command: 'list_tickets', args: [], originalText: text };
-    } else if (cleanText.includes('summarize ticket')) {
-      const ticketMatch = cleanText.match(/ticket\s*#?(\d+)/);
-      const args = ticketMatch ? ['ticket', ticketMatch[1]] : ['ticket'];
-      return { isCommand: true, command: 'summarize_ticket', args, originalText: text };
-    } else if (cleanText.includes('status ticket')) {
-      const ticketMatch = cleanText.match(/ticket\s*#?(\d+)/);
-      const args = ticketMatch ? ['ticket', ticketMatch[1]] : ['ticket'];
-      return { isCommand: true, command: 'status_ticket', args, originalText: text };
-    } else if (cleanText.includes('analytics')) {
-      return { isCommand: true, command: 'analytics', args: [], originalText: text };
-    } else if (this.isNaturalLanguageQuery(cleanText)) {
-      // Route natural language queries to NLP processing
-      return { isCommand: true, command: 'natural_language', args: [], originalText: text };
-    } else {
-      return { isCommand: false, command: 'unknown', args: [], originalText: text };
-    }
-  }
 
-  /**
-   * Handle parsed Slack commands and route to appropriate handlers
-   * @param channel - The channel ID where the command was issued
-   * @param threadTs - The thread timestamp for replies
-   * @param command - The parsed command object
-   * @param user - The user ID who issued the command
-   * @returns Promise that resolves when command is handled
-   */
-  private async handleSlackCommand(
-    channel: string, 
-    threadTs: string, 
-    command: SlackCommand, 
-    _user: string
-  ): Promise<void> {
-    switch (command.command) {
-      case 'help':
-        await this.messagingService.sendHelpMessage(
-          channel,
-          'general',
-          `<@${_user}>`,
-          threadTs
-        );
-        break;
-        
-      case 'list_tickets':
-        await this.handleListTicketsRequest(channel, _user, threadTs);
-        break;
-        
-      case 'search_tickets':
-        const searchQuery = command.args[0]; // Extract search query from args
-        if (searchQuery && searchQuery.trim()) {
-          await this.handleSearchTicketsRequest(channel, searchQuery.trim(), threadTs);
-        } else {
-          await this.messagingService.sendErrorMessage(
-             channel,
-             'invalid_input',
-             {
-               errorMessage: 'Please provide a search query.',
-               suggestions: ['Example: `search tickets password reset`'],
-               showHelpAction: true
-             },
-             threadTs
-           );
-        }
-        break;
-        
-      case 'summarize_ticket':
-        const ticketId = command.args[1]; // Extract ticket ID from args
-        if (ticketId) {
-          await this.handleSummarizeRequest(channel, threadTs, ticketId);
-        } else {
-          await this.messagingService.sendErrorMessage(
-             channel,
-             'invalid_input',
-             {
-               errorMessage: 'Please provide a ticket ID to summarize.',
-               suggestions: ['Example: `summarize ticket #123`'],
-               showHelpAction: true
-             },
-             threadTs
-           );
-        }
-        break;
-        
-      case 'status_ticket':
-        const statusTicketId = command.args[1]; // Extract ticket ID from args
-        if (statusTicketId) {
-          await this.handleStatusRequest(channel, threadTs, statusTicketId);
-        } else {
-          await this.messagingService.sendErrorMessage(
-             channel,
-             'invalid_input',
-             {
-               errorMessage: 'Please provide a ticket ID to check status.',
-               suggestions: ['Example: `status ticket #123`'],
-               showHelpAction: true
-             },
-             threadTs
-           );
-        }
-        break;
-        
-      case 'analytics':
-        await this.handleAnalyticsRequest(channel, _user, threadTs);
-        break;
-        
-      case 'natural_language':
-        await this.handleNaturalLanguageQuery(channel, threadTs, command.originalText, _user);
-        break;
-        
-      default:
-        await this.messagingService.sendErrorMessage(
-           channel,
-           'invalid_input',
-           {
-             errorMessage: `I didn't understand that command.`,
-             suggestions: ['Type `help` to see available commands.'],
-             showHelpAction: true
-           },
-           threadTs
-         );
-    }
-  }
+
 
   /**
    * Handle status request commands

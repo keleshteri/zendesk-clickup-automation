@@ -11,13 +11,15 @@
 
 import { WebClient } from '@slack/web-api';
 import type { Env } from '../../../../types';
+import type { ISlackSecurityService } from '../interfaces';
 import { ErrorSeverity } from '../interfaces/slack-error-reporting.interface';
 // Security types will be defined when needed
 
 /**
  * Service responsible for Slack security, verification, and token management
+ * Implements ISlackSecurityService for LSP compliance
  */
-export class SlackSecurityService {
+export class SlackSecurityService implements ISlackSecurityService {
   private client: WebClient;
   private env: Env;
 
@@ -313,6 +315,16 @@ export class SlackSecurityService {
       console.error('❌ Token validation failed:', error);
       return false;
     }
+  }
+
+  /**
+   * Perform security audit operations
+   * @returns Promise that resolves when audit is complete
+   */
+  async auditSecurity(): Promise<void> {
+    // Placeholder implementation for security auditing
+    console.log('🔍 Performing security audit...');
+    // Add actual security audit logic here
   }
 
   /**
