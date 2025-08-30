@@ -17,7 +17,7 @@ export { SlackMessagingService } from './slack-messaging.service';
 export { SlackEventHandler } from './slack-event-handler.service';
 export { SlackBotManager } from './slack-bot-manager.service';
 export { SlackSecurityService } from './slack-security.service';
-export { SlackErrorReportingService } from './slack-error-reporting.service';
+// Error reporting service is now exported from ../slack-error-reporting
 
 // Default export for backward compatibility
 export { SlackService as default } from './slack-service';

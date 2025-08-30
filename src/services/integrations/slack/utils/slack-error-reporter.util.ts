@@ -9,7 +9,7 @@
  * @dependencies: ["../interfaces/slack-error-reporting.interface.ts", "../slack-service/slack-error-reporting.service.ts"]
  */
 
-import { SlackErrorReportingService } from '../slack-service/slack-error-reporting.service';
+import { SlackErrorReportingService } from '../slack-error-reporting';
 import {
   ErrorSeverity,
   ErrorCategory,

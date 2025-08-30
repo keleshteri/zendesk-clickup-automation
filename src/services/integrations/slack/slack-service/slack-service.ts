@@ -22,7 +22,7 @@ import { SlackMessagingService } from './slack-messaging.service';
 import { SlackEventHandler } from './slack-event-handler.service';
 import { SlackBotManager } from './slack-bot-manager.service';
 import { SlackSecurityService } from './slack-security.service';
-import { SlackErrorReportingService } from './slack-error-reporting.service';
+import { SlackErrorReportingService } from '../slack-error-reporting';
 import { initializeErrorReporter } from '../utils/slack-error-reporter.util';
 import { IExternalServices } from '../../../../interfaces/service-interfaces';
 

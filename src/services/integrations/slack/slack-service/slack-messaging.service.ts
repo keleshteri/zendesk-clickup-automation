@@ -12,7 +12,7 @@
 import { WebClient } from '@slack/web-api';
 import type { Env } from '../../../../types';
 import { SlackEmojiService } from './slack-emoji.service';
-import { SlackErrorReportingService } from './slack-error-reporting.service';
+import { SlackErrorReportingService } from '../slack-error-reporting';
 import { SlackMessageBuilderService } from './slack-message-builder.service';
 import {
   ticketInfoMessageTemplate,
