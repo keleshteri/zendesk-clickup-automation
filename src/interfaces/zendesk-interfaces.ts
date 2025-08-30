@@ -77,11 +77,12 @@ export interface IZendeskService {
   testConnection(): Promise<boolean>;
 
   /**
-   * Search tickets based on query
-   * @param query - Search query string
+   * Optional method to search tickets
+   * @param query - Search query string (if empty, returns recent tickets)
+   * @param limit - Maximum number of tickets to return (default: 25)
    * @returns Promise resolving to array of matching tickets
    */
-  searchTickets?(query: string): Promise<ZendeskTicket[]>;
+  searchTickets?(query: string, limit?: number): Promise<ZendeskTicket[]>;
 }
 
 /**

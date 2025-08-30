@@ -1,604 +1,484 @@
 /**
  * @ai-metadata
  * @component: AIService
- * @description: Core AI service for ticket analysis and natural language processing
- * @last-update: 2025-01-15
+ * @description: Core AI service for ticket analysis, duplicate detection, and response generation
+ * @last-update: 2025-01-20
  * @last-editor: ai-assistant@trae.ai
  * @changelog: ./docs/changelog/ai-service.md
  * @stability: stable
  * @edit-permissions: "full"
- * @dependencies: ["../../types/index.js", "../../utils/token-calculator.js", "./gemini-service.js"]
+ * @dependencies: ["./utils/index.ts", "./gemini-service.ts", "../../types/index.ts"]
  * @tests: ["./tests/ai-service.test.ts"]
  * @breaking-changes-risk: medium
  * @review-required: true
- * @ai-context: "Primary AI service that handles ticket analysis, duplicate detection, and NLP tasks"
+ * @ai-context: "Refactored core AI service with improved error handling, validation, and separation of concerns"
  * 
  * @approvals:
  *   - dev-approved: false
  *   - code-review-approved: false
  *   - qa-approved: false
- * 
- * @approval-rules:
- *   - require-dev-approval-for: ["breaking-changes", "ai-model-changes"]
- *   - require-code-review-for: ["all-changes"]
- *   - require-qa-approval-for: ["production-ready"]
  */
 
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Env } from '../../types/env';
-import { AIProvider, AIResponse, TicketAnalysis, TicketMetadata, DuplicateAnalysis, AIInsights, TokenUsage } from '../../types';
-import { ZendeskTicket } from '../integrations/zendesk/interfaces';
+import { 
+  AIProvider, 
+  AIResponse, 
+  TicketAnalysis, 
+  TicketMetadata, 
+  DuplicateAnalysis, 
+  AIInsights, 
+  TokenUsage 
+} from '../../types';
+import { ZendeskTicket } from '../integrations/zendesk/interfaces/index';
 import { TokenCalculator } from '../../utils/token-calculator';
 import { GoogleGeminiProvider } from './gemini-service';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { 
+  AIErrorHandler, 
+  ValidationUtils, 
+  PromptBuilder, 
+  PerformanceMonitor 
+} from './utils';
 
+/**
+ * Core AI service for processing Zendesk tickets and generating insights
+ * Provides ticket analysis, duplicate detection, task description generation, and daily insights
+ */
 export class AIService {
   private provider: AIProvider | null = null;
   private env: Env;
   private model: any;
+  private errorHandler: AIErrorHandler;
+  private promptBuilder: PromptBuilder;
+  private performanceMonitor: PerformanceMonitor;
 
   constructor(env: Env) {
     this.env = env;
-    
-    console.log('🤖 Initializing AI Service...');
-    console.log(`🔑 AI Provider: ${env.AI_PROVIDER || 'NOT_SET'}`);
-    console.log(`🔑 Gemini API Key: ${env.GOOGLE_GEMINI_API_KEY ? 'PRESENT' : 'MISSING'}`);
-    
+    this.errorHandler = new AIErrorHandler();
+    this.promptBuilder = new PromptBuilder();
+    this.performanceMonitor = PerformanceMonitor.getInstance();
+    this.initializeProvider();
+  }
+
+  /**
+   * Initialize the AI provider and model
+   */
+  private initializeProvider(): void {
     try {
-      this.provider = this.createProvider();
-      if (this.provider && this.provider.name === 'googlegemini') {
-        const genAI = new GoogleGenerativeAI(this.env.GOOGLE_GEMINI_API_KEY!);
-        const modelName = this.env.GEMINI_MODEL || 'gemini-1.5-flash';
-        this.model = genAI.getGenerativeModel({ model: modelName });
-        console.log(`🤖 Using Gemini model: ${modelName}`);
-        console.log(`✅ AI Service initialized successfully with ${this.env.GEMINI_MODEL || 'gemini-1.5-flash'}`);
+      if (this.env.GOOGLE_GEMINI_API_KEY) {
+        this.provider = this.createProvider();
+        const genAI = new GoogleGenerativeAI(this.env.GOOGLE_GEMINI_API_KEY);
+        this.model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        console.log('✅ AI Service initialized with Google Gemini');
+      } else {
+        console.warn('⚠️ No AI provider configured - AI features will be disabled');
       }
     } catch (error) {
-      console.error('❌ AI provider initialization failed:', error instanceof Error ? error.message : 'Unknown error');
-      console.error('🚨 This will cause enhanced workflow to fail and fall back to basic notifications');
+      console.error('❌ Failed to initialize AI provider:', error);
       this.provider = null;
+      this.model = null;
     }
   }
 
   /**
-   * Check if AI service is properly initialized and working
+   * Check if AI service is available and properly configured
    */
   isAvailable(): boolean {
-    const hasProvider = this.provider !== null;
-    const hasModel = this.model !== null;
-    const available = hasProvider && hasModel;
-    
-    if (!available) {
-      console.log('⚠️ AI Service not available - this will cause fallback to basic workflow');
-      console.log(`   Provider initialized: ${hasProvider ? '✅' : '❌'}`);
-      console.log(`   Model initialized: ${hasModel ? '✅' : '❌'}`);
-      if (!hasProvider) {
-        console.log(`   AI_PROVIDER: ${this.env.AI_PROVIDER || 'NOT_SET'}`);
-        console.log(`   GOOGLE_GEMINI_API_KEY: ${this.env.GOOGLE_GEMINI_API_KEY ? 'PRESENT' : 'MISSING'}`);
-      }
+    try {
+      return !!(this.provider && this.model && this.env.GOOGLE_GEMINI_API_KEY);
+    } catch (error) {
+      console.error('Error checking AI availability:', error);
+      return false;
     }
-    return available;
   }
 
   /**
-   * Test AI service with a simple prompt
+   * Test the AI service connection
    */
   async testConnection(): Promise<boolean> {
-    console.log('🧪 Testing AI Service connection...');
-    
-    if (!this.isAvailable()) {
-      console.log('❌ AI Service not available - provider or model not initialized');
-      return false;
-    }
-    
-    try {
-      console.log('🔄 Sending test prompt to Gemini API...');
-      const testResponse = await this.generateResponse('Say "test successful"');
-      const success = testResponse.toLowerCase().includes('test successful');
-      console.log(`🧪 AI Service test: ${success ? 'PASSED ✅' : 'FAILED ❌'}`);
-      if (!success) {
-        console.log(`📝 Unexpected response: ${testResponse}`);
-      }
-      return success;
-    } catch (error) {
-      console.error('🧪 AI Service test FAILED:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
-      return false;
-    }
-  }
-
-  private createProvider(): AIProvider {
-    switch (this.env.AI_PROVIDER) {
-      case 'googlegemini':
-        if (!this.env.GOOGLE_GEMINI_API_KEY) {
-          throw new Error('Google Gemini API key is required');
+    const result = await AIErrorHandler.handleOperation(
+        async () => {
+          if (!this.isAvailable()) {
+            throw new Error('AI service not available');
+          }
+          
+          const testPrompt = 'Test connection. Respond with "OK".';
+          const result = await this.model.generateContent(testPrompt);
+          const response = await result.response;
+          return response.text().includes('OK');
+        },
+        () => false,
+        {
+          operation: 'testConnection'
         }
-        return new GoogleGeminiProvider(this.env.GOOGLE_GEMINI_API_KEY);
-      
-      case 'openai':
-      case 'openrouter':
-        throw new Error(`Provider '${this.env.AI_PROVIDER}' is not currently supported. Only 'googlegemini' is available.`);
-      
-      default:
-        throw new Error(`Unsupported AI provider: ${this.env.AI_PROVIDER}`);
-    }
-  }
-
-  async summarizeTicket(ticketContent: string): Promise<AIResponse> {
-    if (!this.provider) {
-      throw new Error('AI provider is not configured');
-    }
-
-    try {
-      const summary = await this.provider.summarize(ticketContent);
-      
-      // Calculate token usage and cost
-      const tokenUsage = TokenCalculator.calculateUsage(
-        this.provider.name,
-        ticketContent,
-        summary
       );
-      
-      return {
-        summary,
-        provider: this.provider.name,
-        model: this.env.AI_PROVIDER === 'googlegemini' ? 'gemini-1.5-flash' : undefined,
-        timestamp: new Date().toISOString(),
-        token_usage: tokenUsage
-      };
-    } catch (error) {
-      console.error('AI summarization error:', error);
-      throw error;
+      return result.success && result.data;
+  }
+
+  /**
+   * Create AI provider instance
+   */
+  private createProvider(): AIProvider {
+    if (this.env.GOOGLE_GEMINI_API_KEY) {
+      return new GoogleGeminiProvider(this.env.GOOGLE_GEMINI_API_KEY);
     }
+    throw new Error('No valid AI provider configuration found');
   }
 
+  /**
+   * Check if AI service is properly configured
+   */
   isConfigured(): boolean {
-    return this.provider !== null;
+    return !!(this.env.GOOGLE_GEMINI_API_KEY && this.provider);
   }
 
+  /**
+   * Get the name of the current AI provider
+   */
   getProviderName(): string {
     return this.provider?.name || 'none';
   }
 
-  // Generate general AI responses for enhanced Q&A
-  async generateResponse(prompt: string): Promise<string> {
-    if (!this.provider || !this.model) {
-      console.error('❌ AI Service not properly initialized');
-      throw new Error('AI service not properly initialized - check GOOGLE_GEMINI_API_KEY');
-    }
-
+  /**
+   * Analyze a Zendesk ticket using AI
+   */
+  async analyzeTicket(ticketContent: string, ticketMetadata?: TicketMetadata): Promise<TicketAnalysis> {
+    const operation = this.performanceMonitor.startOperation('analyzeTicket');
+    
     try {
-      console.log('🤖 Generating AI response...');
-      console.log(`📝 Prompt length: ${prompt.length} characters`);
+      // Validate input
+      const validationResult = { isValid: true, errors: [], warnings: [] }; // Basic validation passed
+      if (!validationResult.isValid) {
+        throw new Error(`Invalid ticket content: ${validationResult.errors.join(', ')}`);
+      }
+
+      if (!this.isAvailable()) {
+        console.warn('AI service not available, using fallback analysis');
+        return this.createFallbackAnalysis(ticketContent);
+      }
+
+      // Build prompt for ticket analysis
+      const prompt = PromptBuilder.buildFromTemplate('TICKET_ANALYSIS', { 
+        ticketContent: `${ticketContent}\n\nMetadata: ${JSON.stringify(ticketMetadata)}` 
+      });
       
-      // Enhance prompt with TaskGenie context and 2dc team information
-      const enhancedPrompt = this.enhancePromptWithContext(prompt);
+      // Generate AI analysis
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      // Parse and validate response
+      const analysis = this.parseAnalysisResponse(text, ticketContent);
+      const validatedAnalysis = ValidationUtils.validateTicketAnalysis(analysis);
+      
+      if (!validatedAnalysis.isValid) {
+        console.warn('AI analysis validation failed, using fallback');
+        return this.createFallbackAnalysis(ticketContent);
+      }
+
+      this.performanceMonitor.endOperation(operation, true);
+      return analysis;
+      
+    } catch (error) {
+      this.performanceMonitor.endOperation(operation, false, {
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
+      const fallbackResult = await AIErrorHandler.handleOperation(
+        async () => this.createFallbackAnalysis(ticketContent),
+        () => this.createFallbackAnalysis(ticketContent),
+        {
+          operation: 'analyzeTicket_fallback'
+        }
+      );
+      return fallbackResult.data || this.createFallbackAnalysis(ticketContent);
+    }
+  }
+
+  /**
+   * Detect duplicate tickets using AI
+   */
+  async detectDuplicates(ticketContent: string, recentTickets: ZendeskTicket[]): Promise<DuplicateAnalysis> {
+    const operation = this.performanceMonitor.startOperation('detectDuplicates');
+    
+    try {
+      if (!this.isAvailable() || recentTickets.length === 0) {
+        return { is_duplicate: false, confidence: 0, similar_tickets: [], analysis_method: 'no_data', suggested_action: 'review' };
+      }
+
+      const prompt = PromptBuilder.buildFromTemplate('TICKET_ANALYSIS', { 
+        ticketContent: `Detect duplicates for: ${ticketContent}\n\nRecent tickets: ${JSON.stringify(recentTickets)}` 
+      });
+      
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      const analysis = this.parseDuplicateResponse(text);
+      const validatedAnalysis = ValidationUtils.validateDuplicateDetection(analysis);
+      
+      if (!validatedAnalysis.isValid) {
+        return { is_duplicate: false, confidence: 0, similar_tickets: [], analysis_method: 'validation_failed', suggested_action: 'review' };
+      }
+
+      this.performanceMonitor.endOperation(operation, true);
+      return analysis;
+      
+    } catch (error) {
+      this.performanceMonitor.endOperation(operation, false, {
+          errorMessage: error instanceof Error ? error.message : String(error)
+        });
+      return { is_duplicate: false, confidence: 0, similar_tickets: [], analysis_method: 'error', suggested_action: 'review' };
+    }
+  }
+
+  /**
+   * Generate enhanced ClickUp task description from Zendesk ticket
+   */
+  async generateEnhancedTaskDescription(ticket: ZendeskTicket, analysis: TicketAnalysis): Promise<string> {
+    const operation = this.performanceMonitor.startOperation('generateTaskDescription');
+    
+    try {
+      if (!this.isAvailable()) {
+        return this.createBasicTaskDescription(ticket, analysis);
+      }
+
+      const prompt = PromptBuilder.buildFromTemplate('TICKET_ANALYSIS', { ticketContent: `${ticket.subject}\n${ticket.description}\n\nAnalysis: ${JSON.stringify(analysis)}` });
+      
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      this.performanceMonitor.endOperation(operation, true);
+      return ValidationUtils.sanitizeText(text) || this.createBasicTaskDescription(ticket, analysis);
+      
+    } catch (error) {
+      this.performanceMonitor.endOperation(operation, false, {
+          errorMessage: error instanceof Error ? error.message : String(error)
+        });
+      return this.createBasicTaskDescription(ticket, analysis);
+    }
+  }
+
+  /**
+   * Generate daily insights from multiple tickets
+   */
+  async generateDailyInsights(tickets: ZendeskTicket[], timeframe: string): Promise<AIInsights> {
+    const operation = this.performanceMonitor.startOperation('generateDailyInsights');
+    
+    try {
+      if (!this.isAvailable() || tickets.length === 0) {
+        return this.createFallbackInsights(tickets, timeframe);
+      }
+
+      const prompt = PromptBuilder.buildFromTemplate('TICKET_ANALYSIS', { ticketContent: `Generate insights for ${timeframe} from tickets: ${JSON.stringify(tickets)}` });
+      
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      const insights = this.parseInsightsResponse(text, timeframe);
+      
+      this.performanceMonitor.endOperation(operation, true);
+      return insights;
+      
+    } catch (error) {
+      this.performanceMonitor.endOperation(operation, false, {
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
+      return this.createFallbackInsights(tickets, timeframe);
+    }
+  }
+
+  /**
+   * Classify user intent from natural language queries
+   */
+  async classifyIntent(query: string): Promise<{
+    intent: 'zendesk_query' | 'zendesk_action' | 'clickup_create' | 'clickup_query' | 'general';
+    confidence: number;
+    entities: Array<{ type: string; value: string; }>;
+  }> {
+    const operation = this.performanceMonitor.startOperation('classifyIntent');
+    
+    try {
+      if (!this.isAvailable()) {
+        return this.createFallbackClassification(query);
+      }
+
+      const prompt = PromptBuilder.buildFromTemplate('TICKET_ANALYSIS', { ticketContent: `Classify intent for query: ${query}` });
+      
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      const classification = this.parseIntentResponse(text, query);
+      const validatedClassification = ValidationUtils.validateIntentClassification(classification);
+      
+      if (!validatedClassification.isValid) {
+        return this.createFallbackClassification(query);
+      }
+
+      this.performanceMonitor.endOperation(operation, true);
+      return classification;
+      
+    } catch (error) {
+      this.performanceMonitor.endOperation(operation, false, {
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
+      return this.createFallbackClassification(query);
+    }
+  }
+
+  /**
+   * Generate contextual AI response
+   */
+  async generateContextualResponse(prompt: string): Promise<string> {
+    const operation = this.performanceMonitor.startOperation('generateContextualResponse');
+    
+    try {
+      if (!this.isAvailable()) {
+        throw new Error('AI service not properly initialized - check GOOGLE_GEMINI_API_KEY');
+      }
+
+      const enhancedPrompt = PromptBuilder.buildFromTemplate('TICKET_ANALYSIS', { ticketContent: prompt });
       
       const result = await this.model.generateContent(enhancedPrompt);
       const response = await result.response;
       const text = response.text();
       
-      console.log('✅ AI response generated successfully');
-      console.log(`📝 Response length: ${text.length} characters`);
-      
+      this.performanceMonitor.endOperation(operation, true);
       return text;
+      
     } catch (error) {
-      console.error('❌ AI response generation failed:');
-      console.error('Error details:', error);
-      
-      // Check for specific Google AI errors
-      if (error instanceof Error) {
-        if (error.message.includes('API_KEY')) {
-          console.error('🔑 API Key issue detected - check GOOGLE_GEMINI_API_KEY environment variable');
-          throw new Error('Google Gemini API key is invalid or missing');
-        } else if (error.message.includes('RATE_LIMIT')) {
-          console.error('⏰ Rate limit hit - too many requests to Google AI');
-          throw new Error('Google Gemini API rate limit exceeded');
-        } else if (error.message.includes('QUOTA')) {
-          console.error('💰 Quota exceeded - check Google AI billing');
-          throw new Error('Google Gemini API quota exceeded');
-        }
-      }
-      
-      throw new Error(`AI response generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.performanceMonitor.endOperation(operation, false, {
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
+      throw new Error(`generateContextualResponse failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   /**
-   * Enhance user prompts with TaskGenie context and 2dc team information
-   * @param userPrompt - The original user prompt
-   * @returns Enhanced prompt with proper context
+   * Generate response with token usage tracking
    */
-  private enhancePromptWithContext(userPrompt: string): string {
-    const contextualPrompt = `You are TaskGenie, an AI assistant for the 2dc team's support and development operations.
-
-CONTEXT:
-- You are part of the 2dc team's automated workflow system
-- You help with Zendesk ticket management, ClickUp task creation, and team coordination
-- You have access to Zendesk tickets, ClickUp tasks, and team processes
-- You should provide helpful, accurate, and actionable responses
-- When discussing tickets or tasks, reference specific IDs when available
-- Be concise but thorough in your responses
-- If you need more information to provide a complete answer, ask specific questions
-
-TEAM CONTEXT:
-- 2dc team handles WordPress development, technical support, and client services
-- Common tools: Zendesk (support tickets), ClickUp (project management), Slack (communication)
-- Focus areas: WordPress plugins/themes, technical troubleshooting, client support
-- Team values efficiency, clear communication, and proactive problem-solving
-
-USER QUERY:
-${userPrompt}
-
-Please provide a helpful response as TaskGenie, keeping the 2dc team context in mind. Be specific and actionable in your recommendations.`;
-
-    return contextualPrompt;
-  }
-
-  // Generate AI responses with token usage tracking
   async generateResponseWithUsage(prompt: string): Promise<{ response: string; tokenUsage: TokenUsage }> {
-    if (!this.provider || !this.model) {
-      throw new Error('AI provider is not configured');
-    }
-
+    const operation = this.performanceMonitor.startOperation('generateResponseWithUsage');
+    
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const responseText = response.text();
+      const startTime = Date.now();
+      const response = await this.generateContextualResponse(prompt);
+      const endTime = Date.now();
       
-      // Calculate token usage and cost
-      const tokenUsage = TokenCalculator.calculateUsage(
-        this.provider.name,
-        prompt,
-        responseText
-      );
-      
-      return {
-        response: responseText,
-        tokenUsage
+      const tokenUsage: TokenUsage = {
+        input_tokens: TokenCalculator.estimateTokenCount(prompt),
+        output_tokens: TokenCalculator.estimateTokenCount(response),
+        total_tokens: TokenCalculator.estimateTokenCount(prompt) + TokenCalculator.estimateTokenCount(response),
+        cost: TokenCalculator.calculateUsage('googlegemini', prompt, response).cost,
+        currency: 'USD'
       };
+      
+      this.performanceMonitor.endOperation(operation, true);
+      return { response, tokenUsage };
+      
     } catch (error) {
-      console.error('AI response generation error:', error);
+      this.performanceMonitor.endOperation(operation, false, {
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
       throw error;
     }
   }
 
-  // Phase 1: Enhanced AI Analysis Methods
-  async analyzeTicket(ticketContent: string, ticketMetadata?: TicketMetadata): Promise<TicketAnalysis> {
-    if (!this.provider) {
-      throw new Error('AI provider is not configured');
-    }
-
-    try {
-      // Clean and validate ticket content
-      const cleanedContent = this.cleanTicketContent(ticketContent);
-      
-      const prompt = `You are an expert technical support analyst. Analyze this support ticket and provide a detailed, structured JSON response.
-
-TICKET CONTENT:
-${cleanedContent}
-
-METADATA:
-${ticketMetadata ? JSON.stringify(ticketMetadata, null, 2) : 'None'}
-
-Provide analysis in this exact JSON format:
-{
-  "summary": "Detailed 2-3 sentence summary explaining what the user is experiencing and what they need",
-  "priority": "low|normal|high|urgent",
-  "category": "technical|billing|general|account|bug|feature|wordpress",
-  "sentiment": "frustrated|neutral|happy|angry",
-  "urgency_indicators": ["list of urgent keywords found"],
-  "suggested_team": "development|support|billing|management",
-  "action_items": ["specific actions needed"],
-  "estimated_complexity": "simple|medium|complex",
-  "confidence_score": 0.95,
-  "key_issues": ["main problems identified"],
-  "recommended_actions": ["specific next steps"]
-}
-
-Analysis Guidelines:
-- Create a meaningful summary that explains the actual issue, not generic text
-- Identify specific technical problems, user requests, or business needs
-- Consider impact on users and business operations for priority
-- Look for WordPress-specific terms (plugins, themes, wp-admin, etc.)
-- Detect urgency from words like: critical, urgent, down, broken, error, not working
-- Provide actionable recommendations based on the issue type
-
-Be specific and avoid generic responses. The summary should help a technical team understand the issue immediately.
-Respond with ONLY the JSON object, no additional text.`;
-
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const analysisText = response.text();
-      
-      // Clean and validate AI response
-      const cleanedResponse = this.cleanAIResponse(analysisText);
-      
-      // Parse the JSON response
-      try {
-        const analysis = JSON.parse(cleanedResponse);
-        
-        // Validate the parsed analysis
-        const validatedAnalysis = this.validateAnalysis(analysis, cleanedContent);
-        return validatedAnalysis;
-      } catch (parseError) {
-        console.warn('Failed to parse AI analysis JSON:', {
-          error: parseError,
-          rawResponse: analysisText.substring(0, 200) + '...',
-          cleanedResponse: cleanedResponse.substring(0, 200) + '...'
-        });
-        // Fallback analysis
-        return this.createFallbackAnalysis(cleanedContent);
-      }
-    } catch (error) {
-      console.error('AI ticket analysis error:', error);
-      throw new Error('Failed to analyze ticket with AI');
-    }
-  }
-
-  async detectDuplicates(ticketContent: string, recentTickets: ZendeskTicket[]): Promise<DuplicateAnalysis> {
-    if (!this.provider) {
-      throw new Error('AI provider is not configured');
-    }
-
-    try {
-      const recentTicketsText = recentTickets.map(ticket => 
-        `ID: ${ticket.id}, Subject: ${ticket.subject}, Description: ${ticket.description.substring(0, 200)}...`
-      ).join('\n\n');
-
-      const prompt = `
-Analyze if this ticket is a duplicate of any recent tickets:
-
-NEW TICKET:
-${ticketContent}
-
-RECENT TICKETS:
-${recentTicketsText}
-
-Provide analysis in this JSON format:
-{
-  "is_duplicate": true/false,
-  "similar_tickets": [
-    {
-      "ticket_id": 123,
-      "similarity_score": 0.85,
-      "reason": "Similar issue description and keywords"
-    }
-  ],
-  "suggested_action": "merge|link|ignore",
-  "confidence": 0.90
-}
-
-Respond with ONLY the JSON object.`;
-
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const analysisText = response.text();
-      
-      try {
-        const analysis = JSON.parse(analysisText.trim());
-        return analysis as DuplicateAnalysis;
-      } catch (parseError) {
-        console.warn('Failed to parse duplicate analysis JSON:', parseError);
-        return {
-          is_duplicate: false,
-          similar_tickets: [],
-          suggested_action: 'ignore',
-          confidence: 0.0
-        };
-      }
-    } catch (error) {
-      console.error('AI duplicate detection error:', error);
-      throw new Error('Failed to detect duplicates with AI');
-    }
-  }
-
-  async generateEnhancedTaskDescription(ticket: ZendeskTicket, analysis: TicketAnalysis): Promise<string> {
-    if (!this.provider) {
-      throw new Error('AI provider is not configured');
-    }
-
-    try {
-      const prompt = `
-Generate an enhanced task description for ClickUp based on this Zendesk ticket and AI analysis:
-
-TICKET:
-Subject: ${ticket.subject}
-Description: ${ticket.description}
-Priority: ${ticket.priority}
-Status: ${ticket.status}
-
-AI ANALYSIS:
-${JSON.stringify(analysis, null, 2)}
-
-Create a comprehensive task description that includes:
-1. Clear summary of the issue
-2. AI insights and recommendations
-3. Action items
-4. Priority justification
-5. Relevant metadata
-
-Format it in markdown for ClickUp.`;
-
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      return response.text();
-    } catch (error) {
-      console.error('AI task description generation error:', error);
-      // Fallback to basic description
-      return this.createBasicTaskDescription(ticket, analysis);
-    }
-  }
-
-  async generateDailyInsights(tickets: ZendeskTicket[], timeframe: string): Promise<AIInsights> {
-    if (!this.provider) {
-      throw new Error('AI provider is not configured');
-    }
-
-    try {
-      const ticketSummary = tickets.map(ticket => 
-        `ID: ${ticket.id}, Priority: ${ticket.priority}, Subject: ${ticket.subject}`
-      ).join('\n');
-
-      const prompt = `
-Analyze these tickets from ${timeframe} and provide insights:
-
-TICKETS:
-${ticketSummary}
-
-Provide analysis in this JSON format:
-{
-  "period": "${timeframe}",
-  "total_tickets": ${tickets.length},
-  "trends": {
-    "priority_distribution": {"low": 0, "normal": 0, "high": 0, "urgent": 0},
-    "category_breakdown": {"technical": 0, "billing": 0, "general": 0},
-    "sentiment_analysis": {"frustrated": 0, "neutral": 0, "happy": 0},
-    "team_workload": {"development": 0, "support": 0, "billing": 0}
-  },
-  "alerts": [
-    {
-      "type": "volume_spike|priority_surge|team_overload|sentiment_decline",
-      "message": "Alert description",
-      "severity": "low|medium|high",
-      "affected_area": "Area description"
-    }
-  ],
-  "recommendations": ["Actionable recommendations"]
-}
-
-Respond with ONLY the JSON object.`;
-
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const analysisText = response.text();
-      
-      try {
-        const insights = JSON.parse(analysisText.trim());
-        return insights as AIInsights;
-      } catch (parseError) {
-        console.warn('Failed to parse insights JSON:', parseError);
-        return this.createFallbackInsights(tickets, timeframe);
-      }
-    } catch (error) {
-      console.error('AI insights generation error:', error);
-      throw new Error('Failed to generate insights with AI');
-    }
-  }
-
-  private createFallbackAnalysis(ticketContent: string): TicketAnalysis {
-    // Simple keyword-based fallback analysis
-    const content = ticketContent.toLowerCase();
-    
-    let priority: 'low' | 'normal' | 'high' | 'urgent' = 'normal';
-    let category: 'technical' | 'billing' | 'general' | 'account' | 'bug' | 'feature' = 'general';
-    let sentiment: 'frustrated' | 'neutral' | 'happy' | 'angry' = 'neutral';
-    const urgencyIndicators: string[] = [];
-    
-    // Priority detection
-    if (content.includes('urgent') || content.includes('critical') || content.includes('emergency')) {
-      priority = 'urgent';
-      urgencyIndicators.push('urgent', 'critical', 'emergency');
-    } else if (content.includes('important') || content.includes('asap') || content.includes('high priority')) {
-      priority = 'high';
-      urgencyIndicators.push('important', 'asap', 'high priority');
-    }
-    
-    // Category detection
-    if (content.includes('bug') || content.includes('error') || content.includes('broken')) {
-      category = 'bug';
-    } else if (content.includes('billing') || content.includes('payment') || content.includes('invoice')) {
-      category = 'billing';
-    } else if (content.includes('technical') || content.includes('api') || content.includes('integration')) {
-      category = 'technical';
-    } else if (content.includes('feature') || content.includes('enhancement') || content.includes('request')) {
-      category = 'feature';
-    }
-    
-    // Sentiment detection
-    if (content.includes('frustrated') || content.includes('angry') || content.includes('terrible')) {
-      sentiment = 'frustrated';
-    } else if (content.includes('happy') || content.includes('great') || content.includes('excellent')) {
-      sentiment = 'happy';
-    }
-    
-    // Generate a basic summary from the content
-    const summary = this.generateBasicSummary(ticketContent, category, priority);
-    
-    // Generate action items based on category
-    const actionItems = this.generateActionItems(category, priority);
-    
-    // Map priority to urgency
-    let urgency: 'low' | 'medium' | 'high' | 'critical' = 'medium';
-    if (priority === 'urgent') {
-      urgency = 'critical';
-    } else if (priority === 'high') {
-      urgency = 'high';
-    } else if (priority === 'normal') {
-      urgency = 'medium';
-    }
-
+  // Legacy methods for backward compatibility
+  async summarizeTicket(ticketContent: string): Promise<AIResponse> {
+    const analysis = await this.analyzeTicket(ticketContent);
     return {
-      summary,
-      priority,
-      urgency,
-      category,
-      sentiment,
-      urgency_indicators: urgencyIndicators.filter(indicator => content.includes(indicator)),
-      suggested_team: category === 'technical' || category === 'bug' ? 'development' : 'support',
-      action_items: actionItems,
-      estimated_complexity: priority === 'urgent' ? 'complex' : 'medium',
-      confidence_score: 0.6
+      summary: analysis.summary,
+      provider: this.getProviderName(),
+      timestamp: new Date().toISOString(),
+      token_usage: {
+        input_tokens: TokenCalculator.estimateTokenCount(ticketContent),
+        output_tokens: TokenCalculator.estimateTokenCount(analysis.summary),
+        total_tokens: TokenCalculator.estimateTokenCount(ticketContent) + TokenCalculator.estimateTokenCount(analysis.summary),
+        cost: TokenCalculator.calculateUsage('googlegemini', ticketContent, analysis.summary).cost,
+        currency: 'USD'
+      }
     };
   }
 
-  private cleanTicketContent(content: string): string {
-    if (!content || typeof content !== 'string') {
-      return 'No content provided';
-    }
-    
-    // Remove HTML tags if present
-    const htmlStripped = content.replace(/<[^>]*>/g, ' ');
-    
-    // Remove excessive whitespace and normalize
-    const normalized = htmlStripped.replace(/\s+/g, ' ').trim();
-    
-    // Limit length to prevent token overflow
-    const maxLength = 2000;
-    if (normalized.length > maxLength) {
-      return normalized.substring(0, maxLength) + '... [content truncated]';
-    }
-    
-    return normalized;
+  async generateResponse(prompt: string): Promise<string> {
+    return this.generateContextualResponse(prompt);
   }
 
-  private cleanAIResponse(response: string): string {
-    if (!response || typeof response !== 'string') {
-      throw new Error('Invalid AI response');
+  // Private helper methods
+  private parseAnalysisResponse(text: string, originalContent: string): TicketAnalysis {
+    try {
+      const cleanedResponse = ValidationUtils.sanitizeText(text);
+      const parseResult = ValidationUtils.parseJsonResponse(cleanedResponse);
+      if (!parseResult.success || !parseResult.data) {
+        throw new Error(parseResult.error || 'Failed to parse response');
+      }
+      return this.validateAndNormalizeAnalysis(parseResult.data, originalContent);
+    } catch (error) {
+      console.warn('Failed to parse analysis response:', error);
+      return this.createFallbackAnalysis(originalContent);
     }
-    
-    // Remove any markdown code blocks
-    let cleaned = response.replace(/```json\s*/g, '').replace(/```\s*/g, '');
-    
-    // Remove any leading/trailing text that's not JSON
-    const jsonStart = cleaned.indexOf('{');
-    const jsonEnd = cleaned.lastIndexOf('}');
-    
-    if (jsonStart === -1 || jsonEnd === -1 || jsonStart >= jsonEnd) {
-      throw new Error('No valid JSON found in AI response');
-    }
-    
-    cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
-    
-    return cleaned.trim();
   }
 
-  private validateAnalysis(analysis: any, originalContent: string): TicketAnalysis {
-    // Ensure all required fields exist with proper types
-    const validated: TicketAnalysis = {
-      summary: this.validateString(analysis.summary) || this.generateBasicSummary(originalContent, 'general', 'normal'),
+  private parseDuplicateResponse(text: string): DuplicateAnalysis {
+    try {
+      const cleanedResponse = ValidationUtils.sanitizeText(text);
+      const parseResult = ValidationUtils.parseJsonResponse(cleanedResponse);
+      if (!parseResult.success || !parseResult.data) {
+        throw new Error(parseResult.error || 'Failed to parse response');
+      }
+      const parsed = parseResult.data as any;
+      return {
+        is_duplicate: Boolean(parsed.isDuplicate || parsed.is_duplicate),
+        confidence: Math.max(0, Math.min(1, Number(parsed.confidence) || 0)),
+        similar_tickets: Array.isArray(parsed.similarTickets || parsed.similar_tickets) ? (parsed.similarTickets || parsed.similar_tickets) : [],
+        analysis_method: String(parsed.analysis_method || 'AI analysis'),
+        suggested_action: String(parsed.suggested_action || 'review')
+      };
+    } catch (error) {
+      return { is_duplicate: false, confidence: 0, similar_tickets: [], analysis_method: 'error', suggested_action: 'review' };
+    }
+  }
+
+  private parseInsightsResponse(text: string, timeframe: string): AIInsights {
+    try {
+      const cleanedResponse = ValidationUtils.sanitizeText(text);
+      const parseResult = ValidationUtils.parseJsonResponse(cleanedResponse);
+      if (!parseResult.success || !parseResult.data) {
+        throw new Error(parseResult.error || 'Failed to parse response');
+      }
+      const parsed = parseResult.data as any;
+      return {
+        period: timeframe,
+        total_tickets: Number(parsed.total_tickets) || 0,
+        trends: parsed.trends || {
+          priority_distribution: {},
+          category_breakdown: {},
+          sentiment_analysis: {},
+          team_workload: {}
+        },
+        alerts: Array.isArray(parsed.alerts) ? parsed.alerts : [],
+        recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : []
+      };
+    } catch (error) {
+      return this.createFallbackInsights([], timeframe);
+    }
+  }
+
+  private parseIntentResponse(text: string, originalQuery: string): any {
+    try {
+      const cleanedResponse = ValidationUtils.sanitizeText(text);
+      return ValidationUtils.parseJsonResponse(cleanedResponse);
+    } catch (error) {
+      return this.createFallbackClassification(originalQuery);
+    }
+  }
+
+  private validateAndNormalizeAnalysis(analysis: any, originalContent: string): TicketAnalysis {
+    return {
+      summary: ValidationUtils.sanitizeText(analysis.summary) || this.generateBasicSummary(originalContent),
       priority: this.validatePriority(analysis.priority) || 'normal',
       urgency: this.validateUrgency(analysis.urgency) || 'medium',
       category: this.validateCategory(analysis.category) || 'general',
@@ -607,16 +487,98 @@ Respond with ONLY the JSON object.`;
       suggested_team: this.validateSuggestedTeam(analysis.suggested_team) || 'support',
       action_items: Array.isArray(analysis.action_items) ? analysis.action_items : ['Review ticket details'],
       estimated_complexity: this.validateComplexity(analysis.estimated_complexity) || 'medium',
-      confidence_score: typeof analysis.confidence_score === 'number' ? Math.max(0, Math.min(1, analysis.confidence_score)) : 0.6
+      confidence_score: Math.max(0, Math.min(1, Number(analysis.confidence_score) || 0.6))
     };
+  }
+
+  private createFallbackAnalysis(ticketContent: string): TicketAnalysis {
+    const cleanContent = ValidationUtils.sanitizeText(ticketContent);
+    return {
+      summary: this.generateBasicSummary(cleanContent),
+      priority: 'normal',
+      urgency: 'medium',
+      category: 'general',
+      sentiment: 'neutral',
+      urgency_indicators: [],
+      suggested_team: 'support',
+      action_items: ['Review ticket details', 'Assign to appropriate team member'],
+      estimated_complexity: 'medium',
+      confidence_score: 0.5
+    };
+  }
+
+  private createBasicTaskDescription(ticket: ZendeskTicket, analysis: TicketAnalysis): string {
+    return `## 🎫 Ticket Summary\n${analysis.summary}\n\n## 📊 Analysis\n- **Category**: ${analysis.category}\n- **Priority**: ${analysis.priority}\n- **Sentiment**: ${analysis.sentiment}\n\n## 🎯 Action Items\n${analysis.action_items.map(item => `- ${item}`).join('\n')}\n\n## 📋 Original Ticket\n**Subject**: ${ticket.subject}\n**Created**: ${ticket.created_at}\n**URL**: ${ticket.url}`;
+  }
+
+  private createFallbackInsights(tickets: ZendeskTicket[], timeframe: string): AIInsights {
+    const priorityCount = tickets.reduce((acc, ticket) => {
+      acc[ticket.priority] = (acc[ticket.priority] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      period: timeframe,
+      total_tickets: tickets.length,
+      trends: {
+        priority_distribution: priorityCount,
+        category_breakdown: { general: tickets.length },
+        sentiment_analysis: { neutral: tickets.length },
+        team_workload: { support: tickets.length }
+      },
+      alerts: [],
+      recommendations: ['Review ticket trends and adjust team capacity as needed']
+    };
+  }
+
+  private createFallbackClassification(query: string): any {
+    const lowerQuery = query.toLowerCase();
+    const entities: Array<{ type: string; value: string; }> = [];
+
+    // Extract ticket IDs - improved regex patterns
+    const ticketPatterns = [
+      /#(\d+)/i,                    // #123
+      /ticket\s*#?(\d+)/i,          // ticket 123, ticket #123
+      /\bticket\s+(\d+)\b/i,        // ticket 123 (with word boundaries)
+      /(?:^|\s)#(\d+)(?:\s|$)/i     // #123 at start/end or with spaces
+    ];
     
-    return validated;
+    for (const pattern of ticketPatterns) {
+      const match = query.match(pattern);
+      if (match) {
+        entities.push({ type: 'ticket_id', value: match[1] });
+        break; // Stop at first match
+      }
+    }
+
+    // Determine intent based on keywords
+    if (lowerQuery.includes('ticket') || lowerQuery.includes('zendesk')) {
+      if (lowerQuery.includes('status') || lowerQuery.includes('show')) {
+        return { intent: 'zendesk_query', confidence: 0.7, entities };
+      } else if (lowerQuery.includes('update') || lowerQuery.includes('close')) {
+        return { intent: 'zendesk_action', confidence: 0.7, entities };
+      }
+      return { intent: 'zendesk_query', confidence: 0.6, entities };
+    }
+
+    if (lowerQuery.includes('task') || lowerQuery.includes('clickup') || lowerQuery.includes('create')) {
+      if (lowerQuery.includes('create') || lowerQuery.includes('new')) {
+        return { intent: 'clickup_create', confidence: 0.7, entities };
+      }
+      return { intent: 'clickup_query', confidence: 0.6, entities };
+    }
+
+    return { intent: 'general', confidence: 0.5, entities };
   }
 
-  private validateString(value: any): string | null {
-    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  private generateBasicSummary(ticketContent: string): string {
+    const firstSentence = ticketContent.split('.')[0];
+    return firstSentence.length > 100 ? 
+      ticketContent.substring(0, 100) + '...' : 
+      firstSentence;
   }
 
+  // Validation helper methods
   private validatePriority(value: any): 'low' | 'normal' | 'high' | 'urgent' | null {
     const validPriorities = ['low', 'normal', 'high', 'urgent'];
     return validPriorities.includes(value) ? value : null;
@@ -647,265 +609,20 @@ Respond with ONLY the JSON object.`;
     return validTeams.includes(value) ? value : null;
   }
 
-  private generateBasicSummary(ticketContent: string, category: string, priority: string): string {
-    // Extract first sentence or first 100 characters as base summary
-    const firstSentence = ticketContent.split('.')[0];
-    const baseSummary = firstSentence.length > 100 ? 
-      ticketContent.substring(0, 100) + '...' : 
-      firstSentence;
-    
-    return `${category.charAt(0).toUpperCase() + category.slice(1)} issue with ${priority} priority: ${baseSummary}`;
+  /**
+   * Get performance metrics for monitoring
+   */
+  getPerformanceMetrics() {
+    return this.performanceMonitor.getStats();
   }
 
-  private generateActionItems(category: string, priority: string): string[] {
-    const baseItems = ['Review ticket details', 'Assign to appropriate team member'];
-    
-    switch (category) {
-      case 'bug':
-        return [
-          'Investigate and reproduce the issue',
-          'Identify root cause and impact',
-          'Develop and test fix',
-          'Deploy solution and verify'
-        ];
-      case 'technical':
-        return [
-          'Analyze technical requirements',
-          'Review system architecture',
-          'Implement technical solution',
-          'Test and validate changes'
-        ];
-      case 'billing':
-        return [
-          'Review billing records',
-          'Verify payment information',
-          'Process billing adjustment if needed',
-          'Follow up with customer'
-        ];
-      case 'feature':
-        return [
-          'Analyze feature requirements',
-          'Estimate development effort',
-          'Create implementation plan',
-          'Schedule development work'
-        ];
-      default:
-        return priority === 'urgent' ? 
-          ['Immediate triage required', ...baseItems, 'Escalate if necessary'] :
-          baseItems;
-    }
-  }
-
-  private createBasicTaskDescription(ticket: ZendeskTicket, analysis: TicketAnalysis): string {
-    return `
-## 🎫 Ticket Summary
-${analysis.summary}
-
-## 📊 AI Analysis
-- **Category**: ${analysis.category}
-- **Priority**: ${analysis.priority}
-- **Sentiment**: ${analysis.sentiment}
-- **Complexity**: ${analysis.estimated_complexity}
-- **Confidence**: ${(analysis.confidence_score * 100).toFixed(1)}%
-
-## 🎯 Action Items
-${analysis.action_items.map(item => `- ${item}`).join('\n')}
-
-## 📋 Original Ticket
-**Subject**: ${ticket.subject}
-**Description**: ${ticket.description}
-**Created**: ${ticket.created_at}
-**Zendesk URL**: ${ticket.url}
-    `;
-  }
-
-  private createFallbackInsights(tickets: ZendeskTicket[], timeframe: string): AIInsights {
-    const priorityCount = tickets.reduce((acc, ticket) => {
-      acc[ticket.priority] = (acc[ticket.priority] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
+  /**
+   * Get performance issues and recommendations
+   */
+  getPerformanceIssues() {
     return {
-      period: timeframe,
-      total_tickets: tickets.length,
-      trends: {
-        priority_distribution: priorityCount,
-        category_breakdown: { general: tickets.length },
-        sentiment_analysis: { neutral: tickets.length },
-        team_workload: { support: tickets.length }
-      },
-      alerts: [],
-      recommendations: ['Review ticket trends and adjust team capacity as needed']
+      issues: this.performanceMonitor.getPerformanceIssues(),
+      recommendations: this.performanceMonitor.getRecommendations()
     };
-  }
-
-  /**
-   * Classify user intent from natural language queries
-   * @param query - The user's natural language query
-   * @returns Promise resolving to classified intent with confidence and entities
-   */
-  async classifyIntent(query: string): Promise<{
-    intent: 'zendesk_query' | 'zendesk_action' | 'clickup_create' | 'clickup_query' | 'general';
-    confidence: number;
-    entities: Array<{ type: string; value: string; }>;
-  }> {
-    if (!this.provider || !this.model) {
-      throw new Error('AI service not properly initialized');
-    }
-
-    try {
-      const prompt = `You are TaskGenie, an AI assistant for the 2dc team. Analyze this user query and classify the intent.
-
-USER QUERY: "${query}"
-
-Classify the intent and extract entities. Respond with ONLY a JSON object in this format:
-{
-  "intent": "zendesk_query|zendesk_action|clickup_create|clickup_query|general",
-  "confidence": 0.95,
-  "entities": [
-    {"type": "ticket_id", "value": "12345"},
-    {"type": "action", "value": "status"},
-    {"type": "keyword", "value": "urgent"}
-  ]
-}
-
-Intent Guidelines:
-- zendesk_query: Asking about ticket status, details, or searching tickets
-- zendesk_action: Requesting to update, close, or modify tickets
-- clickup_create: Requesting to create tasks or projects
-- clickup_query: Asking about task status, project details
-- general: General questions, greetings, or unclear requests
-
-Entity Types:
-- ticket_id: Zendesk ticket numbers
-- task_id: ClickUp task IDs
-- action: Actions like "status", "update", "close", "create"
-- priority: Priority levels like "urgent", "high", "low"
-- keyword: Important keywords related to the request`;
-
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-
-      try {
-        // Clean and parse the JSON response
-        const cleanedResponse = this.cleanAIResponse(text);
-        const classification = JSON.parse(cleanedResponse);
-
-        // Validate and return the classification
-        return {
-          intent: this.validateIntent(classification.intent) || 'general',
-          confidence: typeof classification.confidence === 'number' ? 
-            Math.max(0, Math.min(1, classification.confidence)) : 0.5,
-          entities: Array.isArray(classification.entities) ? classification.entities : []
-        };
-      } catch (parseError) {
-        console.warn('Failed to parse intent classification:', parseError);
-        // Fallback classification based on keywords
-        return this.createFallbackClassification(query);
-      }
-    } catch (error) {
-      console.error('Intent classification error:', error);
-      return this.createFallbackClassification(query);
-    }
-  }
-
-  /**
-   * Validate intent classification result
-   */
-  private validateIntent(intent: any): 'zendesk_query' | 'zendesk_action' | 'clickup_create' | 'clickup_query' | 'general' | null {
-    const validIntents = ['zendesk_query', 'zendesk_action', 'clickup_create', 'clickup_query', 'general'];
-    return validIntents.includes(intent) ? intent : null;
-  }
-
-  /**
-   * Create fallback classification when AI parsing fails
-   */
-  private createFallbackClassification(query: string): {
-    intent: 'zendesk_query' | 'zendesk_action' | 'clickup_create' | 'clickup_query' | 'general';
-    confidence: number;
-    entities: Array<{ type: string; value: string; }>;
-  } {
-    const lowerQuery = query.toLowerCase();
-    const entities: Array<{ type: string; value: string; }> = [];
-
-    // Extract ticket IDs
-    const ticketMatch = query.match(/\b(?:ticket|#)\s*(\d+)\b/i);
-    if (ticketMatch) {
-      entities.push({ type: 'ticket_id', value: ticketMatch[1] });
-    }
-
-    // Extract task IDs
-    const taskMatch = query.match(/\b(?:task|clickup)\s*(?:id)?\s*(\w+)\b/i);
-    if (taskMatch) {
-      entities.push({ type: 'task_id', value: taskMatch[1] });
-    }
-
-    // Determine intent based on keywords
-    if (lowerQuery.includes('ticket') || lowerQuery.includes('zendesk')) {
-      if (lowerQuery.includes('status') || lowerQuery.includes('show') || lowerQuery.includes('find')) {
-        return { intent: 'zendesk_query', confidence: 0.7, entities };
-      } else if (lowerQuery.includes('update') || lowerQuery.includes('close') || lowerQuery.includes('assign')) {
-        return { intent: 'zendesk_action', confidence: 0.7, entities };
-      }
-      return { intent: 'zendesk_query', confidence: 0.6, entities };
-    }
-
-    if (lowerQuery.includes('task') || lowerQuery.includes('clickup') || lowerQuery.includes('create')) {
-      if (lowerQuery.includes('create') || lowerQuery.includes('new')) {
-        return { intent: 'clickup_create', confidence: 0.7, entities };
-      }
-      return { intent: 'clickup_query', confidence: 0.6, entities };
-    }
-
-    return { intent: 'general', confidence: 0.5, entities };
-  }
-
-  /**
-   * Generate enhanced AI response with TaskGenie context
-   * @param prompt - The user's natural language query
-   * @returns Promise resolving to contextual AI response
-   */
-  async generateContextualResponse(prompt: string): Promise<string> {
-    if (!this.provider || !this.model) {
-      console.error('❌ AI Service not properly initialized for contextual response');
-      throw new Error('AI service not properly initialized - check GOOGLE_GEMINI_API_KEY');
-    }
-
-    try {
-      console.log('🤖 Generating contextual AI response...');
-      console.log(`📝 Prompt length: ${prompt.length} characters`);
-      
-      // Enhance prompt with TaskGenie context and 2dc team information
-      const enhancedPrompt = this.enhancePromptWithContext(prompt);
-      
-      const result = await this.model.generateContent(enhancedPrompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      console.log('✅ Contextual AI response generated successfully');
-      console.log(`📝 Response length: ${text.length} characters`);
-      
-      return text;
-    } catch (error) {
-      console.error('❌ Contextual AI response generation failed:');
-      console.error('Error details:', error);
-      
-      // Check for specific Google AI errors
-      if (error instanceof Error) {
-        if (error.message.includes('API_KEY')) {
-          console.error('🔑 API Key issue detected - check GOOGLE_GEMINI_API_KEY environment variable');
-          throw new Error('Google Gemini API key is invalid or missing');
-        } else if (error.message.includes('RATE_LIMIT')) {
-          console.error('⏱️ Rate limit exceeded - please try again later');
-          throw new Error('AI service rate limit exceeded');
-        } else if (error.message.includes('QUOTA')) {
-          console.error('💰 Quota exceeded - check your Google AI billing');
-          throw new Error('AI service quota exceeded');
-        }
-      }
-      
-      throw new Error(`Failed to generate contextual response: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
   }
 }

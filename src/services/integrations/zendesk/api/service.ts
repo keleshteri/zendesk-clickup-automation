@@ -409,11 +409,63 @@ export class ZendeskService {
         throw new Error(`Zendesk API error: ${lastError.status} ${lastError.statusText} - ${lastError.body}`);
       }
 
-      console.log(`✅ Successfully fetched ${tickets.length} tickets with statuses: ${statuses.join(', ')}`);
+      console.log(`✅ Successfully fetched ${tickets.length} tickets with statuses: ${statuses.join(', ')}`);      return tickets;    } catch (error) {      console.error('❌ Error fetching tickets by status:', error);      throw error;    }  }
+
+  /**
+   * Search tickets based on query string
+   * @param query - Search query string (if empty, returns recent tickets)
+   * @param limit - Maximum number of tickets to return (default: 25)
+   * @returns Promise resolving to array of matching tickets
+   */
+  async searchTickets(query: string = '', limit: number = 25): Promise<ZendeskTicket[]> {
+    try {
+      const safeLimit = Math.min(Math.max(limit, 1), 100);
+
+      // If query is empty, return recent tickets
+      if (!query.trim()) {
+        return this.getTicketsByStatus(['new', 'open', 'pending'], safeLimit);
+      }
+
+      // Use Zendesk search API with the provided query
+      const encodedQuery = encodeURIComponent(`type:ticket ${query}`);
+      const url = `${this.baseUrl}/search.json?query=${encodedQuery}&per_page=${safeLimit}&sort_by=created_at&sort_order=desc`;
+      console.log(`🔍 Searching tickets with query: "${query}" from: ${url}`);
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': this.authHeader,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Failed to search tickets:`, {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          errorBody: errorText
+        });
+
+        // If search fails, fall back to recent tickets
+        console.log(`⚠️ Search failed, falling back to recent tickets`);
+        return this.getTicketsByStatus(['new', 'open', 'pending'], safeLimit);
+      }
+
+      const data = await response.json() as { results: ZendeskTicket[], count: number };
+      const tickets = data.results || [];
+      console.log(`✅ Successfully found ${tickets.length} tickets matching query: "${query}"`);
       return tickets;
     } catch (error) {
-      console.error('❌ Error fetching tickets by status:', error);
-      throw error;
+      console.error('❌ Error searching tickets:', error);
+      // Fall back to recent tickets on error
+      console.log(`⚠️ Search error, falling back to recent tickets`);
+      try {
+        return this.getTicketsByStatus(['new', 'open', 'pending'], limit);
+      } catch (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+        return [];
+      }
     }
   }
 }

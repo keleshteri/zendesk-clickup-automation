@@ -80,6 +80,8 @@ export class SlackEventHandler {
    * @returns Promise that resolves when mention is handled
    */
   async handleMention(event: SlackAppMentionEvent): Promise<void> {
+    console.log('=== SLACK MENTION EVENT RECEIVED ===');
+    console.log('Event:', JSON.stringify(event, null, 2));
     try {
       // Check if this is a direct mention (not just a general mention)
       if (!this.isDirectMention(event.text)) {
@@ -218,6 +220,9 @@ export class SlackEventHandler {
       const { intent, confidence, entities } = nlpResponse;
       
       console.log(`Intent classified: ${intent} (confidence: ${confidence})`);
+      console.log(`Entities found:`, JSON.stringify(entities, null, 2));
+      console.log(`Original text: "${originalText}", Clean text: "${cleanText}"`);
+      
       
       // Handle low confidence responses
       if (confidence < 0.6) {

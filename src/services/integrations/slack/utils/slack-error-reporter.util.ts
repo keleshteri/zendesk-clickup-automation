@@ -242,7 +242,7 @@ export function withErrorReporting(options: {
           source: {
             service: target.constructor.name,
             method: propertyKey,
-            file: __filename
+            file: 'slack-error-reporter.util.ts'
           },
           context: {
             arguments: args.map((arg, index) => ({ [`arg${index}`]: arg })),

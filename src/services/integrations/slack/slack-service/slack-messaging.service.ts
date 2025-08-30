@@ -73,7 +73,7 @@ export class SlackMessagingService {
           {
             service: 'SlackMessagingService',
             method: 'sendMessage',
-            file: __filename
+            file: 'slack-messaging.service.ts'
           },
           {
             metadata: {
