@@ -556,6 +556,7 @@ clickupRoutes.get('/oauth', corsMiddleware, async (c) => {
       description: 'ClickUp OAuth 2.0 integration endpoints',
       documentation: {
         initiate: 'GET /clickup/auth?user_id={userId}&redirect_url={url}',
+        callback: 'GET /clickup/auth/callback?code={code}&state={state}',
         status: 'GET /clickup/auth/status?user_id={userId}',
         test: 'GET /clickup/oauth/test',
         debug: 'GET /clickup/oauth/debug?user_id={userId}',
