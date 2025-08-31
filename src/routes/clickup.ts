@@ -518,6 +518,56 @@ clickupRoutes.get('/oauth/test', corsMiddleware, async (c) => {
 });
 
 /**
+ * ClickUp OAuth information endpoint
+ * GET /clickup/oauth
+ */
+clickupRoutes.get('/oauth', corsMiddleware, async (c) => {
+  return handleAsync(async () => {
+    const services = c.get('services');
+    requireService(services.oauth, 'OAuth');
+    
+    const userId = c.req.query('user_id');
+    
+    // If user_id is provided, return user-specific OAuth status
+    if (userId) {
+      const authHeader = c.req.header('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new AuthenticationError('Authorization header required for user-specific data');
+      }
+      
+      const oauthStatus = await services.oauth!.getOAuthStatus(userId);
+      return c.json({
+        userId,
+        oauth: oauthStatus,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Return general OAuth information
+    return c.json({
+      provider: 'clickup',
+      authUrl: '/clickup/auth',
+      callbackUrl: '/clickup/auth/callback',
+      statusUrl: '/clickup/auth/status',
+      testUrl: '/clickup/oauth/test',
+      debugUrl: '/clickup/oauth/debug',
+      connectionsUrl: '/clickup/oauth/connections',
+      scopes: ['read', 'write'],
+      description: 'ClickUp OAuth 2.0 integration endpoints',
+      documentation: {
+        initiate: 'GET /clickup/auth?user_id={userId}&redirect_url={url}',
+        status: 'GET /clickup/auth/status?user_id={userId}',
+        test: 'GET /clickup/oauth/test',
+        debug: 'GET /clickup/oauth/debug?user_id={userId}',
+        connections: 'GET /clickup/oauth/connections?user_id={userId}'
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  }, 'Failed to get ClickUp OAuth information');
+});
+
+/**
  * OAuth storage debug endpoint
  * GET /clickup/oauth/debug
  */
