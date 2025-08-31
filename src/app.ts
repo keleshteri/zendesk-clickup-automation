@@ -180,7 +180,7 @@ function createTestRoutes(): Hono<{ Bindings: Env }> {
       ZENDESK_SUBDOMAIN: !!c.env.ZENDESK_SUBDOMAIN,
       ZENDESK_EMAIL: !!c.env.ZENDESK_EMAIL,
       ZENDESK_API_TOKEN: !!c.env.ZENDESK_API_TOKEN,
-      CLICKUP_API_TOKEN: !!c.env.CLICKUP_API_TOKEN,
+      CLICKUP_TOKEN: !!c.env.CLICKUP_TOKEN,
       OPENAI_API_KEY: !!c.env.OPENAI_API_KEY
     };
 

@@ -135,29 +135,28 @@ clickupRoutes.get('/auth/callback', corsMiddleware, async (c) => {
       throw new AuthenticationError('OAuth state has expired');
     }
     
-    // Exchange code for tokens (placeholder implementation)
-    const tokenResponse = {
-      success: true,
-      accessToken: 'mock_access_token',
-      refreshToken: 'mock_refresh_token',
-      expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
-      scopes: ['read', 'write'],
-      tokenType: 'Bearer'
-    };
-    
-    if (!tokenResponse.success) {
+    // Exchange code for tokens using OAuth service
+    let tokenResponse;
+    try {
+      tokenResponse = await services.oauth!.exchangeCodeForToken(code);
+    } catch (error) {
+      console.error('OAuth token exchange failed:', error);
       throw new APIError('Failed to exchange OAuth code for tokens', 400);
+    }
+    
+    if (!tokenResponse || !tokenResponse.access_token) {
+      throw new APIError('Invalid token response from ClickUp', 400);
     }
     
     // Store user OAuth data
     const oauthData = {
       user_id: oauthState.userId,
       team_id: 'default_team',
-      access_token: tokenResponse.accessToken,
-      refresh_token: tokenResponse.refreshToken,
-      expires_at: Math.floor(new Date(tokenResponse.expiresAt).getTime() / 1000),
+      access_token: tokenResponse.access_token,
+      refresh_token: tokenResponse.refresh_token,
+      expires_at: Math.floor((Date.now() + (tokenResponse.expires_in || 3600) * 1000) / 1000),
       authorized_at: new Date().toISOString(),
-      scopes: tokenResponse.scopes
+      scopes: ['read', 'write'] // Default scopes
     };
     
     await services.oauth!.storeUserOAuth(oauthState.userId, oauthData);
@@ -177,7 +176,7 @@ clickupRoutes.get('/auth/callback', corsMiddleware, async (c) => {
       message: 'ClickUp OAuth completed successfully',
       provider: 'clickup',
       userId: oauthState.userId,
-      expiresAt: tokenResponse.expiresAt,
+      expiresAt: new Date(oauthData.expires_at * 1000).toISOString(),
       timestamp: new Date().toISOString()
     });
     

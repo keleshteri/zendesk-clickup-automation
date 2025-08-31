@@ -53,7 +53,6 @@ export interface Env {
 
   // ClickUp Configuration
   CLICKUP_TOKEN?: string;
-  CLICKUP_API_TOKEN?: string;
   CLICKUP_WEBHOOK_SECRET?: string;
   CLICKUP_CLIENT_ID: string;
   CLICKUP_CLIENT_SECRET: string;

@@ -77,7 +77,7 @@ healthRoutes.get('/', async (c) => {
       {
         name: 'clickup',
         status: services.clickup ? 'available' : 'unavailable',
-        configured: !!c.env.CLICKUP_API_TOKEN
+        configured: !!c.env.CLICKUP_TOKEN
       },
       {
         name: 'ai',
@@ -222,7 +222,7 @@ healthRoutes.get('/detailed', async (c) => {
       serviceStatuses.push({
         name: 'clickup',
         status: 'unavailable',
-        configured: !!c.env.CLICKUP_API_TOKEN
+        configured: !!c.env.CLICKUP_TOKEN
       });
     }
     
@@ -398,9 +398,9 @@ healthRoutes.get('/credentials', async (c) => {
     
     // Check ClickUp credentials
     credentials.clickup = {
-      valid: !!c.env.CLICKUP_API_TOKEN,
-      configured: !!c.env.CLICKUP_API_TOKEN,
-      error: c.env.CLICKUP_API_TOKEN ? null : 'Missing CLICKUP_API_TOKEN environment variable',
+      valid: !!c.env.CLICKUP_TOKEN,
+      configured: !!c.env.CLICKUP_TOKEN,
+      error: c.env.CLICKUP_TOKEN ? null : 'Missing CLICKUP_TOKEN environment variable',
       lastCheck: timestamp
     };
     

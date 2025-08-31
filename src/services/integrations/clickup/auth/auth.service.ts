@@ -85,8 +85,8 @@ export async function validateClickUpCredentials(env: Env): Promise<ClickUpCrede
   
   // Check for OAuth configuration
   const hasOAuthConfig = env.CLICKUP_CLIENT_ID && env.CLICKUP_CLIENT_SECRET && env.CLICKUP_REDIRECT_URI;
-  const hasApiToken = env.CLICKUP_API_TOKEN;
-  const hasAccessToken = env.CLICKUP_API_TOKEN;
+  const hasApiToken = env.CLICKUP_TOKEN;
+  const hasAccessToken = env.CLICKUP_TOKEN;
   
   if (!hasOAuthConfig && !hasApiToken && !hasAccessToken) {
     errors.push('ClickUp authentication requires either OAuth configuration (CLIENT_ID, CLIENT_SECRET, REDIRECT_URI) or API_TOKEN/ACCESS_TOKEN');
@@ -115,7 +115,7 @@ export async function validateClickUpCredentials(env: Env): Promise<ClickUpCrede
     // Validate API token if present
     if (hasApiToken || hasAccessToken) {
       authType = 'api_token';
-      const token = env.CLICKUP_API_TOKEN;
+      const token = env.CLICKUP_TOKEN;
       
       if (token && token.length < 20) {
         errors.push('ClickUp API token appears to be too short');
@@ -143,7 +143,7 @@ export async function validateClickUpCredentials(env: Env): Promise<ClickUpCrede
   // Test API connectivity if we have a valid token
   if (errors.length === 0 && (hasApiToken || hasAccessToken)) {
     try {
-      const token = env.CLICKUP_API_TOKEN;
+      const token = env.CLICKUP_TOKEN;
       const testUrl = 'https://api.clickup.com/api/v2/user';
       
       const response = await fetch(testUrl, {
@@ -191,12 +191,12 @@ export async function validateClickUpCredentials(env: Env): Promise<ClickUpCrede
  */
 export function hasValidClickUpAuth(env: Env): boolean {
   // Check for OAuth access token
-  if (env.CLICKUP_API_TOKEN && env.CLICKUP_API_TOKEN.length > 20) {
+  if (env.CLICKUP_TOKEN && env.CLICKUP_TOKEN.length > 20) {
     return true;
   }
   
   // Check for API token
-  if (env.CLICKUP_API_TOKEN && env.CLICKUP_API_TOKEN.length > 20) {
+  if (env.CLICKUP_TOKEN && env.CLICKUP_TOKEN.length > 20) {
     return true;
   }
   
@@ -214,12 +214,12 @@ export function hasValidClickUpAuth(env: Env): boolean {
  * @throws {Error} When no valid authentication is available
  */
 export function getClickUpAuthHeader(env: Env): string {
-  if (env.CLICKUP_API_TOKEN) {
-    return env.CLICKUP_API_TOKEN;
+  if (env.CLICKUP_TOKEN) {
+    return env.CLICKUP_TOKEN;
   }
   
-  if (env.CLICKUP_API_TOKEN) {
-    return env.CLICKUP_API_TOKEN;
+  if (env.CLICKUP_TOKEN) {
+    return env.CLICKUP_TOKEN;
   }
   
   throw new Error('No valid ClickUp authentication token available');
@@ -279,7 +279,7 @@ export async function exchangeClickUpOAuthCode(env: Env, code: string): Promise<
     },
     body: JSON.stringify({
       client_id: env.CLICKUP_CLIENT_ID,
-      client_secret: env.CLICKUP_CLIENT_SECRET,
+    client_secret: env.CLICKUP_CLIENT_SECRET,
       code
     })
   });
