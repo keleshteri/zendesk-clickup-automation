@@ -165,6 +165,296 @@ AI: "Interfaces and types are ready. Should I implement:
 Which would you like me to start with? [WAIT FOR CONFIRMATION]"
 ```
 
+## Code Size & Complexity Rules
+
+### File Size Limits (STRICT ENFORCEMENT)
+- **Maximum 300 lines per service class** (excluding imports/exports)
+- **Maximum 500 lines total per file** (including everything)
+- **Maximum 50 lines per method/function**
+- **Maximum 5 public methods per service class**
+
+### AI Actions When Limits Exceeded
+
+#### When Service Approaches 250+ Lines:
+```
+AI: "⚠️ WARNING: [ServiceName] is approaching 250 lines. 
+Current responsibilities detected:
+1. [Responsibility 1]
+2. [Responsibility 2]  
+3. [Responsibility 3]
+
+Should I:
+A) Split into separate services by responsibility?
+B) Extract utility methods to helper classes?
+C) Create domain-specific sub-services?
+
+RECOMMENDATION: Split by [specific reason based on analysis]"
+```
+
+#### When Service Exceeds 300 Lines:
+```
+AI: "🚫 BLOCKED: [ServiceName] exceeds 300 lines (current: X lines).
+This violates SRP and maintainability rules.
+
+REQUIRED ACTION: I must split this service before adding more code.
+
+Detected split opportunities:
+1. Extract [SpecificFeature]Service (lines X-Y)
+2. Extract [AnotherFeature]Service (lines A-B)
+3. Create [Helper]Utils for shared logic (lines C-D)
+
+Shall I proceed with the split? [YES required to continue]"
+```
+
+### Service Splitting Strategies
+
+#### 1. By Business Domain
+```typescript
+// ❌ BAD: One large service (500+ lines)
+class TaskManagementService {
+  // ClickUp operations (150 lines)
+  createClickUpTask() { ... }
+  updateClickUpTask() { ... }
+  
+  // Zendesk operations (150 lines)
+  createZendeskTicket() { ... }
+  updateZendeskTicket() { ... }
+  
+  // Synchronization logic (200 lines)
+  syncTaskToTicket() { ... }
+  syncTicketToTask() { ... }
+}
+
+// ✅ GOOD: Split by domain
+class ClickUpTaskService {
+  createTask() { ... }
+  updateTask() { ... }
+}
+
+class ZendeskTicketService {
+  createTicket() { ... }
+  updateTicket() { ... }
+}
+
+class TaskSyncService {
+  constructor(
+    private clickUpService: IClickUpTaskService,
+    private zendeskService: IZendeskTicketService
+  ) {}
+  
+  syncTaskToTicket() { ... }
+  syncTicketToTask() { ... }
+}
+```
+
+#### 2. By Operation Type (CQRS Pattern)
+```typescript
+// ❌ BAD: Mixed read/write operations
+class UserService {
+  // Read operations (200 lines)
+  getUser() { ... }
+  searchUsers() { ... }
+  getUserStats() { ... }
+  
+  // Write operations (300 lines)  
+  createUser() { ... }
+  updateUser() { ... }
+  deleteUser() { ... }
+}
+
+// ✅ GOOD: Separate read/write
+class UserQueryService {
+  getUser() { ... }
+  searchUsers() { ... }
+  getUserStats() { ... }
+}
+
+class UserCommandService {
+  createUser() { ... }
+  updateUser() { ... }
+  deleteUser() { ... }
+}
+```
+
+#### 3. By Layer Responsibility
+```typescript
+// ❌ BAD: Mixed concerns (400+ lines)
+class TaskService {
+  // Data validation (100 lines)
+  validateTaskData() { ... }
+  
+  // Business logic (150 lines)
+  processTask() { ... }
+  
+  // External API calls (150 lines)
+  callClickUpAPI() { ... }
+  callZendeskAPI() { ... }
+}
+
+// ✅ GOOD: Separate by layer
+class TaskValidator {
+  validateTaskData() { ... }
+}
+
+class TaskBusinessLogic {
+  processTask() { ... }
+}
+
+class TaskApiClient {
+  callClickUpAPI() { ... }
+  callZendeskAPI() { ... }
+}
+
+class TaskService {
+  constructor(
+    private validator: TaskValidator,
+    private businessLogic: TaskBusinessLogic,
+    private apiClient: TaskApiClient
+  ) {}
+  
+  async handleTask(data: TaskData) {
+    const validData = await this.validator.validateTaskData(data);
+    const result = await this.businessLogic.processTask(validData);
+    return await this.apiClient.callClickUpAPI(result);
+  }
+}
+```
+
+### Automated Size Checking Rules
+
+#### AI Must Check Before Adding Code:
+```typescript
+// AI internal check before modification
+function checkServiceSize(filePath: string): SizeCheckResult {
+  const currentLines = countLines(filePath);
+  
+  if (currentLines > 300) {
+    return {
+      allowed: false,
+      reason: "Service exceeds 300 lines - must split first",
+      recommendations: analyzeSplitOpportunities(filePath)
+    };
+  }
+  
+  if (currentLines > 250) {
+    return {
+      allowed: true,
+      warning: "Approaching size limit - consider splitting",
+      recommendations: suggestSplitStrategies(filePath)
+    };
+  }
+  
+  return { allowed: true };
+}
+```
+
+#### Method Complexity Limits:
+```typescript
+// AI checks method complexity
+function checkMethodComplexity(method: string): boolean {
+  const lines = countMethodLines(method);
+  const cyclomaticComplexity = calculateComplexity(method);
+  
+  return lines <= 50 && cyclomaticComplexity <= 10;
+}
+```
+
+### Split Decision Matrix
+
+| Service Type | Split Strategy | Example |
+|-------------|---------------|---------|
+| **CRUD Service** | By Entity | UserService → User + Profile + Settings |
+| **Integration Service** | By External System | ApiService → ClickUp + Zendesk + Slack |
+| **Business Logic** | By Use Case | OrderService → Create + Update + Cancel |
+| **Data Processing** | By Stage | ProcessService → Validate + Transform + Store |
+
+### AI Refactoring Workflow
+
+#### Step 1: Analysis
+```
+AI: "Analyzing [ServiceName] (X lines):
+- Primary responsibilities: [list]
+- External dependencies: [list]  
+- Public interface complexity: [score]
+- Recommended split: [strategy] because [reason]
+
+Proceed with analysis? [confirmation required]"
+```
+
+#### Step 2: Interface Design
+```
+AI: "Creating split interfaces:
+
+interface ITaskCreationService {
+  createTask(data: CreateTaskData): Promise<Task>;
+}
+
+interface ITaskUpdateService {  
+  updateTask(id: string, data: UpdateTaskData): Promise<Task>;
+}
+
+interface ITaskQueryService {
+  getTask(id: string): Promise<Task | null>;
+  searchTasks(query: SearchQuery): Promise<Task[]>;
+}
+
+Approve these interfaces? [confirmation required]"
+```
+
+#### Step 3: Implementation Split
+```
+AI: "Extracting services:
+1. Move lines X-Y to TaskCreationService
+2. Move lines A-B to TaskUpdateService  
+3. Move lines C-D to TaskQueryService
+4. Update dependency injection
+5. Update tests
+
+Begin extraction? [confirmation required]"
+```
+
+#### Step 4: Integration Update
+```
+AI: "Updating service consumers:
+- Update 3 route handlers
+- Update 2 other services
+- Update test files
+- Verify all imports
+
+This will maintain the same public API. Proceed? [confirmation required]"
+```
+
+### Prevention Rules
+
+#### AI Must Ask Before Creating Large Services:
+```
+AI: "This service will handle:
+1. [Feature A] (~100 lines estimated)
+2. [Feature B] (~150 lines estimated)  
+3. [Feature C] (~200 lines estimated)
+
+Total estimate: ~450 lines - approaching limit.
+
+Should I:
+A) Create separate services from the start?
+B) Build as one service and split later?
+C) Redesign the approach to reduce complexity?
+
+RECOMMENDATION: Option A - separate services"
+```
+
+#### Complexity Budget Tracking:
+```typescript
+// AI tracks complexity budget
+interface ServiceBudget {
+  maxLines: 300;
+  currentLines: number;
+  maxMethods: 5;
+  currentMethods: number;
+  remainingBudget: number;
+}
+```
+
 ---
 
 ## AI Sequential Development Rules
