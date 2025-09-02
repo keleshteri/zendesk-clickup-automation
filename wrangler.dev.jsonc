@@ -20,8 +20,8 @@
   "kv_namespaces": [
     {
       "binding": "OAUTH_TOKENS",
-      "id": "ffb2218962b4fb0b645772c8927c202",
-      "preview_id": "ffb2218962b4fb0b645772c8927c202"
+      "id": "fffb2218962b4fb0b645772c8927c202",
+      "preview_id": "fffb2218962b4fb0b645772c8927c202"
     },
     {
       "binding": "USER_SESSIONS",
