@@ -66,19 +66,47 @@ export class ClickUpTaskService implements IClickUpTaskService {
   
   // Core CRUD operations
   async createTask(listId: string, taskData: CreateTaskRequest): Promise<ClickUpTask> {
-    if (this.config.enableValidation) {
-      const validation = await this.validateTaskData(taskData);
-      if (!validation.isValid) {
-        throw new Error(`Task validation failed: ${validation.errors.join(', ')}`);
-      }
+    if (!listId || listId.trim() === '') {
+      throw new Error('List ID is required');
     }
-    
-    const validatedData = CreateTaskRequestSchema.parse(taskData);
-    const response = await this.client.createTask(listId, validatedData);
-    return response.data!;
+
+    if (!taskData.name || taskData.name.trim() === '') {
+      throw new Error('Task name is required');
+    }
+
+    try {
+      // Check rate limits before making API call
+      const rateLimitInfo = await this.client.getRateLimitInfo();
+      if (rateLimitInfo.success && rateLimitInfo.data && rateLimitInfo.data.remaining === 0) {
+        const timeUntilReset = Math.ceil((rateLimitInfo.data.reset * 1000 - Date.now()) / 1000);
+        throw new Error(`Rate limit exceeded. Please try again in ${timeUntilReset} seconds.`);
+      }
+      
+      if (this.config.enableValidation) {
+        const validation = await this.validateTaskData(taskData);
+        if (!validation.isValid) {
+          throw new Error(`Task validation failed: ${validation.errors.join(', ')}`);
+        }
+      }
+      
+      const validatedData = CreateTaskRequestSchema.parse(taskData);
+      const response = await this.client.createTask(listId, validatedData);
+      return response.data!;
+    } catch (error: any) {
+      // If it's already a rate limit error, re-throw as is
+      if (error.message?.includes('Rate limit exceeded')) {
+        throw error;
+      }
+      // Wrap other errors with context
+      throw new Error(`Failed to create task: ${error.message}`);
+    }
   }
   
   async getTaskById(taskId: string): Promise<ClickUpTask | null> {
+    if (!taskId || taskId.trim() === '') {
+      throw new Error('Task ID is required');
+    }
+
     try {
       const response = await this.client.getTask(taskId);
       return response.data || null;
@@ -91,12 +119,44 @@ export class ClickUpTaskService implements IClickUpTaskService {
   }
   
   async updateTask(taskId: string, taskData: UpdateTaskRequest): Promise<ClickUpTask> {
-    const validatedData = UpdateTaskRequestSchema.parse(taskData);
-    const response = await this.client.updateTask(taskId, validatedData);
-    return response.data!;
+    if (!taskId || taskId.trim() === '') {
+      throw new Error('Task ID is required');
+    }
+
+    if (!taskData || Object.keys(taskData).length === 0) {
+      throw new Error('Update data cannot be empty');
+    }
+
+    // Check rate limits before making the request
+    const rateLimitInfo = await this.client.getRateLimitInfo();
+    if (!rateLimitInfo.success || !rateLimitInfo.data) {
+      throw new Error('Failed to check rate limits');
+    }
+
+    if (rateLimitInfo.data.remaining <= 0) {
+      const resetTime = Math.ceil((rateLimitInfo.data.reset - Date.now()) / 1000);
+      throw new Error(`Rate limit exceeded. Please try again in ${resetTime} seconds.`);
+    }
+
+    try {
+      const validatedData = UpdateTaskRequestSchema.parse(taskData);
+      const response = await this.client.updateTask(taskId, validatedData);
+      return response.data!;
+    } catch (error: any) {
+      // Re-throw rate limit errors as is
+      if (error.message && error.message.includes('Rate limit exceeded')) {
+        throw error;
+      }
+      // Wrap other errors with context
+      throw new Error(`Failed to update task: ${error.message}`);
+    }
   }
   
   async deleteTask(taskId: string): Promise<void> {
+    if (!taskId || taskId.trim() === '') {
+      throw new Error('Task ID is required');
+    }
+
     try {
       await this.client.deleteTask(taskId);
     } catch (error: any) {
@@ -108,6 +168,10 @@ export class ClickUpTaskService implements IClickUpTaskService {
   }
   
   async getTasksByList(listId: string, params?: TaskQueryParams): Promise<PaginatedResponse<ClickUpTask>> {
+    if (!listId || listId.trim() === '') {
+      throw new Error('List ID is required');
+    }
+    
     const validatedParams = params ? TaskQueryParamsSchema.parse(params) : undefined;
     const response = await this.client.getTasks(listId, validatedParams);
     

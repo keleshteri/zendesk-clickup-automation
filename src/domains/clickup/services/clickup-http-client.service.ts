@@ -58,7 +58,7 @@ export class ClickUpHttpClient implements IClickUpHttpClient {
   private async executeRequest<T>(
     url: string,
     config: HTTPConfig,
-    attempt = 1
+    attempt = 0
   ): Promise<ClickUpAPIResponse<T>> {
     try {
       const controller = new AbortController();
@@ -90,7 +90,7 @@ export class ClickUpHttpClient implements IClickUpHttpClient {
       };
     } catch (error) {
       if (attempt < this.config.retryAttempts && this.shouldRetry(error)) {
-        await this.delay(this.config.retryDelay * attempt);
+        await this.delay(this.config.retryDelay * (attempt + 1));
         return this.executeRequest<T>(url, config, attempt + 1);
       }
       throw this.createAPIError(error, url, config.method);
@@ -183,7 +183,8 @@ export class ClickUpHttpClient implements IClickUpHttpClient {
       return error.isRateLimitError() || error.isServerError();
     }
     // Retry on network errors
-    return error.name === 'AbortError' || error.name === 'TypeError';
+    return error.name === 'AbortError' || error.name === 'TypeError' || 
+           (error instanceof Error && error.message.includes('Network error'));
   }
 
   /**

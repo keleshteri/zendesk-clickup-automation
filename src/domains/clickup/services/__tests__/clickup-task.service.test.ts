@@ -82,6 +82,17 @@ describe('ClickUpTaskService', () => {
         tags: ['test'],
       };
 
+      mockClient.getRateLimitInfo.mockResolvedValue({
+        success: true,
+        data: {
+          limit: 100,
+          remaining: 50,
+          reset: Date.now() + 60000,
+        },
+        statusCode: 200,
+        headers: {},
+      });
+
       const mockTask: ClickUpTask = {
         id: 'task-123',
         name: 'Test Task',
@@ -150,7 +161,12 @@ describe('ClickUpTaskService', () => {
         },
       };
 
-      mockClient.createTask.mockResolvedValue(mockTask);
+      mockClient.createTask.mockResolvedValue({
+        success: true,
+        data: mockTask,
+        statusCode: 200,
+        headers: {},
+      });
 
       const result = await service.createTask('list-123', taskData);
 
@@ -189,6 +205,17 @@ describe('ClickUpTaskService', () => {
         name: 'Test Task',
         description: 'Test Description',
       };
+
+      mockClient.getRateLimitInfo.mockResolvedValue({
+        success: true,
+        data: {
+          limit: 100,
+          remaining: 50,
+          reset: Date.now() + 60000,
+        },
+        statusCode: 200,
+        headers: {},
+      });
 
       const apiError = new Error('API Error: Insufficient permissions');
       mockClient.createTask.mockRejectedValue(apiError);
@@ -265,7 +292,12 @@ describe('ClickUpTaskService', () => {
         },
       };
 
-      mockClient.getTask.mockResolvedValue(mockTask);
+      mockClient.getTask.mockResolvedValue({
+        success: true,
+        data: mockTask,
+        statusCode: 200,
+        headers: {},
+      });
 
       const result = await service.getTaskById('task-123');
 
@@ -274,7 +306,12 @@ describe('ClickUpTaskService', () => {
     });
 
     it('should return null when task not found', async () => {
-      mockClient.getTask.mockResolvedValue(null);
+      mockClient.getTask.mockResolvedValue({
+        success: true,
+        data: null,
+        statusCode: 200,
+        headers: {},
+      });
 
       const result = await service.getTaskById('nonexistent-task');
 
@@ -368,7 +405,23 @@ describe('ClickUpTaskService', () => {
         },
       };
 
-      mockClient.updateTask.mockResolvedValue(updatedTask);
+      mockClient.getRateLimitInfo.mockResolvedValue({
+        success: true,
+        data: {
+          limit: 100,
+          remaining: 50,
+          reset: Date.now() + 60000,
+        },
+        statusCode: 200,
+        headers: {},
+      });
+
+      mockClient.updateTask.mockResolvedValue({
+        success: true,
+        data: updatedTask,
+        statusCode: 200,
+        headers: {},
+      });
 
       const result = await service.updateTask('task-123', updateData);
 
@@ -376,7 +429,7 @@ describe('ClickUpTaskService', () => {
       expect(mockClient.updateTask).toHaveBeenCalledWith('task-123', updateData);
     });
 
-    it('should validate task ID for updates', async () => {
+    it('should validate task ID for update', async () => {
       const updateData: UpdateTaskRequest = {
         name: 'Updated Task Name',
       };
@@ -386,6 +439,7 @@ describe('ClickUpTaskService', () => {
         .toThrow('Task ID is required');
 
       expect(mockClient.updateTask).not.toHaveBeenCalled();
+      expect(mockClient.getRateLimitInfo).not.toHaveBeenCalled();
     });
 
     it('should validate update data is not empty', async () => {
@@ -394,6 +448,7 @@ describe('ClickUpTaskService', () => {
         .toThrow('Update data cannot be empty');
 
       expect(mockClient.updateTask).not.toHaveBeenCalled();
+      expect(mockClient.getRateLimitInfo).not.toHaveBeenCalled();
     });
   });
 
@@ -484,9 +539,21 @@ describe('ClickUpTaskService', () => {
         },
       ];
 
+      mockClient.getTasks.mockResolvedValue({
+        success: true,
+        data: {
+          items: mockTasks,
+          totalCount: mockTasks.length,
+          hasMore: false,
+          nextCursor: null,
+        },
+        statusCode: 200,
+        headers: {},
+      });
+
       const result = await service.getTasksByList('list-123');
 
-      expect(result).toEqual(mockTasks);
+      expect(result.items).toEqual(mockTasks);
       expect(mockClient.getTasks).toHaveBeenCalledWith('list-123', undefined);
     });
   });
@@ -559,12 +626,22 @@ describe('ClickUpTaskService', () => {
         },
       ];
 
-      mockClient.getTasks.mockResolvedValue(mockTasks);
+      mockClient.getTasks.mockResolvedValue({
+        success: true,
+        data: {
+          items: mockTasks,
+          totalCount: mockTasks.length,
+          hasMore: false,
+          nextCursor: null,
+        },
+        statusCode: 200,
+        headers: {},
+      });
 
       const result = await service.getTasksByList('list-123');
 
-      expect(result).toEqual(mockTasks);
-      expect(mockClient.getTasks).toHaveBeenCalledWith('list-123');
+      expect(result.items).toEqual(mockTasks);
+      expect(mockClient.getTasks).toHaveBeenCalledWith('list-123', undefined);
     });
 
     it('should validate list ID', async () => {
@@ -578,6 +655,18 @@ describe('ClickUpTaskService', () => {
 
   describe('error handling', () => {
     it('should wrap client errors with context', async () => {
+      // Mock rate limit info to return not rate limited
+      mockClient.getRateLimitInfo.mockResolvedValue({
+        success: true,
+        data: {
+          limit: 100,
+          remaining: 50,
+          reset: Math.floor(Date.now() / 1000) + 3600,
+        },
+        statusCode: 200,
+        headers: {},
+      });
+      
       const clientError = new Error('ClickUp API Error');
       mockClient.createTask.mockRejectedValue(clientError);
 
@@ -593,10 +682,16 @@ describe('ClickUpTaskService', () => {
 
     it('should handle rate limiting gracefully', async () => {
       // Mock rate limit info to simulate rate limiting
-      mockClient.getRateLimitInfo.mockReturnValue({
-        limit: 100,
-        remaining: 0,
-        reset: Date.now() + 60000, // 1 minute from now
+      const resetTime = Math.floor((Date.now() + 60000) / 1000); // 1 minute from now in seconds
+      mockClient.getRateLimitInfo.mockResolvedValue({
+        success: true,
+        data: {
+          limit: 100,
+          remaining: 0,
+          reset: resetTime,
+        },
+        statusCode: 200,
+        headers: {},
       });
 
       const taskData: CreateTaskRequest = {

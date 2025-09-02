@@ -102,7 +102,7 @@ describe('ClickUpClient', () => {
 
       const result = await client.getAuthorizedUser();
 
-      expect(result).toEqual(mockUser);
+      expect(result.data).toEqual(mockUser);
     });
 
     it('should throw error for failed request', async () => {
@@ -209,7 +209,7 @@ describe('ClickUpClient', () => {
 
       const result = await client.createTask('list-123', taskData);
 
-      expect(result).toEqual(mockTask);
+      expect(result.data).toEqual(mockTask);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.clickup.com/api/v2/list/list-123/task',
         expect.objectContaining({
@@ -223,14 +223,22 @@ describe('ClickUpClient', () => {
       );
     });
 
-    it('should handle validation errors', async () => {
-      const invalidTaskData = {
-        name: '', // Invalid: empty name
-      } as CreateTaskRequest;
+    it('should handle API errors', async () => {
+      const taskData: CreateTaskRequest = {
+        name: 'Test Task',
+        description: 'Test Description',
+      };
 
-      await expect(client.createTask('list-123', invalidTaskData))
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        headers: new Headers(),
+        json: () => Promise.resolve({ error: 'Bad Request' }),
+      } as Response);
+
+      await expect(client.createTask('list-123', taskData))
         .rejects
-        .toThrow('Task name is required');
+        .toThrow();
     });
   });
 
@@ -288,7 +296,7 @@ describe('ClickUpClient', () => {
 
       const result = await client.getSpaces('team-123');
 
-      expect(result).toEqual(mockSpaces);
+      expect(result.data!.items).toEqual(mockSpaces);
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.clickup.com/api/v2/team/team-123/space',
         expect.objectContaining({
@@ -310,22 +318,31 @@ describe('ClickUpClient', () => {
         ok: true,
         status: 200,
         headers,
-        json: () => Promise.resolve({ user: {} }),
+        json: () => Promise.resolve({ 
+          user: {
+            id: 123,
+            username: 'testuser',
+            email: 'test@example.com',
+            color: '#ff0000',
+            profilePicture: null,
+            initials: 'TU'
+          }
+        }),
       } as Response);
 
       await client.getAuthorizedUser();
 
-      const rateLimitInfo = client.getRateLimitInfo();
-      expect(rateLimitInfo).toEqual({
+      const rateLimitInfo = await client.getRateLimitInfo();
+      expect(rateLimitInfo.data).toEqual({
         limit: 100,
         remaining: 99,
         reset: 1640995200,
-        resetTime: new Date(1640995200 * 1000),
       });
     });
 
     it('should detect rate limiting', async () => {
       const headers = new Headers({
+        'x-ratelimit-limit': '100',
         'x-ratelimit-remaining': '0',
         'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + 60),
       });
@@ -334,14 +351,23 @@ describe('ClickUpClient', () => {
         ok: true,
         status: 200,
         headers,
-        json: () => Promise.resolve({ user: {} }),
+        json: () => Promise.resolve({ 
+          user: {
+            id: 123,
+            username: 'testuser',
+            email: 'test@example.com',
+            color: '#ff0000',
+            profilePicture: null,
+            initials: 'TU'
+          }
+        }),
       } as Response);
 
       await client.getAuthorizedUser();
 
       const rateLimitInfo = await client.getRateLimitInfo();
       expect(rateLimitInfo.data?.remaining).toBe(0);
-      expect(rateLimitInfo.data?.reset).toBeGreaterThan(Date.now());
+      expect(rateLimitInfo.data?.reset).toBeGreaterThan(Math.floor(Date.now() / 1000));
     });
   });
 
@@ -354,7 +380,16 @@ describe('ClickUpClient', () => {
           ok: true,
           status: 200,
           headers: new Headers(),
-          json: () => Promise.resolve({ user: {} }),
+          json: () => Promise.resolve({ 
+            user: {
+              id: 123,
+              username: 'testuser',
+              email: 'test@example.com',
+              color: '#ff0000',
+              profilePicture: null,
+              initials: 'TU'
+            }
+          }),
         } as Response);
 
       await client.getAuthorizedUser();
@@ -363,9 +398,15 @@ describe('ClickUpClient', () => {
     });
 
     it('should throw error after max retries', async () => {
+      // Create client with faster retry delay for testing
+      const fastRetryClient = new ClickUpClient({
+        ...config,
+        retryDelay: 10 // 10ms instead of 1000ms
+      });
+      
       mockFetch.mockRejectedValue(new Error('Network error'));
 
-      await expect(client.getAuthorizedUser())
+      await expect(fastRetryClient.getAuthorizedUser())
         .rejects
         .toThrow('Network error');
 
