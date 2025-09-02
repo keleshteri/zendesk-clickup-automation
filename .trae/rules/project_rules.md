@@ -165,6 +165,288 @@ AI: "Interfaces and types are ready. Should I implement:
 Which would you like me to start with? [WAIT FOR CONFIRMATION]"
 ```
 
+## Interface & Type Organization Rules
+
+### CRITICAL: No Types/Interfaces in Service Files
+
+#### Bad Practice (FORBIDDEN):
+```typescript
+// ❌ BAD: Types defined inside service file
+// src/domains/clickup/services/clickup-http-client.service.ts
+
+export interface HTTPConfig { ... }           // Should be in types/
+export type HTTPHeaders = { ... };            // Should be in types/  
+export interface ClickUpAPIResponse<T> { ... } // Should be in interfaces/
+export interface ClickUpHttpClientConfig { ... } // Should be in interfaces/
+
+export class ClickUpHttpClient {
+  // Service implementation
+}
+```
+
+#### Good Practice (REQUIRED):
+```typescript
+// ✅ GOOD: Separated concerns
+
+// src/domains/clickup/interfaces/http-client.interface.ts
+export interface IClickUpHttpClient {
+  get<T>(url: string): Promise<ClickUpAPIResponse<T>>;
+  post<T>(url: string, data: any): Promise<ClickUpAPIResponse<T>>;
+}
+
+export interface ClickUpAPIResponse<T> {
+  data: T;
+  status: number;
+  headers: HTTPHeaders;
+  rateLimitInfo: ClickUpRateLimitInfo | null;
+}
+
+// src/domains/clickup/types/http.types.ts
+export type HTTPHeaders = Record<string, string>;
+
+export type HTTPConfig = {
+  readonly method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  readonly headers?: HTTPHeaders;
+  readonly body?: string;
+  readonly timeout?: number;
+};
+
+export type ClickUpHttpClientConfig = {
+  readonly apiKey: string;
+  readonly baseUrl?: string;
+  readonly timeout?: number;
+  readonly retryAttempts?: number;
+  readonly retryDelay?: number;
+  readonly userAgent?: string;
+};
+
+// src/domains/clickup/services/clickup-http-client.service.ts
+import type { IClickUpHttpClient, ClickUpAPIResponse } from '../interfaces/http-client.interface';
+import type { HTTPConfig, ClickUpHttpClientConfig } from '../types/http.types';
+
+export class ClickUpHttpClient implements IClickUpHttpClient {
+  // Clean service implementation only
+}
+```
+
+### AI Enforcement Rules
+
+#### BEFORE Creating Any Service:
+```
+AI: "I'm about to create [ServiceName]. I detect these types/interfaces needed:
+- Interface: I[ServiceName] → goes to interfaces/[service-name].interface.ts
+- Types: [TypeName1, TypeName2] → goes to types/[category].types.ts
+- Config: [ConfigName] → goes to types/config.types.ts
+
+Should I create the interfaces and types first in separate files? [YES required]"
+```
+
+#### When AI Detects Inline Types/Interfaces:
+```
+AI: "🚫 VIOLATION DETECTED: [ServiceFile] contains inline type definitions.
+
+Found violations:
+- HTTPConfig interface (line X) → should be in types/http.types.ts
+- ClickUpAPIResponse interface (line Y) → should be in interfaces/api.interface.ts
+
+REQUIRED ACTION: I must extract these to proper files before continuing.
+Shall I extract them now? [YES required to continue]"
+```
+
+### File Organization Rules
+
+#### Types vs Interfaces Decision Matrix:
+| Use **interfaces/** for: | Use **types/** for: |
+|-------------------------|---------------------|
+| Service contracts (IUserService) | Data structures (User, UserData) |
+| API response shapes | Configuration objects |
+| Repository contracts | Union types (Status \| Error) |
+| Client contracts | Primitive combinations |
+| Abstract behaviors | Utility type definitions |
+
+#### Naming Conventions:
+```typescript
+// Interfaces (contracts/behaviors)
+interfaces/
+├── user-service.interface.ts     // IUserService
+├── http-client.interface.ts      // IHttpClient, IAPIResponse
+└── repository.interface.ts       // IUserRepository
+
+// Types (data structures)  
+types/
+├── user.types.ts                 // User, UserData, CreateUserRequest
+├── api.types.ts                  // APIResponse<T>, HTTPHeaders
+├── config.types.ts               // AppConfig, DatabaseConfig
+└── common.types.ts               // ID, Timestamp, Status
+```
+
+### AI Extraction Workflow
+
+#### Step 1: Detection
+```typescript
+// AI scans service files for violations
+function detectInlineTypes(serviceFile: string): Violation[] {
+  const violations = [];
+  
+  // Detect exported interfaces
+  if (contains(serviceFile, 'export interface')) {
+    violations.push({
+      type: 'interface',
+      suggestion: 'Extract to interfaces/ directory'
+    });
+  }
+  
+  // Detect exported types
+  if (contains(serviceFile, 'export type')) {
+    violations.push({
+      type: 'type',
+      suggestion: 'Extract to types/ directory'
+    });
+  }
+  
+  return violations;
+}
+```
+
+#### Step 2: Extraction Plan
+```
+AI: "Extraction plan for [ServiceName]:
+
+1. Create interfaces/[service].interface.ts:
+   - IClickUpHttpClient (service contract)
+   - ClickUpAPIResponse<T> (API response shape)
+
+2. Create types/http.types.ts:
+   - HTTPConfig (configuration data)
+   - HTTPHeaders (utility type)
+
+3. Update [ServiceName] imports:
+   - Import from new interface file
+   - Import from new types file
+
+4. Update other files that might import these types
+
+Proceed with extraction? [confirmation required]"
+```
+
+#### Step 3: Automated Extraction
+```typescript
+// AI creates properly organized files
+// interfaces/clickup-http-client.interface.ts
+/**
+ * @type: interface
+ * @domain: clickup
+ * @purpose: HTTP client contract for ClickUp API
+ * @exports: [IClickUpHttpClient, ClickUpAPIResponse]
+ */
+
+// types/http.types.ts  
+/**
+ * @type: types
+ * @domain: clickup
+ * @purpose: HTTP-related data structures
+ * @exports: [HTTPConfig, HTTPHeaders, ClickUpHttpClientConfig]
+ */
+
+// services/clickup-http-client.service.ts
+/**
+ * @type: service
+ * @domain: clickup
+ * @purpose: HTTP client implementation
+ * @implements: IClickUpHttpClient
+ * @dependencies: [ClickUpAPIError]
+ */
+```
+
+### Import Organization Rules
+
+#### Clean Import Structure:
+```typescript
+// ✅ GOOD: Organized imports in service files
+// External dependencies first
+import { ClickUpAPIError } from '../errors/clickup-api.error';
+
+// Interface imports (contracts)
+import type { IClickUpHttpClient, ClickUpAPIResponse } from '../interfaces/http-client.interface';
+
+// Type imports (data structures)
+import type { 
+  HTTPConfig, 
+  HTTPHeaders, 
+  ClickUpHttpClientConfig 
+} from '../types/http.types';
+
+// Shared types
+import type { ClickUpRateLimitInfo } from '../types/api.types';
+```
+
+#### Import Rules:
+- **Interface imports**: Use `import type` for interfaces
+- **Type imports**: Always use `import type` for types
+- **Group by category**: External → Interfaces → Types → Shared
+- **Alphabetical within groups**: Keep imports sorted
+
+### Violation Prevention
+
+#### Service File Template:
+```typescript
+/**
+ * @type: service
+ * @domain: [domain]
+ * @purpose: [single line purpose]
+ * @implements: [IInterfaceName]
+ * @dependencies: [list]
+ * @tested: no
+ */
+
+// IMPORTS ONLY - NO TYPE DEFINITIONS ALLOWED
+import type { ... } from '../interfaces/...';
+import type { ... } from '../types/...';
+
+// SERVICE IMPLEMENTATION ONLY
+export class [ServiceName] implements [IServiceName] {
+  // Implementation only - no type definitions
+}
+
+// NO EXPORTS OF TYPES OR INTERFACES ALLOWED
+```
+
+#### AI Pre-Check Before Service Creation:
+```typescript
+function validateServiceFileStructure(content: string): ValidationResult {
+  const violations = [];
+  
+  if (content.includes('export interface')) {
+    violations.push('Contains interface definition - should be in interfaces/');
+  }
+  
+  if (content.includes('export type')) {
+    violations.push('Contains type definition - should be in types/');
+  }
+  
+  if (violations.length > 0) {
+    return {
+      valid: false,
+      violations,
+      action: 'Extract types/interfaces to proper directories first'
+    };
+  }
+  
+  return { valid: true };
+}
+```
+
+### Benefits of Proper Organization:
+
+1. **Reusability**: Types/interfaces can be imported by multiple services
+2. **Maintainability**: Changes to types don't affect service logic
+3. **Testability**: Easier to mock interfaces separately
+4. **Clarity**: Service files focus only on business logic
+5. **Circular Dependencies**: Prevents import cycles
+6. **Bundle Size**: Better tree-shaking for unused types
+
+---
+
 ## Code Size & Complexity Rules
 
 ### File Size Limits (STRICT ENFORCEMENT)
