@@ -1,0 +1,57 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "zendesk-clickup-automation-dev",
+  "main": "src/index.ts",
+  "compatibility_date": "2023-05-18",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "ENVIRONMENT": "development",
+    "LOG_LEVEL": "debug",
+    "CLICKUP_API_BASE_URL": "https://api.clickup.com/api/v2",
+    "ZENDESK_API_BASE_URL": "https://your-domain.zendesk.com/api/v2",
+    "CLICKUP_REDIRECT_URI": "http://localhost:8787/auth/callback",
+    "APP_BASE_URL": "http://localhost:8787",
+    "APP_ENVIRONMENT": "development",
+    "CORS_ORIGINS": "http://localhost:3000,http://localhost:8080"
+  },
+  // Development KV namespaces for local testing
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_TOKENS",
+      "id": "ffb2218962b4fb0b645772c8927c202",
+      "preview_id": "ffb2218962b4fb0b645772c8927c202"
+    },
+    {
+      "binding": "USER_SESSIONS",
+      "id": "77a6abe03ea54bdb9af5fc19199cc6b7",
+      "preview_id": "77a6abe03ea54bdb9af5fc19199cc6b7"
+    },
+    {
+      "binding": "OAUTH_STATES",
+      "id": "78a10605c18c4fd8be4687705c41b7bf",
+      "preview_id": "78a10605c18c4fd8be4687705c41b7bf"
+    },
+    {
+      "binding": "USER_TOKENS",
+      "id": "5545e0449b184fecb6e07ee172c36151",
+      "preview_id": "5545e0449b184fecb6e07ee172c36151"
+    }
+  ],
+  // Development secrets (set via: wrangler secret put <SECRET_NAME> --env dev)
+  // Required secrets for development:
+  // - CLICKUP_CLIENT_ID: ClickUp OAuth application client ID (dev)
+  // - CLICKUP_CLIENT_SECRET: ClickUp OAuth application client secret (dev)
+  // - CLICKUP_WEBHOOK_SECRET: ClickUp webhook verification secret (dev)
+  // - ZENDESK_API_TOKEN: Zendesk API token for authentication (dev)
+  // - ZENDESK_SUBDOMAIN: Your Zendesk subdomain (dev)
+  // - JWT_SECRET: Secret for signing JWT tokens (dev)
+  // - ENCRYPTION_KEY: Key for encrypting sensitive data (dev)
+  
+  // Optional development features
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

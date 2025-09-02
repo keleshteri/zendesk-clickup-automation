@@ -2,14 +2,30 @@
   "name": "zendesk-clickup-automation",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --config wrangler.dev.jsonc",
+    "dev:prod": "wrangler dev",
     "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "deploy:dev": "wrangler deploy --config wrangler.dev.jsonc --minify",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "cf-typegen:dev": "wrangler types --config wrangler.dev.jsonc --env-interface CloudflareBindings",
+    "kv:list": "wrangler kv:namespace list",
+    "kv:list:dev": "wrangler kv:namespace list --config wrangler.dev.jsonc",
+    "logs": "wrangler tail",
+    "logs:dev": "wrangler tail --config wrangler.dev.jsonc",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^4.9.5"
+    "hono": "^4.9.5",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.1.0",
+    "@cloudflare/workers-types": "^4.20250831.0",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
     "wrangler": "^4.4.0"
   }
 }

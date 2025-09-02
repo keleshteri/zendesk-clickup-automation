@@ -1,20 +1,53 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "zendesk-clickup-automation",
+  "name": "zendesk-clickup-automation-prod",
   "main": "src/index.ts",
-  "compatibility_date": "2025-09-01"
-  // "compatibility_flags": [
-  //   "nodejs_compat"
-  // ],
-  // "vars": {
-  //   "MY_VAR": "my-variable"
-  // },
-  // "kv_namespaces": [
-  //   {
-  //     "binding": "MY_KV_NAMESPACE",
-  //     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  //   }
-  // ],
+  "compatibility_date": "2023-05-18",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "LOG_LEVEL": "warn",
+    "CLICKUP_API_BASE_URL": "https://api.clickup.com/api/v2",
+    "ZENDESK_API_BASE_URL": "https://your-domain.zendesk.com/api/v2",
+    "APP_ENVIRONMENT": "production",
+    "CORS_ORIGINS": "https://your-production-domain.com"
+  },
+  // Production secrets (set via: wrangler secret put <SECRET_NAME>)
+  // Required secrets for production:
+  // - CLICKUP_CLIENT_ID: ClickUp OAuth application client ID (prod)
+  // - CLICKUP_CLIENT_SECRET: ClickUp OAuth application client secret (prod)
+  // - CLICKUP_WEBHOOK_SECRET: ClickUp webhook verification secret (prod)
+  // - ZENDESK_API_TOKEN: Zendesk API token for authentication (prod)
+  // - ZENDESK_SUBDOMAIN: Your Zendesk subdomain (prod)
+  // - JWT_SECRET: Secret for signing JWT tokens (prod)
+  // - ENCRYPTION_KEY: Key for encrypting sensitive data (prod)
+  // - APP_BASE_URL: Production app base URL
+  // - CLICKUP_REDIRECT_URI: Production OAuth redirect URI
+  
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_TOKENS",
+      "id": "prod-oauth-tokens-kv",
+      "preview_id": "prod-oauth-tokens-kv-preview"
+    },
+    {
+      "binding": "USER_SESSIONS",
+      "id": "prod-user-sessions-kv",
+      "preview_id": "prod-user-sessions-kv-preview"
+    },
+    {
+      "binding": "OAUTH_STATES",
+      "id": "prod-oauth-states-kv",
+      "preview_id": "prod-oauth-states-kv-preview"
+    },
+    {
+      "binding": "USER_TOKENS",
+      "id": "prod-user-tokens-kv",
+      "preview_id": "prod-user-tokens-kv-preview"
+    }
+  ],
   // "r2_buckets": [
   //   {
   //     "binding": "MY_BUCKET",
