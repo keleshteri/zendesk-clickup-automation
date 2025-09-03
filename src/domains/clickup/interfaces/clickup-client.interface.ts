@@ -85,4 +85,5 @@ export interface IClickUpClient {
   // Utility Operations
   validateWebhookSignature(signature: string, body: string, secret: string): boolean;
   getRateLimitInfo(): Promise<ApiResponse<{ limit: number; remaining: number; reset: number }>>;
+  healthCheck(): Promise<ApiResponse<{ status: string; timestamp: string }>>;
 }

@@ -86,35 +86,15 @@ app.get('/api', (c: DIContext) => {
       oauth: {
         authorize: '/api/clickup/auth',
         callback: '/api/clickup/auth/callback',
+        token_management: 'GET/POST/DELETE /api/clickup/auth/token/:userId',
       },
-      api: {
-        // Task Management
-        get_task: 'GET /api/clickup/tasks/:taskId',
-        get_tasks: 'GET /api/clickup/lists/:listId/tasks',
-        create_task: 'POST /api/clickup/lists/:listId/tasks',
-        update_task: 'PUT /api/clickup/tasks/:taskId',
-        delete_task: 'DELETE /api/clickup/tasks/:taskId',
-        
-        // Workspace Management
-        get_spaces: 'GET /api/clickup/spaces',
-        get_space: 'GET /api/clickup/spaces/:spaceId',
-        create_space: 'POST /api/clickup/teams/:teamId/spaces',
-        get_folders: 'GET /api/clickup/spaces/:spaceId/folders',
-        create_folder: 'POST /api/clickup/spaces/:spaceId/folders',
-        get_lists: 'GET /api/clickup/folders/:folderId/lists',
-        get_folderless_lists: 'GET /api/clickup/spaces/:spaceId/lists',
-        create_list: 'POST /api/clickup/folders/:folderId/lists',
-        
-        // User & Team Management
-        get_user: 'GET /api/clickup/user',
-        get_teams: 'GET /api/clickup/teams',
-        
-        // Webhook Management
-        get_webhooks: 'GET /api/clickup/teams/:teamId/webhooks',
-        create_webhook: 'POST /api/clickup/teams/:teamId/webhooks',
+      status: {
+        connectivity: 'GET /api/clickup/status',
+        authentication: 'GET /api/clickup/status/auth',
+        automation_config: 'GET /api/clickup/automation/config',
       },
       authentication: {
-        note: 'All /api/clickup/* endpoints require Bearer token in Authorization header',
+        note: 'Status endpoints require Bearer token in Authorization header (except /status)',
         example: 'Authorization: Bearer your_clickup_access_token',
       },
     },
@@ -132,12 +112,11 @@ app.notFound((c) => {
       available_endpoints: {
         general: ['/health', '/api'],
         oauth: ['/api/clickup/auth', '/api/clickup/auth/callback'],
-        clickup_api: [
-          '/api/clickup/tasks/:taskId',
-          '/api/clickup/lists/:listId/tasks',
-          '/api/clickup/spaces',
-          '/api/clickup/teams',
-          '/api/clickup/user',
+        token_management: ['/api/clickup/auth/token/:userId'],
+        status: [
+          '/api/clickup/status',
+          '/api/clickup/status/auth',
+          '/api/clickup/automation/config',
         ],
         note: 'See /api for complete endpoint documentation',
       },

@@ -1,7 +1,7 @@
 /**
  * @type: routes
  * @domain: clickup
- * @purpose: ClickUp API routes with comprehensive endpoint coverage
+ * @purpose: Essential ClickUp routes for automation setup and status
  * @framework: Hono
  * @validation: Zod
  */
@@ -19,25 +19,6 @@ type DIContextWithAuth = Context<{
     accessToken: string;
   };
 }>;
-
-// Import validation schemas
-import {
-  CreateTaskRequestSchema,
-  UpdateTaskRequestSchema,
-  TaskQueryParamsSchema,
-} from '../../domains/clickup/types/task.types';
-
-import {
-  CreateSpaceRequestSchema,
-  UpdateSpaceRequestSchema,
-  CreateFolderRequestSchema,
-  CreateListRequestSchema,
-} from '../../domains/clickup/types/workspace.types';
-
-import {
-  CreateWebhookRequestSchema,
-  UpdateWebhookRequestSchema,
-} from '../../domains/clickup/types/webhook.types';
 
 // Create ClickUp routes app
 const clickupRoutes = new Hono<{ Bindings: Env }>();
@@ -233,8 +214,8 @@ clickupRoutes.get('/auth/callback', async (c: DIContext) => {
 
 // Middleware for authentication validation (applies to all routes except OAuth)
 clickupRoutes.use('*', async (c: DIContextWithAuth, next) => {
-  // Skip authentication for OAuth routes and debug routes
-  if (c.req.path.includes('/auth') || c.req.path.includes('/debug')) {
+  // Skip authentication for OAuth routes, debug routes, and status routes
+  if (c.req.path.includes('/auth') || c.req.path.includes('/debug') || c.req.path.includes('/status')) {
     return next();
   }
 
@@ -256,767 +237,163 @@ clickupRoutes.use('*', async (c: DIContextWithAuth, next) => {
 });
 
 // ============================================================================
-// TASK MANAGEMENT ROUTES
+// STATUS AND CONNECTIVITY ROUTES
 // ============================================================================
 
 /**
- * Get task by ID
- * GET /api/clickup/tasks/:taskId
+ * Check ClickUp connectivity and authentication status
+ * GET /api/clickup/status
  */
-clickupRoutes.get('/tasks/:taskId', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpTaskService } = c.get('deps');
-    const taskId = c.req.param('taskId');
-    const accessToken = c.get('accessToken');
-    
-    if (!taskId) {
-      return c.json(
-        {
-          error: 'Bad Request',
-          message: 'Task ID is required',
-        },
-        400
-      );
-    }
-    
-    const result = await clickUpTaskService.getTask(taskId, accessToken);
-    
-    if (!result.success) {
-      return c.json(
-        {
-          error: 'Task Not Found',
-          message: result.error || 'Task not found',
-        },
-        404
-      );
-    }
-    
-    return c.json({
-      success: true,
-      data: result.data,
-    });
-  } catch (error) {
-    console.error('Get task error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve task',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Get tasks from a list
- * GET /api/clickup/lists/:listId/tasks
- */
-clickupRoutes.get('/lists/:listId/tasks', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpTaskService } = c.get('deps');
-    const listId = c.req.param('listId');
-    const accessToken = c.get('accessToken');
-    
-    // Parse and validate query parameters
-    const queryParams = {
-      archived: c.req.query('archived'),
-      page: c.req.query('page'),
-      order_by: c.req.query('order_by'),
-      reverse: c.req.query('reverse'),
-      subtasks: c.req.query('subtasks'),
-      statuses: c.req.query('statuses'),
-      include_closed: c.req.query('include_closed'),
-      assignees: c.req.query('assignees'),
-      tags: c.req.query('tags'),
-      due_date_gt: c.req.query('due_date_gt'),
-      due_date_lt: c.req.query('due_date_lt'),
-      date_created_gt: c.req.query('date_created_gt'),
-      date_created_lt: c.req.query('date_created_lt'),
-      date_updated_gt: c.req.query('date_updated_gt'),
-      date_updated_lt: c.req.query('date_updated_lt'),
-    };
-    
-    // Remove undefined values
-    const cleanParams = Object.fromEntries(
-      Object.entries(queryParams).filter(([_, value]) => value !== undefined)
-    );
-    
-    const validationResult = TaskQueryParamsSchema.safeParse(cleanParams);
-    if (!validationResult.success) {
-      return c.json(
-        {
-          error: 'Bad Request',
-          message: 'Invalid query parameters',
-          details: validationResult.error.errors,
-        },
-        400
-      );
-    }
-    
-    const result = await clickUpTaskService.getTasks(listId, validationResult.data, accessToken);
-    
-    if (!result.success) {
-      return c.json(
-        {
-          error: 'Failed to Retrieve Tasks',
-          message: result.error || 'Failed to retrieve tasks',
-        },
-        400
-      );
-    }
-    
-    return c.json({
-      success: true,
-      data: result.data,
-      pagination: result.pagination,
-    });
-  } catch (error) {
-    console.error('Get tasks error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve tasks',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Create a new task
- * POST /api/clickup/lists/:listId/tasks
- */
-clickupRoutes.post('/lists/:listId/tasks', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpTaskService } = c.get('deps');
-    const listId = c.req.param('listId');
-    const accessToken = c.get('accessToken');
-    
-    const body = await c.req.json();
-    const validationResult = CreateTaskRequestSchema.safeParse(body);
-    
-    if (!validationResult.success) {
-      return c.json(
-        {
-          error: 'Bad Request',
-          message: 'Invalid task data',
-          details: validationResult.error.errors,
-        },
-        400
-      );
-    }
-    
-    const result = await clickUpTaskService.createTask(listId, validationResult.data, accessToken);
-    
-    if (!result.success) {
-      return c.json(
-        {
-          error: 'Task Creation Failed',
-          message: result.error || 'Failed to create task',
-        },
-        400
-      );
-    }
-    
-    return c.json(
-      {
-        success: true,
-        data: result.data,
-        message: 'Task created successfully',
-      },
-      201
-    );
-  } catch (error) {
-    console.error('Create task error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to create task',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Update a task
- * PUT /api/clickup/tasks/:taskId
- */
-clickupRoutes.put('/tasks/:taskId', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpTaskService } = c.get('deps');
-    const taskId = c.req.param('taskId');
-    const accessToken = c.get('accessToken');
-    
-    const body = await c.req.json();
-    const validationResult = UpdateTaskRequestSchema.safeParse(body);
-    
-    if (!validationResult.success) {
-      return c.json(
-        {
-          error: 'Bad Request',
-          message: 'Invalid task update data',
-          details: validationResult.error.errors,
-        },
-        400
-      );
-    }
-    
-    const result = await clickUpTaskService.updateTask(taskId, validationResult.data, accessToken);
-    
-    if (!result.success) {
-      return c.json(
-        {
-          error: 'Task Update Failed',
-          message: result.error || 'Failed to update task',
-        },
-        400
-      );
-    }
-    
-    return c.json({
-      success: true,
-      data: result.data,
-      message: 'Task updated successfully',
-    });
-  } catch (error) {
-    console.error('Update task error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to update task',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Delete a task
- * DELETE /api/clickup/tasks/:taskId
- */
-clickupRoutes.delete('/tasks/:taskId', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpTaskService } = c.get('deps');
-    const taskId = c.req.param('taskId');
-    const accessToken = c.get('accessToken');
-    
-    const result = await clickUpTaskService.deleteTask(taskId, accessToken);
-    
-    if (!result.success) {
-      return c.json(
-        {
-          error: 'Task Deletion Failed',
-          message: result.error || 'Failed to delete task',
-        },
-        400
-      );
-    }
-    
-    return c.json({
-      success: true,
-      message: 'Task deleted successfully',
-    });
-  } catch (error) {
-    console.error('Delete task error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to delete task',
-      },
-      500
-    );
-  }
-});
-
-// ============================================================================
-// WORKSPACE MANAGEMENT ROUTES
-// ============================================================================
-
-/**
- * Get all spaces for authorized teams
- * GET /api/clickup/spaces
- */
-clickupRoutes.get('/spaces', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpSpaceService } = c.get('deps');
-    const accessToken = c.get('accessToken');
-    
-    const result = await clickUpSpaceService.getSpacesByTeam('', {});
-    
-    return c.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    console.error('Get spaces error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve spaces',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Get space by ID
- * GET /api/clickup/spaces/:spaceId
- */
-clickupRoutes.get('/spaces/:spaceId', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpSpaceService } = c.get('deps');
-    const spaceId = c.req.param('spaceId');
-    const accessToken = c.get('accessToken');
-    
-    const result = await clickUpSpaceService.getSpaceById(spaceId);
-    
-    if (!result.success) {
-      return c.json(
-        {
-          error: 'Space Not Found',
-          message: result.error || 'Space not found',
-        },
-        404
-      );
-    }
-    
-    return c.json({
-      success: true,
-      data: result.data,
-    });
-  } catch (error) {
-    console.error('Get space error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve space',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Create a new space
- * POST /api/clickup/teams/:teamId/spaces
- */
-clickupRoutes.post('/teams/:teamId/spaces', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpSpaceService } = c.get('deps');
-    const teamId = c.req.param('teamId');
-    const accessToken = c.get('accessToken');
-    
-    const body = await c.req.json();
-    const validationResult = CreateSpaceRequestSchema.safeParse(body);
-    
-    if (!validationResult.success) {
-      return c.json(
-        {
-          error: 'Bad Request',
-          message: 'Invalid space data',
-          details: validationResult.error.errors,
-        },
-        400
-      );
-    }
-    
-    const result = await clickUpSpaceService.createSpace(teamId, validationResult.data);
-    
-    return c.json(
-      {
-        success: true,
-        data: result,
-        message: 'Space created successfully',
-      },
-      201
-    );
-  } catch (error) {
-    console.error('Create space error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to create space',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Get folders in a space
- * GET /api/clickup/spaces/:spaceId/folders
- */
-clickupRoutes.get('/spaces/:spaceId/folders', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpSpaceService } = c.get('deps');
-    const spaceId = c.req.param('spaceId');
-    const accessToken = c.get('accessToken');
-    
-    const result = await clickUpSpaceService.getFoldersBySpace(spaceId, {});
-    
-    return c.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    console.error('Get folders error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve folders',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Create a folder in a space
- * POST /api/clickup/spaces/:spaceId/folders
- */
-clickupRoutes.post('/spaces/:spaceId/folders', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpSpaceService } = c.get('deps');
-    const spaceId = c.req.param('spaceId');
-    const accessToken = c.get('accessToken');
-    
-    const body = await c.req.json();
-    const validationResult = CreateFolderRequestSchema.safeParse(body);
-    
-    if (!validationResult.success) {
-      return c.json(
-        {
-          error: 'Bad Request',
-          message: 'Invalid folder data',
-          details: validationResult.error.errors,
-        },
-        400
-      );
-    }
-    
-    const result = await clickUpSpaceService.createFolder(spaceId, validationResult.data);
-    
-    return c.json(
-      {
-        success: true,
-        data: result,
-        message: 'Folder created successfully',
-      },
-      201
-    );
-  } catch (error) {
-    console.error('Create folder error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to create folder',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Get lists in a folder
- * GET /api/clickup/folders/:folderId/lists
- */
-clickupRoutes.get('/folders/:folderId/lists', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpSpaceService } = c.get('deps');
-    const folderId = c.req.param('folderId');
-    const accessToken = c.get('accessToken');
-    
-    const result = await clickUpSpaceService.getListsByFolder(folderId, {});
-    
-    return c.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    console.error('Get lists error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve lists',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Get folderless lists in a space
- * GET /api/clickup/spaces/:spaceId/lists
- */
-clickupRoutes.get('/spaces/:spaceId/lists', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpSpaceService } = c.get('deps');
-    const spaceId = c.req.param('spaceId');
-    const accessToken = c.get('accessToken');
-    
-    const result = await clickUpSpaceService.getFolderlessLists(spaceId, {});
-    
-    return c.json({
-      success: true,
-      data: result,
-    });
-  } catch (error) {
-    console.error('Get folderless lists error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve folderless lists',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Create a list in a folder
- * POST /api/clickup/folders/:folderId/lists
- */
-clickupRoutes.post('/folders/:folderId/lists', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpSpaceService } = c.get('deps');
-    const folderId = c.req.param('folderId');
-    const accessToken = c.get('accessToken');
-    
-    const body = await c.req.json();
-    const validationResult = CreateListRequestSchema.safeParse(body);
-    
-    if (!validationResult.success) {
-      return c.json(
-        {
-          error: 'Bad Request',
-          message: 'Invalid list data',
-          details: validationResult.error.errors,
-        },
-        400
-      );
-    }
-    
-    const result = await clickUpSpaceService.createList(folderId, validationResult.data);
-    
-    return c.json(
-      {
-        success: true,
-        data: result,
-        message: 'List created successfully',
-      },
-      201
-    );
-  } catch (error) {
-    console.error('Create list error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to create list',
-      },
-      500
-    );
-  }
-});
-
-// ============================================================================
-// WEBHOOK MANAGEMENT ROUTES
-// ============================================================================
-
-/**
- * Get webhooks for a team
- * GET /api/clickup/teams/:teamId/webhooks
- */
-clickupRoutes.get('/teams/:teamId/webhooks', async (c: DIContextWithAuth) => {
+clickupRoutes.get('/status', async (c: DIContext) => {
   try {
     const { clickUpClient } = c.get('deps');
-    const teamId = c.req.param('teamId');
-    const accessToken = c.get('accessToken');
     
-    // Note: This would need to be implemented in the client service
-    // For now, return a placeholder response
-    return c.json({
-      success: true,
-      data: { webhooks: [] },
-      message: 'Webhook management coming soon',
-    });
-  } catch (error) {
-    console.error('Get webhooks error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve webhooks',
-      },
-      500
-    );
-  }
-});
-
-/**
- * Create a webhook
- * POST /api/clickup/teams/:teamId/webhooks
- */
-clickupRoutes.post('/teams/:teamId/webhooks', async (c: DIContextWithAuth) => {
-  try {
-    const { clickUpClient } = c.get('deps');
-    const teamId = c.req.param('teamId');
-    const accessToken = c.get('accessToken');
+    // Check if we can reach ClickUp API (basic connectivity)
+    const healthCheck = await clickUpClient.healthCheck();
     
-    const body = await c.req.json();
-    const validationResult = CreateWebhookRequestSchema.safeParse(body);
-    
-    if (!validationResult.success) {
+    if (!healthCheck.success) {
       return c.json(
         {
-          error: 'Bad Request',
-          message: 'Invalid webhook data',
-          details: validationResult.error.errors,
+          status: 'error',
+          message: 'ClickUp API is not accessible',
+          connectivity: false,
+          authentication: false,
         },
-        400
+        503
       );
     }
     
-    // Note: This would need to be implemented in the client service
-    return c.json(
-      {
-        success: true,
-        data: { webhook: validationResult.data },
-        message: 'Webhook creation coming soon',
+    return c.json({
+      status: 'ok',
+      message: 'ClickUp integration is ready',
+      connectivity: true,
+      authentication: 'token_required',
+      endpoints: {
+        auth: '/api/clickup/auth',
+        callback: '/api/clickup/auth/callback',
+        token_management: '/api/clickup/auth/token/:userId',
       },
-      201
-    );
+    });
   } catch (error) {
-    console.error('Create webhook error:', error);
+    console.error('ClickUp status check error:', error);
     return c.json(
       {
-        error: 'Internal Server Error',
-        message: 'Failed to create webhook',
+        status: 'error',
+        message: 'Failed to check ClickUp status',
+        connectivity: false,
+        authentication: false,
       },
       500
     );
   }
 });
 
-// ============================================================================
-// USER AND TEAM ROUTES
-// ============================================================================
-
 /**
- * Get authorized user information
- * GET /api/clickup/user
+ * Check authenticated user's ClickUp access
+ * GET /api/clickup/status/auth
  */
-clickupRoutes.get('/user', async (c: DIContextWithAuth) => {
+clickupRoutes.get('/status/auth', async (c: DIContextWithAuth) => {
   try {
     const { clickUpClient } = c.get('deps');
     const accessToken = c.get('accessToken');
     
+    // Test authentication by getting user info
     const userResponse = await clickUpClient.getAuthorizedUser(accessToken);
     
     if (!userResponse.success) {
       return c.json(
         {
-          error: 'Unauthorized',
-          message: 'Failed to retrieve user information',
+          status: 'error',
+          message: 'Authentication failed',
+          connectivity: true,
+          authentication: false,
+          error: userResponse.error || 'Invalid or expired token',
         },
         401
       );
     }
     
+    // Get teams to verify full access
+    const teamsResponse = await clickUpClient.getAuthorizedTeams(accessToken);
+    
     return c.json({
-      success: true,
-      data: userResponse.data,
-      statusCode: userResponse.statusCode,
+      status: 'ok',
+      message: 'ClickUp authentication successful',
+      connectivity: true,
+      authentication: true,
+      user: {
+        id: userResponse.data.user?.id,
+        username: userResponse.data.user?.username,
+        email: userResponse.data.user?.email,
+      },
+      teams_count: teamsResponse.success ? teamsResponse.data?.teams?.length || 0 : 0,
     });
   } catch (error) {
-    console.error('Get user error:', error);
+    console.error('ClickUp auth status check error:', error);
     return c.json(
       {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve user information',
+        status: 'error',
+        message: 'Failed to verify authentication',
+        connectivity: true,
+        authentication: false,
       },
       500
     );
   }
 });
 
+// ============================================================================
+// AUTOMATION SETUP ROUTES
+// ============================================================================
+
 /**
- * Get authorized teams
- * GET /api/clickup/teams
+ * Get automation configuration status
+ * GET /api/clickup/automation/config
  */
-clickupRoutes.get('/teams', async (c: DIContextWithAuth) => {
+clickupRoutes.get('/automation/config', async (c: DIContextWithAuth) => {
   try {
     const { clickUpClient } = c.get('deps');
     const accessToken = c.get('accessToken');
     
-    const teamsResponse = await clickUpClient.getAuthorizedTeams(accessToken);
+    // Get user and teams info for automation setup
+    const [userResponse, teamsResponse] = await Promise.all([
+      clickUpClient.getAuthorizedUser(accessToken),
+      clickUpClient.getAuthorizedTeams(accessToken),
+    ]);
     
-    if (!teamsResponse.success) {
+    if (!userResponse.success || !teamsResponse.success) {
       return c.json(
         {
-          error: 'Unauthorized',
-          message: 'Failed to retrieve teams information',
+          status: 'error',
+          message: 'Failed to retrieve ClickUp configuration',
+          authentication: false,
         },
         401
       );
     }
     
     return c.json({
-      success: true,
-      data: teamsResponse.data,
-      statusCode: teamsResponse.statusCode,
-    });
-  } catch (error) {
-    console.error('Get teams error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve teams information',
+      status: 'ok',
+      message: 'ClickUp automation configuration ready',
+      user: {
+        id: userResponse.data.user?.id,
+        username: userResponse.data.user?.username,
+        email: userResponse.data.user?.email,
       },
-      500
-    );
-  }
-});
-
-// ============================================================================
-// DEBUG ROUTES (Development only)
-// ============================================================================
-
-/**
- * List stored tokens (debug endpoint)
- * GET /api/clickup/debug/tokens
- */
-clickupRoutes.get('/debug/tokens', async (c: DIContext) => {
-  try {
-    const { clickUpOAuthService } = c.get('deps');
-    
-    // Get token storage service from OAuth service
-    const tokenStorageService = (clickUpOAuthService as any).tokenStorage;
-    
-    if (!tokenStorageService) {
-      return c.json(
-        {
-          error: 'Service Error',
-          message: 'Token storage service not available',
-        },
-        500
-      );
-    }
-    
-    const tokenKeys = await tokenStorageService.listTokenKeys();
-    
-    return c.json({
-      message: 'Stored tokens retrieved successfully',
-      total_tokens: tokenKeys.length,
-      token_user_ids: tokenKeys,
-      note: 'Use GET /api/clickup/auth/token/:userId to retrieve specific token details'
+      teams: teamsResponse.data?.teams?.map((team: any) => ({
+        id: team.id,
+        name: team.name,
+        color: team.color,
+      })) || [],
+      automation_ready: true,
     });
   } catch (error) {
-    console.error('Debug tokens error:', error);
+    console.error('ClickUp automation config error:', error);
     return c.json(
       {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve stored tokens',
+        status: 'error',
+        message: 'Failed to retrieve automation configuration',
+        automation_ready: false,
       },
       500
     );
