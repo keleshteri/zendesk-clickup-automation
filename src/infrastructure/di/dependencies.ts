@@ -16,6 +16,14 @@ import type { ITokenStorageService } from '../../domains/clickup/interfaces/toke
 import type { OAuthConfig } from '../../domains/clickup/types/oauth.types';
 import type { ClickUpHttpClientConfig } from '../../domains/clickup/types/http.types';
 
+// Zendesk imports
+import type {
+  IZendeskClient,
+  IZendeskTicketService,
+  IZendeskHttpClient,
+} from '../../domains/zendesk/interfaces';
+import type { ZendeskHttpClientConfig } from '../../domains/zendesk/types/http.types';
+
 // Service implementations
 import { ClickUpOAuthService } from '../../domains/clickup/services/clickup-oauth.service';
 import { ClickUpAuthClient } from '../../domains/clickup/services/clickup-auth-client.service';
@@ -23,6 +31,11 @@ import { ClickUpClient } from '../../domains/clickup/services/clickup-client.ser
 import { ClickUpTaskService } from '../../domains/clickup/services/clickup-task.service';
 import { ClickUpSpaceService } from '../../domains/clickup/services/clickup-space.service';
 import { TokenStorageService } from '../../domains/clickup/services/token-storage.service';
+
+// Zendesk service implementations
+import { ZendeskHttpClient } from '../../domains/zendesk/services/zendesk-http-client.service';
+import { ZendeskClient } from '../../domains/zendesk/services/zendesk-client.service';
+import { ZendeskTicketService } from '../../domains/zendesk/services/zendesk-ticket.service';
 
 /**
  * Environment variables interface for Cloudflare Workers
@@ -35,6 +48,11 @@ export interface Env {
   
   // ClickUp System Token (for health checks and system operations)
   CLICKUP_SYSTEM_TOKEN?: string;
+  
+  // Zendesk Configuration
+  ZENDESK_SUBDOMAIN: string;
+  ZENDESK_EMAIL: string;
+  ZENDESK_API_TOKEN: string;
   
   // Application Configuration
   APP_BASE_URL: string;
@@ -60,10 +78,15 @@ export interface Dependencies {
   readonly clickUpAuthClient: IClickUpAuthClient;
   readonly tokenStorageService: ITokenStorageService;
   
-  // API services
+  // ClickUp API services
   readonly clickUpClient: IClickUpClient;
   readonly clickUpTaskService: IClickUpTaskService;
   readonly clickUpSpaceService: IClickUpSpaceService;
+  
+  // Zendesk API services
+  readonly zendeskHttpClient: IZendeskHttpClient;
+  readonly zendeskClient: IZendeskClient;
+  readonly zendeskTicketService: IZendeskTicketService;
   
   // Configuration
   readonly oauthConfig: OAuthConfig;
@@ -124,16 +147,37 @@ export function createDependencies(env: Env): Dependencies {
   const clickUpTaskService = new ClickUpTaskService(clickUpClient);
   const clickUpSpaceService = new ClickUpSpaceService(clickUpClient);
   
+  // Create Zendesk services
+  const zendeskHttpClientConfig: ZendeskHttpClientConfig = {
+    subdomain: env.ZENDESK_SUBDOMAIN,
+    email: env.ZENDESK_EMAIL,
+    apiToken: env.ZENDESK_API_TOKEN,
+    baseUrl: `https://${env.ZENDESK_SUBDOMAIN}.zendesk.com/api/v2`,
+    timeout: 30000,
+    retryAttempts: 3,
+    retryDelay: 1000,
+    userAgent: 'zendesk-clickup-automation/1.0.0',
+  };
+  
+  const zendeskHttpClient = new ZendeskHttpClient(zendeskHttpClientConfig);
+  const zendeskClient = new ZendeskClient(zendeskHttpClient);
+  const zendeskTicketService = new ZendeskTicketService(zendeskClient);
+  
   return {
     // OAuth services
     clickUpOAuthService,
     clickUpAuthClient,
     tokenStorageService,
     
-    // API services
+    // ClickUp API services
     clickUpClient,
     clickUpTaskService,
     clickUpSpaceService,
+    
+    // Zendesk API services
+    zendeskHttpClient,
+    zendeskClient,
+    zendeskTicketService,
     
     // Configuration
     oauthConfig,
@@ -181,6 +225,9 @@ export function validateEnvironment(env: Env): void {
     'CLICKUP_CLIENT_SECRET',
     'CLICKUP_REDIRECT_URI',
     'APP_BASE_URL',
+    'ZENDESK_SUBDOMAIN',
+    'ZENDESK_EMAIL',
+    'ZENDESK_API_TOKEN',
   ] as const;
   
   const missing = required.filter(key => !env[key]);
@@ -200,6 +247,20 @@ export function validateEnvironment(env: Env): void {
     throw new Error(
       'Invalid URL format in environment variables. ' +
       'CLICKUP_REDIRECT_URI and APP_BASE_URL must be valid URLs.'
+    );
+  }
+  
+  // Validate Zendesk subdomain format
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/.test(env.ZENDESK_SUBDOMAIN)) {
+    throw new Error(
+      'Invalid ZENDESK_SUBDOMAIN format. Must be a valid subdomain (alphanumeric and hyphens only).'
+    );
+  }
+  
+  // Validate Zendesk email format
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.ZENDESK_EMAIL)) {
+    throw new Error(
+      'Invalid ZENDESK_EMAIL format. Must be a valid email address.'
     );
   }
   

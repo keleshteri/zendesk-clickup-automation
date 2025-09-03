@@ -14,6 +14,7 @@ import type { Env } from './infrastructure/di/dependencies';
 import { createDIMiddleware, type DIContext } from './infrastructure/di/container';
 import { getEnvironmentConfig } from './infrastructure/di/dependencies';
 import { clickupRoutes } from './infrastructure/routes/clickup.routes';
+import { zendeskRoutes } from './infrastructure/routes/zendesk.routes';
 
 // Create Hono app with proper typing
 const app = new Hono<{ Bindings: Env }>();
@@ -54,7 +55,8 @@ app.get('/health', (c: DIContext) => {
       version: '1.0.0',
       services: {
         clickup_oauth: 'available',
-        clickup_api: 'available'
+        clickup_api: 'available',
+        zendesk_api: 'available'
       },
       ...(envConfig.isDevelopment && {
         debug: {
@@ -76,25 +78,36 @@ app.get('/health', (c: DIContext) => {
 // Mount ClickUp API routes
 app.route('/api/clickup', clickupRoutes);
 
+// Mount Zendesk API routes
+app.route('/api/zendesk', zendeskRoutes);
+
 // API routes overview
 app.get('/api', (c: DIContext) => {
   return c.json({
-    message: 'ClickUp Integration API',
+    message: 'Zendesk-ClickUp Automation API',
     version: '1.0.0',
     endpoints: {
       health: '/health',
-      oauth: {
-        authorize: '/api/clickup/auth',
-        callback: '/api/clickup/auth/callback',
+      clickup: {
+        oauth: {
+          authorize: '/api/clickup/auth',
+          callback: '/api/clickup/auth/callback',
+        },
+        status: {
+          connectivity: 'GET /api/clickup/status',
+          authentication: 'GET /api/clickup/status/auth',
+          automation_config: 'GET /api/clickup/automation/config',
+        },
+        authentication: {
+          note: 'Status endpoints require Bearer token in Authorization header (except /status)',
+          example: 'Authorization: Bearer your_clickup_access_token',
+        },
       },
-      status: {
-        connectivity: 'GET /api/clickup/status',
-        authentication: 'GET /api/clickup/status/auth',
-        automation_config: 'GET /api/clickup/automation/config',
-      },
-      authentication: {
-        note: 'Status endpoints require Bearer token in Authorization header (except /status)',
-        example: 'Authorization: Bearer your_clickup_access_token',
+      zendesk: {
+        status: {
+          connectivity: 'GET /api/zendesk/status',
+        },
+        note: 'Zendesk endpoints use API token authentication configured in environment variables',
       },
     },
   });
@@ -110,12 +123,8 @@ app.notFound((c) => {
       message: 'The requested endpoint does not exist',
       available_endpoints: {
         general: ['/health', '/api'],
-        oauth: ['/api/clickup/auth', '/api/clickup/auth/callback'],
-        status: [
-          '/api/clickup/status',
-          '/api/clickup/status/auth',
-          '/api/clickup/automation/config',
-        ],
+        clickup: ['/api/clickup/auth', '/api/clickup/auth/callback', '/api/clickup/status'],
+        zendesk: ['/api/zendesk/status'],
         note: 'See /api for complete endpoint documentation',
       },
     },
