@@ -24,6 +24,13 @@ import type {
 } from '../../domains/zendesk/interfaces';
 import type { ZendeskHttpClientConfig } from '../../domains/zendesk/types/http.types';
 
+// Workflow imports
+import type {
+  IWorkflowOrchestrator,
+  IZendeskWebhookHandler,
+  IClickUpWebhookHandler,
+} from '../../domains/workflow/interfaces';
+
 // Service implementations
 import { ClickUpOAuthService } from '../../domains/clickup/services/clickup-oauth.service';
 import { ClickUpAuthClient } from '../../domains/clickup/services/clickup-auth-client.service';
@@ -36,6 +43,11 @@ import { TokenStorageService } from '../../domains/clickup/services/token-storag
 import { ZendeskHttpClient } from '../../domains/zendesk/services/zendesk-http-client.service';
 import { ZendeskClient } from '../../domains/zendesk/services/zendesk-client.service';
 import { ZendeskTicketService } from '../../domains/zendesk/services/zendesk-ticket.service';
+
+// Workflow service implementations
+import { WorkflowOrchestrator } from '../../domains/workflow/services/workflow-orchestrator.service';
+import { ZendeskWebhookHandler } from '../../domains/workflow/services/zendesk-webhook-handler.service';
+import { ClickUpWebhookHandler } from '../../domains/workflow/services/clickup-webhook-handler.service';
 
 /**
  * Environment variables interface for Cloudflare Workers
@@ -87,6 +99,11 @@ export interface Dependencies {
   readonly zendeskHttpClient: IZendeskHttpClient;
   readonly zendeskClient: IZendeskClient;
   readonly zendeskTicketService: IZendeskTicketService;
+  
+  // Workflow services
+  readonly workflowOrchestrator: IWorkflowOrchestrator;
+  readonly zendeskWebhookHandler: IZendeskWebhookHandler;
+  readonly clickUpWebhookHandler: IClickUpWebhookHandler;
   
   // Configuration
   readonly oauthConfig: OAuthConfig;
@@ -163,6 +180,14 @@ export function createDependencies(env: Env): Dependencies {
   const zendeskClient = new ZendeskClient(zendeskHttpClient);
   const zendeskTicketService = new ZendeskTicketService(zendeskClient);
   
+  // Create workflow services
+  const zendeskWebhookHandler = new ZendeskWebhookHandler();
+  const clickUpWebhookHandler = new ClickUpWebhookHandler();
+  const workflowOrchestrator = new WorkflowOrchestrator(
+    zendeskWebhookHandler,
+    clickUpWebhookHandler
+  );
+  
   return {
     // OAuth services
     clickUpOAuthService,
@@ -178,6 +203,11 @@ export function createDependencies(env: Env): Dependencies {
     zendeskHttpClient,
     zendeskClient,
     zendeskTicketService,
+    
+    // Workflow services
+    workflowOrchestrator,
+    zendeskWebhookHandler,
+    clickUpWebhookHandler,
     
     // Configuration
     oauthConfig,

@@ -15,6 +15,7 @@ import { createDIMiddleware, type DIContext } from './infrastructure/di/containe
 import { getEnvironmentConfig } from './infrastructure/di/dependencies';
 import { clickupRoutes } from './infrastructure/routes/clickup.routes';
 import { zendeskRoutes } from './infrastructure/routes/zendesk.routes';
+import { webhookRoutes } from './infrastructure/routes/webhook.routes';
 
 // Create Hono app with proper typing
 const app = new Hono<{ Bindings: Env }>();
@@ -81,6 +82,9 @@ app.route('/api/clickup', clickupRoutes);
 // Mount Zendesk API routes
 app.route('/api/zendesk', zendeskRoutes);
 
+// Mount Webhook API routes
+app.route('/api/webhooks', webhookRoutes);
+
 // API routes overview
 app.get('/api', (c: DIContext) => {
   return c.json({
@@ -108,6 +112,11 @@ app.get('/api', (c: DIContext) => {
           connectivity: 'GET /api/zendesk/status',
         },
         note: 'Zendesk endpoints use API token authentication configured in environment variables',
+      },
+      webhooks: {
+        zendesk: 'POST /api/webhooks/zendesk',
+        clickup: 'POST /api/webhooks/clickup',
+        status: 'GET /api/webhooks/status',
       },
     },
   });
