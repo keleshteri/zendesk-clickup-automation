@@ -118,7 +118,7 @@ export const CreateTaskRequestSchema = z.object({
   assignees: z.array(z.number()).optional(),
   tags: z.array(z.string()).optional(),
   status: z.string().optional(),
-  priority: TaskPrioritySchema.optional(),
+  priority: z.number().min(1).max(4).optional(), // 1=urgent, 2=high, 3=normal, 4=low
   due_date: z.number().optional(), // Unix timestamp
   due_date_time: z.boolean().optional(),
   time_estimate: z.number().optional(), // milliseconds

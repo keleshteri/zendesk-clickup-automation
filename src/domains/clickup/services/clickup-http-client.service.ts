@@ -196,6 +196,13 @@ export class ClickUpHttpClient implements IClickUpHttpClient {
       errorData = { message: response.statusText };
     }
 
+    // Debug: Log error response details
+    console.log('[ClickUpHttpClient] Error response:', {
+      status: response.status,
+      statusText: response.statusText,
+      errorData: JSON.stringify(errorData, null, 2)
+    });
+
     throw new ClickUpAPIError(
       errorData.message || `HTTP ${response.status}: ${response.statusText}`,
       response.status,

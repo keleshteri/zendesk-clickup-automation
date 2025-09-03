@@ -49,6 +49,10 @@ export const ClickUpConfigSchema = z.object({
   retries: z.number().min(0).max(5).default(3),
   retryDelay: z.number().positive().default(1000),
   webhookSecret: z.string().optional(),
+  // Workspace Configuration
+  defaultTeamId: z.string().optional(),
+  defaultSpaceId: z.string().optional(),
+  defaultListId: z.string().optional(),
 });
 
 export type ClickUpConfig = z.infer<typeof ClickUpConfigSchema>;
@@ -128,6 +132,9 @@ export const EnvSchema = z.object({
   // ClickUp
   CLICKUP_API_KEY: z.string().min(1),
   CLICKUP_WEBHOOK_SECRET: z.string().optional(),
+  CLICKUP_DEFAULT_TEAM_ID: z.string().optional(),
+  CLICKUP_DEFAULT_SPACE_ID: z.string().optional(),
+  CLICKUP_DEFAULT_LIST_ID: z.string().optional(),
   
   // Zendesk
   ZENDESK_SUBDOMAIN: z.string().min(1),

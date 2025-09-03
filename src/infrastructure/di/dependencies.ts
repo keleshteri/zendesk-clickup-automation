@@ -61,6 +61,9 @@ export interface Env {
   // ClickUp System Token (for health checks and system operations)
   CLICKUP_SYSTEM_TOKEN?: string;
   
+  // ClickUp Configuration
+  CLICKUP_DEFAULT_LIST_ID?: string;
+  
   // Zendesk Configuration
   ZENDESK_SUBDOMAIN: string;
   ZENDESK_EMAIL: string;
@@ -154,7 +157,7 @@ export function createDependencies(env: Env): Dependencies {
   
   // Create API client services
   const apiClientConfig: ClickUpHttpClientConfig = {
-    apiKey: '', // Will be set per request
+    apiKey: env.CLICKUP_SYSTEM_TOKEN || '', // Use system token as default API key
     baseUrl: 'https://api.clickup.com/api/v2',
     timeout: 30000,
     retryAttempts: 3,
@@ -181,7 +184,7 @@ export function createDependencies(env: Env): Dependencies {
   const zendeskTicketService = new ZendeskTicketService(zendeskClient);
   
   // Create workflow services
-  const zendeskWebhookHandler = new ZendeskWebhookHandler();
+  const zendeskWebhookHandler = new ZendeskWebhookHandler(clickUpTaskService, clickUpSpaceService, env as unknown as Record<string, string | undefined>);
   const clickUpWebhookHandler = new ClickUpWebhookHandler();
   const workflowOrchestrator = new WorkflowOrchestrator(
     zendeskWebhookHandler,

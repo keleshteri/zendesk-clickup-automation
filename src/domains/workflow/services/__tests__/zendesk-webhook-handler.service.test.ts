@@ -9,12 +9,51 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ZendeskWebhookHandler } from '../zendesk-webhook-handler.service';
 import type { WebhookEvent } from '../../types/webhook.types';
 import type { WorkflowResult } from '../../types/workflow.types';
+import type { IClickUpTaskService } from '../../../clickup/interfaces/clickup-task-service.interface';
 
 describe('ZendeskWebhookHandler', () => {
   let handler: ZendeskWebhookHandler;
+  let mockClickUpTaskService: IClickUpTaskService;
 
   beforeEach(() => {
-    handler = new ZendeskWebhookHandler();
+    // Create mock ClickUp task service
+    mockClickUpTaskService = {
+      createTask: vi.fn().mockResolvedValue({
+        id: 'mock-task-id',
+        name: 'Mock Task',
+        priority: { name: 'normal' },
+        url: 'https://app.clickup.com/t/mock-task-id'
+      }),
+      getTaskById: vi.fn(),
+      getTasksByList: vi.fn(),
+      updateTask: vi.fn(),
+      deleteTask: vi.fn(),
+      updateTaskStatus: vi.fn(),
+      getTasksByStatus: vi.fn(),
+      updateTaskPriority: vi.fn(),
+      getTasksByPriority: vi.fn(),
+      assignTask: vi.fn(),
+      unassignTask: vi.fn(),
+      getTasksByAssignee: vi.fn(),
+      searchTasks: vi.fn(),
+      getOverdueTasks: vi.fn(),
+      getTasksDueToday: vi.fn(),
+      getTasksDueSoon: vi.fn(),
+      validateTaskData: vi.fn(),
+      canUserModifyTask: vi.fn(),
+      createMultipleTasks: vi.fn(),
+      updateMultipleTasks: vi.fn(),
+      deleteMultipleTasks: vi.fn(),
+      getTaskCompletionRate: vi.fn(),
+      getAverageTaskCompletionTime: vi.fn(),
+      getTaskCountByStatus: vi.fn()
+    } as IClickUpTaskService;
+
+    // Create handler with mock dependencies
+    handler = new ZendeskWebhookHandler(mockClickUpTaskService, {
+      CLICKUP_API_KEY: 'test-api-key',
+      CLICKUP_DEFAULT_LIST_ID: 'test-list-id'
+    });
   });
 
   describe('handleWebhook', () => {

@@ -12,7 +12,10 @@
     "CLICKUP_API_BASE_URL": "https://api.clickup.com/api/v2",
     "ZENDESK_API_BASE_URL": "https://your-domain.zendesk.com/api/v2",
     "APP_ENVIRONMENT": "production",
-    "CORS_ORIGINS": "https://your-production-domain.com"
+    "CORS_ORIGINS": "https://your-production-domain.com",
+    "CLICKUP_DEFAULT_TEAM_ID": "",
+    "CLICKUP_DEFAULT_SPACE_ID": "",
+    "CLICKUP_DEFAULT_LIST_ID": ""
   },
   // Production secrets (set via: wrangler secret put <SECRET_NAME>)
   // Required secrets for production:

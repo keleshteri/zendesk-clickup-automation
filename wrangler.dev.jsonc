@@ -14,7 +14,10 @@
     "CLICKUP_REDIRECT_URI": "http://localhost:8787/auth/callback",
     "APP_BASE_URL": "http://localhost:8787",
     "APP_ENVIRONMENT": "development",
-    "CORS_ORIGINS": "http://localhost:3000,http://localhost:8080"
+    "CORS_ORIGINS": "http://localhost:3000,http://localhost:8080",
+    "CLICKUP_DEFAULT_TEAM_ID": "9008124067",
+    "CLICKUP_DEFAULT_SPACE_ID": "90080214645",
+    "CLICKUP_DEFAULT_LIST_ID": "900800881574"
   },
   // Development KV namespaces for local testing
   "kv_namespaces": [

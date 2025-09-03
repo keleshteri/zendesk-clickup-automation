@@ -9,7 +9,8 @@
       "ES2020"
     ],
     "types": [
-      "@cloudflare/workers-types"
+      "@cloudflare/workers-types",
+      "vitest/globals"
     ],
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"
