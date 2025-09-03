@@ -120,15 +120,21 @@ export class ClickUpHttpClient implements IClickUpHttpClient {
    * Build HTTP headers for requests
    */
   private buildHeaders(accessToken?: string): HTTPHeaders {
+    const headers: HTTPHeaders = {
+      'Content-Type': 'application/json',
+      'User-Agent': this.config.userAgent,
+    };
+    
+    // Only add Authorization header if we have a token or API key
     const authHeader = accessToken 
       ? `Bearer ${accessToken}` 
       : this.config.apiKey;
       
-    return {
-      'Authorization': authHeader,
-      'Content-Type': 'application/json',
-      'User-Agent': this.config.userAgent,
-    };
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    
+    return headers;
   }
 
   /**

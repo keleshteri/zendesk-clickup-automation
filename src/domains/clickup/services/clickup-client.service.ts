@@ -52,6 +52,7 @@ import {
   ClickUpAuthService,
   type IClickUpAuthService,
 } from "./clickup-auth.service";
+import { ClickUpAPIError } from "../errors/clickup-api.error";
 
 // Validation schemas are now used in HTTP client and auth service
 // Error handling is delegated to HTTP client service
@@ -65,10 +66,12 @@ import {
 export class ClickUpClient implements IClickUpClient {
   private readonly httpClient: ClickUpHttpClient;
   private readonly authService: IClickUpAuthService;
+  private readonly systemToken?: string;
 
-  constructor(config: ClickUpHttpClientConfig) {
+  constructor(config: ClickUpHttpClientConfig, systemToken?: string) {
     this.httpClient = new ClickUpHttpClient(config);
     this.authService = new ClickUpAuthService(this.httpClient);
+    this.systemToken = systemToken;
   }
 
   // Authentication methods
@@ -698,26 +701,81 @@ export class ClickUpClient implements IClickUpClient {
   }
 
   async healthCheck(): Promise<
-    ApiResponse<{ status: string; timestamp: string }>
+    ApiResponse<{ status: string; timestamp: string; authentication: string }>
   > {
     try {
-      // Simple health check - try to get authorized user
-      await this.getAuthorizedUser();
-      const healthData = {
-        status: "healthy",
-        timestamp: new Date().toISOString(),
-      };
+      if (this.systemToken) {
+        // Use system token to test actual API functionality
+        const userResponse = await this.getAuthorizedUser(this.systemToken);
+        
+        if (userResponse.success) {
+          const healthData = {
+            status: "healthy",
+            timestamp: new Date().toISOString(),
+            authentication: "system_token_valid",
+          };
 
-      return {
-        success: true,
-        data: healthData,
-        statusCode: 200,
-        headers: {},
-      };
+          return {
+            success: true,
+            data: healthData,
+            statusCode: 200,
+            headers: {},
+          };
+        } else {
+          // System token is invalid but API is reachable
+          const healthData = {
+            status: "degraded",
+            timestamp: new Date().toISOString(),
+            authentication: "system_token_invalid",
+          };
+
+          return {
+            success: true,
+            data: healthData,
+            statusCode: 200,
+            headers: {},
+          };
+        }
+      } else {
+        // No system token - basic connectivity check
+        await this.httpClient.makeRequest('GET', '/user'); // No token provided
+        
+        // If we reach here without error, the API is accessible
+        const healthData = {
+          status: "healthy",
+          timestamp: new Date().toISOString(),
+          authentication: "no_system_token",
+        };
+
+        return {
+          success: true,
+          data: healthData,
+          statusCode: 200,
+          headers: {},
+        };
+      }
     } catch (error) {
+      // Check if it's a 400 or 401 error - this means API is reachable but requires auth
+      if (error instanceof ClickUpAPIError && (error.isBadRequestError() || error.isAuthenticationError())) {
+        const healthData = {
+          status: "healthy",
+          timestamp: new Date().toISOString(),
+          authentication: "api_reachable_auth_required",
+        };
+
+        return {
+          success: true,
+          data: healthData,
+          statusCode: 200,
+          headers: {},
+        };
+      }
+      
+      // Any other error indicates connectivity issues
       const healthData = {
         status: "unhealthy",
         timestamp: new Date().toISOString(),
+        authentication: "connectivity_error",
       };
 
       return {

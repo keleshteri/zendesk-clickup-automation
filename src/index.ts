@@ -86,7 +86,6 @@ app.get('/api', (c: DIContext) => {
       oauth: {
         authorize: '/api/clickup/auth',
         callback: '/api/clickup/auth/callback',
-        token_management: 'GET/POST/DELETE /api/clickup/auth/token/:userId',
       },
       status: {
         connectivity: 'GET /api/clickup/status',
@@ -112,7 +111,6 @@ app.notFound((c) => {
       available_endpoints: {
         general: ['/health', '/api'],
         oauth: ['/api/clickup/auth', '/api/clickup/auth/callback'],
-        token_management: ['/api/clickup/auth/token/:userId'],
         status: [
           '/api/clickup/status',
           '/api/clickup/status/auth',

@@ -33,6 +33,9 @@ export interface Env {
   CLICKUP_CLIENT_SECRET: string;
   CLICKUP_REDIRECT_URI: string;
   
+  // ClickUp System Token (for health checks and system operations)
+  CLICKUP_SYSTEM_TOKEN?: string;
+  
   // Application Configuration
   APP_BASE_URL: string;
   APP_ENVIRONMENT: 'development' | 'staging' | 'production';
@@ -117,7 +120,7 @@ export function createDependencies(env: Env): Dependencies {
     retryAttempts: 3,
     retryDelay: 1000,
   };
-  const clickUpClient = new ClickUpClient(apiClientConfig);
+  const clickUpClient = new ClickUpClient(apiClientConfig, env.CLICKUP_SYSTEM_TOKEN);
   const clickUpTaskService = new ClickUpTaskService(clickUpClient);
   const clickUpSpaceService = new ClickUpSpaceService(clickUpClient);
   

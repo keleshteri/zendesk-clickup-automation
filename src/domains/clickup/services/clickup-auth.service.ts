@@ -54,19 +54,31 @@ export class ClickUpAuthService implements IClickUpAuthService {
    * @returns Promise<ApiResponse<ClickUpUser>> - The authorized user data
    */
   async getAuthorizedUser(accessToken?: string): Promise<ApiResponse<ClickUpUser>> {
-    const response = await this.httpClient.makeRequest<{ user: ClickUpUser }>('GET', '/user', undefined, accessToken);
-    
-    // Debug: Log the actual response to see the structure
-    console.log('[ClickUpAuthService] Raw user response:', JSON.stringify(response.data, null, 2));
-    
-    const validatedUser = ClickUpUserSchema.parse(response.data.user);
-    
-    return {
-      success: true,
-      data: validatedUser,
-      statusCode: response.status,
-      headers: response.headers,
-    };
+    try {
+      const response = await this.httpClient.makeRequest<{ user: ClickUpUser }>('GET', '/user', undefined, accessToken);
+      
+      // Debug: Log the actual response to see the structure
+      console.log('[ClickUpAuthService] Raw user response:', JSON.stringify(response.data, null, 2));
+      
+      const validatedUser = ClickUpUserSchema.parse(response.data.user);
+      
+      return {
+        success: true,
+        data: validatedUser,
+        statusCode: response.status,
+        headers: response.headers,
+      };
+    } catch (error) {
+      console.error('[ClickUpAuthService] getAuthorizedUser error:', error);
+      
+      return {
+        success: false,
+        data: {} as ClickUpUser,
+        statusCode: error instanceof Error && error.message.includes('401') ? 401 : 500,
+        headers: {},
+        error: error instanceof Error ? error.message : 'Failed to get authorized user',
+      };
+    }
   }
 
   /**
@@ -75,14 +87,26 @@ export class ClickUpAuthService implements IClickUpAuthService {
    * @returns Promise<ApiResponse<AuthorizedTeamsResponse>> - The authorized teams data
    */
   async getAuthorizedTeams(accessToken?: string): Promise<ApiResponse<AuthorizedTeamsResponse>> {
-    const response = await this.httpClient.makeRequest<{ teams: ClickUpTeam[] }>('GET', '/team', undefined, accessToken);
-    const validatedTeams = response.data.teams.map(team => ClickUpTeamSchema.parse(team));
-    
-    return {
-      success: true,
-      data: { teams: validatedTeams },
-      statusCode: response.status,
-      headers: response.headers,
-    };
+    try {
+      const response = await this.httpClient.makeRequest<{ teams: ClickUpTeam[] }>('GET', '/team', undefined, accessToken);
+      const validatedTeams = response.data.teams.map(team => ClickUpTeamSchema.parse(team));
+      
+      return {
+        success: true,
+        data: { teams: validatedTeams },
+        statusCode: response.status,
+        headers: response.headers,
+      };
+    } catch (error) {
+      console.error('[ClickUpAuthService] getAuthorizedTeams error:', error);
+      
+      return {
+        success: false,
+        data: { teams: [] },
+        statusCode: error instanceof Error && error.message.includes('401') ? 401 : 500,
+        headers: {},
+        error: error instanceof Error ? error.message : 'Failed to get authorized teams',
+      };
+    }
   }
 }

@@ -17,8 +17,10 @@ import type {
 // Mock ClickUp client
 class MockClickUpClient implements IClickUpClient {
   // Authentication & Authorization
+  validateToken = vi.fn();
   getAuthorizedUser = vi.fn();
   getAuthorizedTeams = vi.fn();
+  healthCheck = vi.fn();
   
   // Task Operations
   getTask = vi.fn();

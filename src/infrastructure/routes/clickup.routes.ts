@@ -51,89 +51,7 @@ clickupRoutes.get('/auth', async (c: DIContext) => {
 });
 
 // Token management routes
-clickupRoutes.get('/auth/token/:userId', async (c: DIContext) => {
-  try {
-    const { clickUpOAuthService } = c.get('deps');
-    const userId = c.req.param('userId');
-    
-    if (!userId) {
-      return c.json(
-        {
-          error: 'Missing Parameter',
-          message: 'User ID is required',
-        },
-        400
-      );
-    }
-    
-    // Retrieve stored token
-    const tokenData = await clickUpOAuthService.getUserToken(userId);
-    
-    if (!tokenData) {
-      return c.json(
-        {
-          error: 'Token Not Found',
-          message: 'No valid token found for this user',
-        },
-        404
-      );
-    }
-    
-    return c.json({
-      message: 'Token retrieved successfully',
-      user_id: userId,
-      access_token: tokenData.access_token,
-      token_type: tokenData.token_type,
-      expires_in: tokenData.expires_in,
-      scope: tokenData.scope,
-    });
-  } catch (error) {
-    console.error('Token retrieval error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve token',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      500
-    );
-  }
-});
-
-clickupRoutes.delete('/auth/token/:userId', async (c: DIContext) => {
-  try {
-    const { clickUpOAuthService } = c.get('deps');
-    const userId = c.req.param('userId');
-    
-    if (!userId) {
-      return c.json(
-        {
-          error: 'Missing Parameter',
-          message: 'User ID is required',
-        },
-        400
-      );
-    }
-    
-    // Remove stored token
-    await clickUpOAuthService.removeUserToken(userId);
-    
-    return c.json({
-      message: 'Token removed successfully',
-      user_id: userId,
-    });
-  } catch (error) {
-    console.error('Token removal error:', error);
-    return c.json(
-      {
-        error: 'Internal Server Error',
-        message: 'Failed to remove token',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      500
-    );
-  }
-});
+// Token management endpoints removed - using system token for health checks
 
 clickupRoutes.get('/auth/callback', async (c: DIContext) => {
   try {
@@ -248,7 +166,7 @@ clickupRoutes.get('/status', async (c: DIContext) => {
   try {
     const { clickUpClient } = c.get('deps');
     
-    // Check if we can reach ClickUp API (basic connectivity)
+    // Check ClickUp API health (includes system token validation if available)
     const healthCheck = await clickUpClient.healthCheck();
     
     if (!healthCheck.success) {
@@ -257,7 +175,8 @@ clickupRoutes.get('/status', async (c: DIContext) => {
           status: 'error',
           message: 'ClickUp API is not accessible',
           connectivity: false,
-          authentication: false,
+          authentication: healthCheck.data?.authentication || 'unknown',
+          timestamp: healthCheck.data?.timestamp,
         },
         503
       );
@@ -267,11 +186,12 @@ clickupRoutes.get('/status', async (c: DIContext) => {
       status: 'ok',
       message: 'ClickUp integration is ready',
       connectivity: true,
-      authentication: 'token_required',
+      authentication: healthCheck.data?.authentication || 'unknown',
+      timestamp: healthCheck.data?.timestamp,
       endpoints: {
         auth: '/api/clickup/auth',
         callback: '/api/clickup/auth/callback',
-        token_management: '/api/clickup/auth/token/:userId',
+        status_auth: '/api/clickup/status/auth',
       },
     });
   } catch (error) {
@@ -281,7 +201,8 @@ clickupRoutes.get('/status', async (c: DIContext) => {
         status: 'error',
         message: 'Failed to check ClickUp status',
         connectivity: false,
-        authentication: false,
+        authentication: 'unknown',
+        timestamp: new Date().toISOString(),
       },
       500
     );
@@ -292,10 +213,26 @@ clickupRoutes.get('/status', async (c: DIContext) => {
  * Check authenticated user's ClickUp access
  * GET /api/clickup/status/auth
  */
-clickupRoutes.get('/status/auth', async (c: DIContextWithAuth) => {
+clickupRoutes.get('/status/auth', async (c: DIContext) => {
   try {
     const { clickUpClient } = c.get('deps');
-    const accessToken = c.get('accessToken');
+    
+    // Extract token directly from Authorization header since middleware skips /status routes
+    const authHeader = c.req.header('Authorization');
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json(
+        {
+          status: 'error',
+          message: 'Bearer token required in Authorization header',
+          connectivity: true,
+          authentication: false,
+        },
+        401
+      );
+    }
+    
+    const accessToken = authHeader.replace('Bearer ', '');
     
     // Test authentication by getting user info
     const userResponse = await clickUpClient.getAuthorizedUser(accessToken);
@@ -322,9 +259,9 @@ clickupRoutes.get('/status/auth', async (c: DIContextWithAuth) => {
       connectivity: true,
       authentication: true,
       user: {
-        id: userResponse.data.user?.id,
-        username: userResponse.data.user?.username,
-        email: userResponse.data.user?.email,
+        id: userResponse.data?.id,
+        username: userResponse.data?.username,
+        email: userResponse.data?.email,
       },
       teams_count: teamsResponse.success ? teamsResponse.data?.teams?.length || 0 : 0,
     });
