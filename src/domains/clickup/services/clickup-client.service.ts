@@ -75,16 +75,16 @@ export class ClickUpClient implements IClickUpClient {
   /**
    * Validate the API token by attempting to get authorized user
    */
-  async validateToken(): Promise<boolean> {
-    return this.authService.validateToken();
+  async validateToken(accessToken?: string): Promise<boolean> {
+    return this.authService.validateToken(accessToken);
   }
 
-  async getAuthorizedUser(): Promise<ApiResponse<ClickUpUser>> {
-    return this.authService.getAuthorizedUser();
+  async getAuthorizedUser(accessToken?: string): Promise<ApiResponse<ClickUpUser>> {
+    return this.authService.getAuthorizedUser(accessToken);
   }
 
-  async getAuthorizedTeams(): Promise<ApiResponse<AuthorizedTeamsResponse>> {
-    return this.authService.getAuthorizedTeams();
+  async getAuthorizedTeams(accessToken?: string): Promise<ApiResponse<AuthorizedTeamsResponse>> {
+    return this.authService.getAuthorizedTeams(accessToken);
   }
 
   // Task management methods

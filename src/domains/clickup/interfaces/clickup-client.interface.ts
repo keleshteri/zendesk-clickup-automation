@@ -42,8 +42,9 @@ import type {
  */
 export interface IClickUpClient {
   // Authentication & Authorization
-  getAuthorizedUser(): Promise<ApiResponse<ClickUpUser>>;
-  getAuthorizedTeams(): Promise<ApiResponse<AuthorizedTeamsResponse>>;
+  validateToken(accessToken?: string): Promise<boolean>;
+  getAuthorizedUser(accessToken?: string): Promise<ApiResponse<ClickUpUser>>;
+  getAuthorizedTeams(accessToken?: string): Promise<ApiResponse<AuthorizedTeamsResponse>>;
   
   // Task Operations
   getTask(taskId: string): Promise<ApiResponse<ClickUpTask>>;

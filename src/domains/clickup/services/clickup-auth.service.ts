@@ -14,17 +14,17 @@ export interface IClickUpAuthService {
   /**
    * Validates the API token by attempting to fetch user information
    */
-  validateToken(): Promise<boolean>;
+  validateToken(accessToken?: string): Promise<boolean>;
   
   /**
    * Gets the authorized user information
    */
-  getAuthorizedUser(): Promise<ApiResponse<ClickUpUser>>;
+  getAuthorizedUser(accessToken?: string): Promise<ApiResponse<ClickUpUser>>;
   
   /**
    * Gets the teams the authorized user has access to
    */
-  getAuthorizedTeams(): Promise<ApiResponse<AuthorizedTeamsResponse>>;
+  getAuthorizedTeams(accessToken?: string): Promise<ApiResponse<AuthorizedTeamsResponse>>;
 }
 
 /**
@@ -36,11 +36,12 @@ export class ClickUpAuthService implements IClickUpAuthService {
 
   /**
    * Validates the API token by attempting to fetch user information
+   * @param accessToken - Optional access token to validate
    * @returns Promise<boolean> - true if token is valid, false otherwise
    */
-  async validateToken(): Promise<boolean> {
+  async validateToken(accessToken?: string): Promise<boolean> {
     try {
-      await this.getAuthorizedUser();
+      await this.getAuthorizedUser(accessToken);
       return true;
     } catch {
       return false;
@@ -49,10 +50,15 @@ export class ClickUpAuthService implements IClickUpAuthService {
 
   /**
    * Gets the authorized user information
+   * @param accessToken - Optional access token to use for the request
    * @returns Promise<ApiResponse<ClickUpUser>> - The authorized user data
    */
-  async getAuthorizedUser(): Promise<ApiResponse<ClickUpUser>> {
-    const response = await this.httpClient.makeRequest<{ user: ClickUpUser }>('GET', '/user');
+  async getAuthorizedUser(accessToken?: string): Promise<ApiResponse<ClickUpUser>> {
+    const response = await this.httpClient.makeRequest<{ user: ClickUpUser }>('GET', '/user', undefined, accessToken);
+    
+    // Debug: Log the actual response to see the structure
+    console.log('[ClickUpAuthService] Raw user response:', JSON.stringify(response.data, null, 2));
+    
     const validatedUser = ClickUpUserSchema.parse(response.data.user);
     
     return {
@@ -65,10 +71,11 @@ export class ClickUpAuthService implements IClickUpAuthService {
 
   /**
    * Gets the teams the authorized user has access to
+   * @param accessToken - Optional access token to use for the request
    * @returns Promise<ApiResponse<AuthorizedTeamsResponse>> - The authorized teams data
    */
-  async getAuthorizedTeams(): Promise<ApiResponse<AuthorizedTeamsResponse>> {
-    const response = await this.httpClient.makeRequest<{ teams: ClickUpTeam[] }>('GET', '/team');
+  async getAuthorizedTeams(accessToken?: string): Promise<ApiResponse<AuthorizedTeamsResponse>> {
+    const response = await this.httpClient.makeRequest<{ teams: ClickUpTeam[] }>('GET', '/team', undefined, accessToken);
     const validatedTeams = response.data.teams.map(team => ClickUpTeamSchema.parse(team));
     
     return {

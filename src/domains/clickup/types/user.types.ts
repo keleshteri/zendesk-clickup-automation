@@ -9,15 +9,22 @@ import { z } from 'zod';
 
 // ClickUp User
 export const ClickUpUserSchema = z.object({
-  id: z.number(),
+  id: z.union([z.number(), z.string()]).transform((val) => {
+    // Convert string IDs to numbers if possible, otherwise keep as string
+    if (typeof val === 'string') {
+      const parsed = parseInt(val, 10);
+      return isNaN(parsed) ? val : parsed;
+    }
+    return val;
+  }),
   username: z.string(),
   email: z.string().email(),
   color: z.string(),
   profilePicture: z.string().nullable(),
   initials: z.string(),
-  week_start_day: z.number().optional(),
-  global_font_support: z.boolean().optional(),
-  timezone: z.string().optional(),
+  week_start_day: z.number().nullable().optional(),
+  global_font_support: z.boolean().nullable().optional(),
+  timezone: z.string().nullable().optional(),
 });
 
 export type ClickUpUser = z.infer<typeof ClickUpUserSchema>;

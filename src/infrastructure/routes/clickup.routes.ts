@@ -233,8 +233,8 @@ clickupRoutes.get('/auth/callback', async (c: DIContext) => {
 
 // Middleware for authentication validation (applies to all routes except OAuth)
 clickupRoutes.use('*', async (c: DIContextWithAuth, next) => {
-  // Skip authentication for OAuth routes
-  if (c.req.path.includes('/auth')) {
+  // Skip authentication for OAuth routes and debug routes
+  if (c.req.path.includes('/auth') || c.req.path.includes('/debug')) {
     return next();
   }
 
@@ -911,10 +911,22 @@ clickupRoutes.get('/user', async (c: DIContextWithAuth) => {
     const { clickUpClient } = c.get('deps');
     const accessToken = c.get('accessToken');
     
-    // Note: This would need to be implemented with proper token handling
+    const userResponse = await clickUpClient.getAuthorizedUser(accessToken);
+    
+    if (!userResponse.success) {
+      return c.json(
+        {
+          error: 'Unauthorized',
+          message: 'Failed to retrieve user information',
+        },
+        401
+      );
+    }
+    
     return c.json({
       success: true,
-      message: 'User information endpoint coming soon',
+      data: userResponse.data,
+      statusCode: userResponse.statusCode,
     });
   } catch (error) {
     console.error('Get user error:', error);
@@ -937,10 +949,22 @@ clickupRoutes.get('/teams', async (c: DIContextWithAuth) => {
     const { clickUpClient } = c.get('deps');
     const accessToken = c.get('accessToken');
     
-    // Note: This would need to be implemented with proper token handling
+    const teamsResponse = await clickUpClient.getAuthorizedTeams(accessToken);
+    
+    if (!teamsResponse.success) {
+      return c.json(
+        {
+          error: 'Unauthorized',
+          message: 'Failed to retrieve teams information',
+        },
+        401
+      );
+    }
+    
     return c.json({
       success: true,
-      message: 'Teams information endpoint coming soon',
+      data: teamsResponse.data,
+      statusCode: teamsResponse.statusCode,
     });
   } catch (error) {
     console.error('Get teams error:', error);
@@ -948,6 +972,51 @@ clickupRoutes.get('/teams', async (c: DIContextWithAuth) => {
       {
         error: 'Internal Server Error',
         message: 'Failed to retrieve teams information',
+      },
+      500
+    );
+  }
+});
+
+// ============================================================================
+// DEBUG ROUTES (Development only)
+// ============================================================================
+
+/**
+ * List stored tokens (debug endpoint)
+ * GET /api/clickup/debug/tokens
+ */
+clickupRoutes.get('/debug/tokens', async (c: DIContext) => {
+  try {
+    const { clickUpOAuthService } = c.get('deps');
+    
+    // Get token storage service from OAuth service
+    const tokenStorageService = (clickUpOAuthService as any).tokenStorage;
+    
+    if (!tokenStorageService) {
+      return c.json(
+        {
+          error: 'Service Error',
+          message: 'Token storage service not available',
+        },
+        500
+      );
+    }
+    
+    const tokenKeys = await tokenStorageService.listTokenKeys();
+    
+    return c.json({
+      message: 'Stored tokens retrieved successfully',
+      total_tokens: tokenKeys.length,
+      token_user_ids: tokenKeys,
+      note: 'Use GET /api/clickup/auth/token/:userId to retrieve specific token details'
+    });
+  } catch (error) {
+    console.error('Debug tokens error:', error);
+    return c.json(
+      {
+        error: 'Internal Server Error',
+        message: 'Failed to retrieve stored tokens',
       },
       500
     );

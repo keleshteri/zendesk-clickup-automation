@@ -36,12 +36,13 @@ export class ClickUpHttpClient implements IClickUpHttpClient {
   async makeRequest<T = any>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
-    data?: any
+    data?: any,
+    accessToken?: string
   ): Promise<ClickUpAPIResponse<T>> {
     const url = `${this.config.baseUrl}${endpoint}`;
     const config: HTTPConfig = {
       method,
-      headers: this.buildHeaders(),
+      headers: this.buildHeaders(accessToken),
       timeout: this.config.timeout,
     };
 
@@ -61,6 +62,14 @@ export class ClickUpHttpClient implements IClickUpHttpClient {
     attempt = 0
   ): Promise<ClickUpAPIResponse<T>> {
     try {
+      // Debug: Log request details
+      console.log('[ClickUpHttpClient] Making request:', {
+        url,
+        method: config.method,
+        headers: config.headers,
+        attempt
+      });
+      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), config.timeout);
 
@@ -73,6 +82,13 @@ export class ClickUpHttpClient implements IClickUpHttpClient {
 
       clearTimeout(timeoutId);
 
+      // Debug: Log response details
+      console.log('[ClickUpHttpClient] Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
       // Update rate limit info from response headers
       this.updateRateLimitInfo(response.headers);
 
@@ -81,6 +97,9 @@ export class ClickUpHttpClient implements IClickUpHttpClient {
       }
 
       const responseData = await response.json() as T;
+      
+      // Debug: Log response data
+      console.log('[ClickUpHttpClient] Response data:', JSON.stringify(responseData, null, 2));
       
       return {
         data: responseData,
@@ -100,9 +119,13 @@ export class ClickUpHttpClient implements IClickUpHttpClient {
   /**
    * Build HTTP headers for requests
    */
-  private buildHeaders(): HTTPHeaders {
+  private buildHeaders(accessToken?: string): HTTPHeaders {
+    const authHeader = accessToken 
+      ? `Bearer ${accessToken}` 
+      : this.config.apiKey;
+      
     return {
-      'Authorization': this.config.apiKey,
+      'Authorization': authHeader,
       'Content-Type': 'application/json',
       'User-Agent': this.config.userAgent,
     };

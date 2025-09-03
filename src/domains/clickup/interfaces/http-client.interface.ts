@@ -28,7 +28,8 @@ export interface IClickUpHttpClient {
   makeRequest<T = any>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
-    data?: any
+    data?: any,
+    accessToken?: string
   ): Promise<ClickUpAPIResponse<T>>;
 
   /**
