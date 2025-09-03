@@ -14,6 +14,8 @@ import type {
   WebhookEvent,
   ZendeskWebhookEvent,
   ZendeskWebhookPayload,
+  ZendeskTicketDetail,
+  LegacyZendeskEventType,
 } from '../types/webhook.types';
 import type {
   WorkflowResult,
@@ -22,6 +24,7 @@ import type {
 import {
   ZendeskWebhookEventSchema,
   ZendeskEventTypeSchema,
+  mapZendeskEventType,
 } from '../types/webhook.types';
 
 /**
@@ -29,12 +32,15 @@ import {
  */
 export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
   private readonly supportedEvents = [
-    'ticket.created',
-    'ticket.updated',
-    'ticket.status_changed',
-    'ticket.priority_changed',
-    'ticket.assigned',
-    'ticket.comment_added',
+    'zen:event-type:ticket.created',
+    'zen:event-type:ticket.agent_assignment_changed',
+    'zen:event-type:ticket.comment_added',
+    'zen:event-type:ticket.status_changed',
+    'zen:event-type:ticket.priority_changed',
+    'zen:event-type:ticket.subject_changed',
+    'zen:event-type:ticket.description_changed',
+    'zen:event-type:ticket.tags_changed',
+    'zen:event-type:ticket.custom_field_changed',
   ] as const;
 
   /**
@@ -45,13 +51,36 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
     const startTime = new Date().toISOString();
 
     try {
-      // Validate event structure
-      const validatedEvent = ZendeskWebhookEventSchema.parse(event);
+      // For direct Zendesk webhook payloads, convert to our internal format
+      let validatedEvent: ZendeskWebhookEvent;
       
-      // Route to specific handler based on event type
+      if (this.isDirectZendeskWebhook(event.data)) {
+        // Direct Zendesk webhook - convert to our internal format
+        validatedEvent = {
+          id: event.data.id,
+          source: 'zendesk' as const,
+          eventType: event.data.type,
+          timestamp: new Date(event.data.time).getTime(),
+          data: event.data,
+          signature: event.signature,
+          headers: event.headers,
+        };
+      } else {
+        // Already in our internal format
+        validatedEvent = ZendeskWebhookEventSchema.parse(event);
+      }
+      
+      // Map official event type to legacy type for routing
+      const legacyEventType = mapZendeskEventType(validatedEvent.eventType);
+      
+      if (!legacyEventType) {
+        return this.createUnsupportedEventResult(executionId, validatedEvent.eventType);
+      }
+      
+      // Route to specific handler based on legacy event type
       let result: WorkflowResult;
       
-      switch (validatedEvent.eventType) {
+      switch (legacyEventType) {
         case 'ticket.created':
           result = await this.handleTicketCreated(validatedEvent.data);
           break;
@@ -71,7 +100,7 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
           result = await this.handleTicketCommentAdded(validatedEvent.data);
           break;
         default:
-          result = this.createUnsupportedEventResult(executionId, validatedEvent.eventType);
+          result = this.createUnsupportedEventResult(executionId, legacyEventType);
       }
 
       return {
@@ -84,6 +113,19 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
     } catch (error) {
       return this.createErrorResult(executionId, startTime, error);
     }
+  }
+
+  /**
+   * Checks if the event data is a direct Zendesk webhook payload
+   */
+  private isDirectZendeskWebhook(data: any): data is ZendeskWebhookPayload {
+    return data && 
+           typeof data.type === 'string' && 
+           data.type.startsWith('zen:event-type:') &&
+           typeof data.account_id === 'number' &&
+           typeof data.id === 'string' &&
+           typeof data.time === 'string' &&
+           data.detail !== undefined;
   }
 
   /**
@@ -111,6 +153,7 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
    */
   async handleTicketCreated(ticketData: unknown): Promise<WorkflowResult> {
     const payload = ticketData as ZendeskWebhookPayload;
+    const ticketDetail = payload.detail as ZendeskTicketDetail;
     
     // Mock implementation - in future phases this would:
     // 1. Extract ticket information
@@ -122,7 +165,12 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
       execution_id: '', // Will be set by caller
       status: 'completed' as WorkflowStatus,
       started_at: '', // Will be set by caller
-      trigger_data: { ticket: payload.ticket },
+      trigger_data: { 
+        ticket: ticketDetail,
+        account_id: payload.account_id,
+        event_id: payload.id,
+        event_time: payload.time,
+      },
       step_results: [
         {
           step_id: 'extract_ticket_data',
@@ -132,12 +180,12 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
           duration_ms: 10,
           input: payload,
           output: {
-            ticketId: payload.ticket.id,
-            subject: payload.ticket.subject,
-            description: payload.ticket.description,
-            priority: payload.ticket.priority,
-            status: payload.ticket.status,
-            requester: payload.requester,
+            ticketId: ticketDetail.id,
+            subject: ticketDetail.subject,
+            description: ticketDetail.description,
+            priority: ticketDetail.priority,
+            status: ticketDetail.status,
+            requester: ticketDetail.requester_id,
           },
           retry_count: 0,
         },
@@ -147,18 +195,18 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
           duration_ms: 50,
-          input: { ticketId: payload.ticket.id },
+          input: { ticketId: ticketDetail.id },
           output: {
             message: 'Mock: ClickUp task would be created here',
-            mockTaskId: `mock_task_${payload.ticket.id}`,
+            mockTaskId: `mock_task_${ticketDetail.id}`,
           },
           retry_count: 0,
         },
       ],
       final_output: {
         message: 'Zendesk ticket processed successfully',
-        ticketId: payload.ticket.id,
-        mockTaskId: `mock_task_${payload.ticket.id}`,
+        ticketId: ticketDetail.id,
+        mockTaskId: `mock_task_${ticketDetail.id}`,
       },
     };
   }
@@ -168,13 +216,20 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
    */
   async handleTicketUpdated(ticketData: unknown): Promise<WorkflowResult> {
     const payload = ticketData as ZendeskWebhookPayload;
+    const ticketDetail = payload.detail as ZendeskTicketDetail;
     
     return {
       workflow_id: 'zendesk_ticket_updated',
       execution_id: '',
       status: 'completed' as WorkflowStatus,
       started_at: '',
-      trigger_data: { ticket: payload.ticket },
+      trigger_data: { 
+        ticket: ticketDetail,
+        account_id: payload.account_id,
+        event_id: payload.id,
+        event_time: payload.time,
+        changes: payload.event,
+      },
       step_results: [
         {
           step_id: 'process_ticket_update',
@@ -185,14 +240,14 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
           input: payload,
           output: {
             message: 'Mock: Ticket update would sync to ClickUp here',
-            ticketId: payload.ticket.id,
+            ticketId: ticketDetail.id,
           },
           retry_count: 0,
         },
       ],
       final_output: {
         message: 'Zendesk ticket update processed',
-        ticketId: payload.ticket.id,
+        ticketId: ticketDetail.id,
       },
     };
   }
@@ -201,12 +256,20 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
    * Handles ticket status change events
    */
   private async handleTicketStatusChanged(ticketData: ZendeskWebhookPayload): Promise<WorkflowResult> {
+    const ticketDetail = ticketData.detail as ZendeskTicketDetail;
+    
     return {
       workflow_id: 'zendesk_ticket_status_changed',
       execution_id: '',
       status: 'completed' as WorkflowStatus,
       started_at: '',
-      trigger_data: { ticket: ticketData.ticket },
+      trigger_data: { 
+        ticket: ticketDetail,
+        account_id: ticketData.account_id,
+        event_id: ticketData.id,
+        event_time: ticketData.time,
+        changes: ticketData.event,
+      },
       step_results: [
         {
           step_id: 'sync_status_to_clickup',
@@ -214,19 +277,19 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
           duration_ms: 30,
-          input: { newStatus: ticketData.ticket.status },
+          input: { newStatus: ticketDetail.status },
           output: {
             message: 'Mock: Status change would sync to ClickUp',
-            ticketId: ticketData.ticket.id,
-            newStatus: ticketData.ticket.status,
+            ticketId: ticketDetail.id,
+            newStatus: ticketDetail.status,
           },
           retry_count: 0,
         },
       ],
       final_output: {
         message: 'Ticket status change processed',
-        ticketId: ticketData.ticket.id,
-        newStatus: ticketData.ticket.status,
+        ticketId: ticketDetail.id,
+        newStatus: ticketDetail.status,
       },
     };
   }
@@ -235,12 +298,20 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
    * Handles ticket priority change events
    */
   private async handleTicketPriorityChanged(ticketData: ZendeskWebhookPayload): Promise<WorkflowResult> {
+    const ticketDetail = ticketData.detail as ZendeskTicketDetail;
+    
     return {
       workflow_id: 'zendesk_ticket_priority_changed',
       execution_id: '',
       status: 'completed' as WorkflowStatus,
       started_at: '',
-      trigger_data: { ticket: ticketData.ticket },
+      trigger_data: { 
+        ticket: ticketDetail,
+        account_id: ticketData.account_id,
+        event_id: ticketData.id,
+        event_time: ticketData.time,
+        changes: ticketData.event,
+      },
       step_results: [
         {
           step_id: 'sync_priority_to_clickup',
@@ -248,19 +319,19 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
           duration_ms: 25,
-          input: { newPriority: ticketData.ticket.priority },
+          input: { newPriority: ticketDetail.priority },
           output: {
             message: 'Mock: Priority change would sync to ClickUp',
-            ticketId: ticketData.ticket.id,
-            newPriority: ticketData.ticket.priority,
+            ticketId: ticketDetail.id,
+            newPriority: ticketDetail.priority,
           },
           retry_count: 0,
         },
       ],
       final_output: {
         message: 'Ticket priority change processed',
-        ticketId: ticketData.ticket.id,
-        newPriority: ticketData.ticket.priority,
+        ticketId: ticketDetail.id,
+        newPriority: ticketDetail.priority,
       },
     };
   }
@@ -269,12 +340,20 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
    * Handles ticket assignment events
    */
   private async handleTicketAssigned(ticketData: ZendeskWebhookPayload): Promise<WorkflowResult> {
+    const ticketDetail = ticketData.detail as ZendeskTicketDetail;
+    
     return {
       workflow_id: 'zendesk_ticket_assigned',
       execution_id: '',
       status: 'completed' as WorkflowStatus,
       started_at: '',
-      trigger_data: { ticket: ticketData.ticket },
+      trigger_data: { 
+        ticket: ticketDetail,
+        account_id: ticketData.account_id,
+        event_id: ticketData.id,
+        event_time: ticketData.time,
+        changes: ticketData.event,
+      },
       step_results: [
         {
           step_id: 'sync_assignee_to_clickup',
@@ -282,19 +361,19 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
           duration_ms: 35,
-          input: { assignee: ticketData.assignee },
+          input: { assignee: ticketDetail.assignee_id },
           output: {
             message: 'Mock: Assignee change would sync to ClickUp',
-            ticketId: ticketData.ticket.id,
-            assignee: ticketData.assignee,
+            ticketId: ticketDetail.id,
+            assignee: ticketDetail.assignee_id,
           },
           retry_count: 0,
         },
       ],
       final_output: {
         message: 'Ticket assignment processed',
-        ticketId: ticketData.ticket.id,
-        assignee: ticketData.assignee,
+        ticketId: ticketDetail.id,
+        assignee: ticketDetail.assignee_id,
       },
     };
   }
@@ -303,12 +382,20 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
    * Handles ticket comment events
    */
   private async handleTicketCommentAdded(ticketData: ZendeskWebhookPayload): Promise<WorkflowResult> {
+    const ticketDetail = ticketData.detail as ZendeskTicketDetail;
+    
     return {
       workflow_id: 'zendesk_ticket_comment_added',
       execution_id: '',
       status: 'completed' as WorkflowStatus,
       started_at: '',
-      trigger_data: { ticket: ticketData.ticket },
+      trigger_data: { 
+        ticket: ticketDetail,
+        account_id: ticketData.account_id,
+        event_id: ticketData.id,
+        event_time: ticketData.time,
+        changes: ticketData.event,
+      },
       step_results: [
         {
           step_id: 'sync_comment_to_clickup',
@@ -316,17 +403,17 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
           duration_ms: 40,
-          input: { ticketId: ticketData.ticket.id },
+          input: { ticketId: ticketDetail.id },
           output: {
             message: 'Mock: Comment would sync to ClickUp',
-            ticketId: ticketData.ticket.id,
+            ticketId: ticketDetail.id,
           },
           retry_count: 0,
         },
       ],
       final_output: {
         message: 'Ticket comment processed',
-        ticketId: ticketData.ticket.id,
+        ticketId: ticketDetail.id,
       },
     };
   }

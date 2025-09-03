@@ -30,60 +30,127 @@ export const WebhookEventSchema = z.object({
 
 export type WebhookEvent = z.infer<typeof WebhookEventSchema>;
 
-// Zendesk webhook event types
+// Zendesk webhook event types (official format: zen:event-type:domain.action)
 export const ZendeskEventTypeSchema = z.enum([
-  'ticket.created',
-  'ticket.updated',
-  'ticket.status_changed',
-  'ticket.priority_changed',
-  'ticket.assigned',
-  'ticket.comment_added',
+  'zen:event-type:ticket.created',
+  'zen:event-type:ticket.agent_assignment_changed',
+  'zen:event-type:ticket.comment_added',
+  'zen:event-type:ticket.status_changed',
+  'zen:event-type:ticket.priority_changed',
+  'zen:event-type:ticket.subject_changed',
+  'zen:event-type:ticket.description_changed',
+  'zen:event-type:ticket.tags_changed',
+  'zen:event-type:ticket.custom_field_changed',
+  'zen:event-type:ticket.group_assignment_changed',
+  'zen:event-type:ticket.organization_changed',
+  'zen:event-type:ticket.requester_changed',
+  'zen:event-type:ticket.type_changed',
+  'zen:event-type:ticket.form_changed',
+  'zen:event-type:ticket.merged',
+  'zen:event-type:ticket.soft_deleted',
+  'zen:event-type:ticket.permanently_deleted',
+  'zen:event-type:ticket.undeleted',
+  'zen:event-type:user.created',
+  'zen:event-type:user.active_changed',
+  'zen:event-type:organization.created',
+  'zen:event-type:organization.name_changed',
 ]);
 
 export type ZendeskEventType = z.infer<typeof ZendeskEventTypeSchema>;
 
-// Zendesk webhook payload structure
-export const ZendeskWebhookPayloadSchema = z.object({
-  ticket: z.object({
-    id: z.number(),
-    external_id: z.string().nullable(),
-    subject: z.string(),
-    description: z.string(),
-    status: z.string(),
-    priority: z.string().nullable(),
-    type: z.string().nullable(),
-    tags: z.array(z.string()),
-    created_at: z.string(),
-    updated_at: z.string(),
-    assignee_id: z.number().nullable(),
-    requester_id: z.number(),
-    organization_id: z.number().nullable(),
-    group_id: z.number().nullable(),
-    custom_fields: z.array(z.object({
-      id: z.number(),
-      value: z.unknown(),
-    })).optional(),
+// Zendesk webhook detail object (varies by domain)
+export const ZendeskTicketDetailSchema = z.object({
+  actor_id: z.string().optional(),
+  assignee_id: z.string().nullable(),
+  brand_id: z.string(),
+  created_at: z.string(),
+  custom_status: z.string().nullable(),
+  description: z.string(),
+  external_id: z.string().nullable(),
+  form_id: z.string().optional(),
+  group_id: z.string().optional(),
+  id: z.string(),
+  is_public: z.boolean(),
+  organization_id: z.string().nullable(),
+  priority: z.string().nullable(),
+  requester_id: z.string(),
+  status: z.string(),
+  subject: z.string(),
+  submitter_id: z.string(),
+  tags: z.array(z.string()).nullable(),
+  type: z.string().nullable(),
+  updated_at: z.string(),
+  via: z.object({
+    channel: z.string(),
   }),
-  requester: z.object({
-    id: z.number(),
-    name: z.string(),
-    email: z.string(),
+});
+
+export const ZendeskUserDetailSchema = z.object({
+  created_at: z.string(),
+  email: z.string(),
+  external_id: z.string().nullable(),
+  default_group_id: z.string(),
+  id: z.string(),
+  organization_id: z.string(),
+  role: z.string(),
+  updated_at: z.string(),
+});
+
+export const ZendeskOrganizationDetailSchema = z.object({
+  created_at: z.string(),
+  details: z.string().optional(),
+  domain_names: z.array(z.string()),
+  external_id: z.string().nullable(),
+  group_id: z.string().nullable(),
+  id: z.string(),
+  name: z.string(),
+  notes: z.string().optional(),
+  shared_comments: z.boolean(),
+  shared_tickets: z.boolean(),
+  tags: z.array(z.string()),
+  updated_at: z.string(),
+  url: z.string().optional(),
+});
+
+// Zendesk webhook event object (contains change information)
+export const ZendeskEventObjectSchema = z.object({
+  current: z.unknown().optional(),
+  previous: z.unknown().optional(),
+  comment: z.object({
+    id: z.string(),
+    attachment: z.object({
+      content_type: z.string(),
+      content_url: z.string(),
+      filename: z.string(),
+      id: z.string(),
+      is_public: z.boolean(),
+    }).optional(),
   }).optional(),
-  assignee: z.object({
-    id: z.number(),
-    name: z.string(),
-    email: z.string(),
-  }).optional(),
-  current_user: z.object({
-    id: z.number(),
-    name: z.string(),
-    email: z.string(),
-  }).optional(),
+}).passthrough(); // Allow additional properties for different event types
+
+// Official Zendesk webhook payload structure
+export const ZendeskWebhookPayloadSchema = z.object({
+  type: ZendeskEventTypeSchema,
+  account_id: z.number(),
+  id: z.string(), // Unique event ID
+  time: z.string(), // ISO timestamp
+  zendesk_event_version: z.string(), // e.g., "2022-06-20"
+  subject: z.string(), // e.g., "zen:ticket:14038"
+  detail: z.union([
+    ZendeskTicketDetailSchema,
+    ZendeskUserDetailSchema,
+    ZendeskOrganizationDetailSchema,
+  ]),
+  event: ZendeskEventObjectSchema,
 });
 
 export type ZendeskWebhookPayload = z.infer<typeof ZendeskWebhookPayloadSchema>;
+export type ZendeskTicketDetail = z.infer<typeof ZendeskTicketDetailSchema>;
+export type ZendeskUserDetail = z.infer<typeof ZendeskUserDetailSchema>;
+export type ZendeskOrganizationDetail = z.infer<typeof ZendeskOrganizationDetailSchema>;
+export type ZendeskEventObject = z.infer<typeof ZendeskEventObjectSchema>;
 
-// Zendesk webhook event
+// Zendesk webhook event (wrapper for our internal processing)
 export const ZendeskWebhookEventSchema = WebhookEventSchema.extend({
   source: z.literal('zendesk'),
   eventType: ZendeskEventTypeSchema,
@@ -91,6 +158,48 @@ export const ZendeskWebhookEventSchema = WebhookEventSchema.extend({
 });
 
 export type ZendeskWebhookEvent = z.infer<typeof ZendeskWebhookEventSchema>;
+
+// Legacy event type mapping for backward compatibility
+export const LegacyZendeskEventTypeSchema = z.enum([
+  'ticket.created',
+  'ticket.updated', 
+  'ticket.status_changed',
+  'ticket.priority_changed',
+  'ticket.assigned',
+  'ticket.comment_added',
+]);
+
+export type LegacyZendeskEventType = z.infer<typeof LegacyZendeskEventTypeSchema>;
+
+// Helper function to map official Zendesk event types to legacy types
+export function mapZendeskEventType(officialType: ZendeskEventType): LegacyZendeskEventType | null {
+  const mapping: Record<ZendeskEventType, LegacyZendeskEventType | null> = {
+    'zen:event-type:ticket.created': 'ticket.created',
+    'zen:event-type:ticket.agent_assignment_changed': 'ticket.assigned',
+    'zen:event-type:ticket.comment_added': 'ticket.comment_added',
+    'zen:event-type:ticket.status_changed': 'ticket.status_changed',
+    'zen:event-type:ticket.priority_changed': 'ticket.priority_changed',
+    'zen:event-type:ticket.subject_changed': 'ticket.updated',
+    'zen:event-type:ticket.description_changed': 'ticket.updated',
+    'zen:event-type:ticket.tags_changed': 'ticket.updated',
+    'zen:event-type:ticket.custom_field_changed': 'ticket.updated',
+    'zen:event-type:ticket.group_assignment_changed': 'ticket.updated',
+    'zen:event-type:ticket.organization_changed': 'ticket.updated',
+    'zen:event-type:ticket.requester_changed': 'ticket.updated',
+    'zen:event-type:ticket.type_changed': 'ticket.updated',
+    'zen:event-type:ticket.form_changed': 'ticket.updated',
+    'zen:event-type:ticket.merged': null,
+    'zen:event-type:ticket.soft_deleted': null,
+    'zen:event-type:ticket.permanently_deleted': null,
+    'zen:event-type:ticket.undeleted': null,
+    'zen:event-type:user.created': null,
+    'zen:event-type:user.active_changed': null,
+    'zen:event-type:organization.created': null,
+    'zen:event-type:organization.name_changed': null,
+  };
+  
+  return mapping[officialType] ?? null;
+}
 
 // ClickUp webhook event types (extending existing)
 export const ClickUpEventTypeSchema = z.enum([

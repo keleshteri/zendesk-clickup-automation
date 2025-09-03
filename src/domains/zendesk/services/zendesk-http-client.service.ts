@@ -25,11 +25,54 @@ export class ZendeskAPIError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly code?: string,
-    public readonly details?: unknown
+    public readonly error?: string,
+    public readonly description?: string,
+    public readonly details?: Record<string, Array<{ type: string; description: string }>> | string
   ) {
     super(message);
     this.name = 'ZendeskAPIError';
+  }
+
+  /**
+   * Create ZendeskAPIError from Zendesk API error response
+   */
+  static fromApiResponse(response: {
+    status: number;
+    data?: ZendeskAPIErrorType;
+    statusText?: string;
+  }): ZendeskAPIError {
+    const errorData = response.data;
+    const message = errorData?.description || errorData?.error || response.statusText || 'Unknown API error';
+    
+    return new ZendeskAPIError(
+      message,
+      response.status,
+      errorData?.error,
+      errorData?.description,
+      errorData?.details
+    );
+  }
+
+  /**
+   * Check if this is a validation error (422 with field details)
+   */
+  isValidationError(): boolean {
+    return this.status === 422 && typeof this.details === 'object' && this.details !== null;
+  }
+
+  /**
+   * Get field-specific validation errors
+   */
+  getFieldErrors(): Record<string, string[]> | null {
+    if (!this.isValidationError() || typeof this.details !== 'object') {
+      return null;
+    }
+
+    const fieldErrors: Record<string, string[]> = {};
+    for (const [field, errors] of Object.entries(this.details as Record<string, Array<{ type: string; description: string }>>)) {
+      fieldErrors[field] = errors.map(err => err.description);
+    }
+    return fieldErrors;
   }
 }
 
@@ -198,13 +241,32 @@ export class ZendeskHttpClient implements IZendeskHttpClient {
     const response = await fetch(url, init);
     
     if (!response.ok) {
-      throw new ZendeskAPIError(
-        `HTTP ${response.status}: ${response.statusText}`,
-        response.status
-      );
+      await this.handleErrorResponse(response);
     }
 
     return response;
+  }
+
+  /**
+   * Handle error responses from Zendesk API
+   */
+  private async handleErrorResponse(response: Response): Promise<never> {
+    let errorData: ZendeskAPIErrorType | undefined;
+    
+    try {
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        errorData = await response.json();
+      }
+    } catch {
+      // If JSON parsing fails, we'll use the status text
+    }
+
+    throw ZendeskAPIError.fromApiResponse({
+      status: response.status,
+      data: errorData,
+      statusText: response.statusText,
+    });
   }
 
   private async parseResponse<T>(response: Response): Promise<T> {
@@ -218,18 +280,24 @@ export class ZendeskHttpClient implements IZendeskHttpClient {
   }
 
   private extractRateLimitInfo(headers: HTTPHeaders): ZendeskRateLimitInfo | null {
-    const limit = headers['x-rate-limit-limit'];
-    const remaining = headers['x-rate-limit-remaining'];
-    const reset = headers['x-rate-limit-reset'];
+    // Zendesk uses these standard headers for rate limiting
+    const limit = headers['x-rate-limit'] || headers['ratelimit-limit'];
+    const remaining = headers['x-rate-limit-remaining'] || headers['ratelimit-remaining'];
+    const reset = headers['ratelimit-reset'];
+    const retryAfter = headers['retry-after'];
 
     if (!limit || !remaining) {
       return null;
     }
 
+    const resetTime = reset ? (Date.now() / 1000) + parseInt(reset, 10) : undefined;
+
     return {
       limit: parseInt(limit, 10),
       remaining: parseInt(remaining, 10),
-      retry_after: reset ? parseInt(reset, 10) : undefined,
+      retry_after: retryAfter ? parseInt(retryAfter, 10) : undefined,
+      reset_time: resetTime,
+      window_ms: 60000, // Zendesk uses 1-minute windows
     };
   }
 
@@ -257,10 +325,20 @@ export class ZendeskHttpClient implements IZendeskHttpClient {
     }
 
     if (error instanceof Error) {
-      return new ZendeskAPIError(error.message, 0);
+      return new ZendeskAPIError(
+        error.message,
+        0,
+        'NetworkError',
+        'A network or connection error occurred'
+      );
     }
 
-    return new ZendeskAPIError('Unknown error occurred', 0);
+    return new ZendeskAPIError(
+      'Unknown error occurred',
+      0,
+      'UnknownError',
+      'An unexpected error occurred during the API request'
+    );
   }
 
   private async delay(ms: number): Promise<void> {

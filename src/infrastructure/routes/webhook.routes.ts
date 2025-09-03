@@ -70,35 +70,17 @@ webhookRoutes.post('/zendesk', async (c: DIContext) => {
       );
     }
     
-    // Transform Zendesk webhook to our standard format
+    // Create webhook event with raw Zendesk payload
     const webhookEvent = {
       id: zendeskPayload.id || `zendesk_${Date.now()}`,
       source: 'zendesk' as const,
-      eventType: transformZendeskEventType(zendeskPayload.type),
+      eventType: zendeskPayload.type, // Keep the original Zendesk event type
       timestamp: zendeskPayload.time ? new Date(zendeskPayload.time).getTime() : Date.now(),
-      data: {
-        ticket: {
-          id: parseInt(zendeskPayload.detail?.id || '0'),
-          external_id: zendeskPayload.detail?.external_id || null,
-          subject: zendeskPayload.detail?.subject || '',
-          description: zendeskPayload.detail?.description || '',
-          status: zendeskPayload.detail?.status?.toLowerCase() || 'unknown',
-          priority: zendeskPayload.detail?.priority?.toLowerCase() || null,
-          type: zendeskPayload.detail?.type || null,
-          requester_id: parseInt(zendeskPayload.detail?.requester_id || '0'),
-          assignee_id: zendeskPayload.detail?.assignee_id ? parseInt(zendeskPayload.detail.assignee_id) : null,
-          organization_id: zendeskPayload.detail?.organization_id ? parseInt(zendeskPayload.detail.organization_id) : null,
-          group_id: zendeskPayload.detail?.group_id ? parseInt(zendeskPayload.detail.group_id) : null,
-          created_at: zendeskPayload.detail?.created_at || new Date().toISOString(),
-          updated_at: zendeskPayload.detail?.updated_at || new Date().toISOString(),
-          tags: zendeskPayload.detail?.tags || [],
-          custom_fields: zendeskPayload.detail?.custom_fields || [],
-        },
-        account_id: zendeskPayload.account_id,
-        brand_id: zendeskPayload.detail?.brand_id,
-        organization_id: zendeskPayload.detail?.organization_id,
-        zendesk_event_version: zendeskPayload.zendesk_event_version,
-      },
+      data: zendeskPayload, // Pass the raw Zendesk payload
+      signature,
+      headers: Object.fromEntries(
+        Object.entries(c.req.header()).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])
+      ),
     };
     
     // Validate the transformed event
