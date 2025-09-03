@@ -5,6 +5,447 @@
 **Tech Stack**: TypeScript, Hono, Cloudflare Workers  
 **Architecture**: SOLID principles, Interface-driven, Modular design  
 **MCP tools can use**: mcp-memory, Cloudflare, Context7
+
+---
+
+## 🛡️ AI Code Generation Validation Rules (CRITICAL PRIORITY)
+
+### MANDATORY: Pre-Generation Validation Checklist
+
+Before generating ANY code, AI MUST verify ALL of the following conditions:
+
+```typescript
+// AI MUST run this validation before code generation
+interface CodeGenerationValidation {
+  // Type Safety Requirements
+  strictModeEnabled: boolean;           // ✓ TypeScript strict mode active?
+  noImplicitAny: boolean;              // ✓ All types explicitly declared?
+  noUnknownAccess: boolean;            // ✓ No property access on unknown types?
+  returnTypesExplicit: boolean;        // ✓ All functions have return types?
+  nullChecksPresent: boolean;          // ✓ Null/undefined safety checks?
+  
+  // Syntax Validation
+  validTypeScript: boolean;            // ✓ Syntactically correct TypeScript?
+  noSyntaxErrors: boolean;             // ✓ No compilation errors?
+  properImports: boolean;              // ✓ All imports properly declared?
+  exportConsistency: boolean;          // ✓ Exports match file structure?
+  
+  // Logical Consistency
+  interfaceImplementation: boolean;     // ✓ Classes implement declared interfaces?
+  solidPrinciples: boolean;            // ✓ SOLID principles followed?
+  dependencyInjection: boolean;        // ✓ DI patterns correctly applied?
+  errorHandling: boolean;              // ✓ Proper error handling present?
+  
+  // Architecture Compliance
+  fileOrganization: boolean;           // ✓ Files in correct directories?
+  namingConventions: boolean;          // ✓ Consistent naming patterns?
+  sizeConstraints: boolean;            // ✓ Files under size limits?
+  separationOfConcerns: boolean;       // ✓ Types/interfaces separated?
+}
+```
+
+### 🚫 CRITICAL: TypeScript Error Prevention Rules
+
+#### Rule 1: NEVER Access Properties Without Type Guards
+
+```typescript
+// ❌ FORBIDDEN - Will cause TS18046 errors
+function processData(data: unknown) {
+  const id = data.id;                  // ERROR: Property 'id' does not exist on type 'unknown'
+  const nested = data.task.id;         // ERROR: Object is possibly 'undefined'
+}
+
+// ✅ REQUIRED - Type guard first, then access
+function processData(data: unknown): string | null {
+  // Step 1: Type guard
+  if (!isValidData(data)) {
+    return null;
+  }
+  
+  // Step 2: Safe access with optional chaining
+  return data.task?.id ?? null;
+}
+
+function isValidData(data: unknown): data is { task?: { id: string } } {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    (!('task' in data) || 
+     (typeof (data as any).task === 'object' && 
+      'id' in (data as any).task &&
+      typeof (data as any).task.id === 'string'))
+  );
+}
+```
+
+#### Rule 2: Zod Validation for ALL External Data
+
+```typescript
+// MANDATORY for ALL API responses, webhooks, and external data
+import { z } from 'zod';
+
+// Step 1: Define schema
+const TaskResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.object({
+    task: z.object({
+      id: z.string(),
+      name: z.string(),
+      status: z.enum(['open', 'in_progress', 'closed'])
+    })
+  }).optional(),
+  error: z.object({
+    message: z.string(),
+    code: z.string()
+  }).optional()
+});
+
+// Step 2: Infer type
+type TaskResponse = z.infer<typeof TaskResponseSchema>;
+
+// Step 3: Validate before use
+function handleTaskResponse(rawResponse: unknown): TaskResponse {
+  try {
+    return TaskResponseSchema.parse(rawResponse);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(`Invalid response structure: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+// Step 4: Type-safe usage
+const response = handleTaskResponse(apiResponse);
+if (response.success && response.data?.task) {
+  const taskId = response.data.task.id; // ✓ Type-safe access
+}
+```
+
+#### Rule 3: Explicit Return Types for ALL Functions
+
+```typescript
+// ❌ FORBIDDEN - Implicit return types
+function createTask(data) {                    // Missing parameter type
+  return processTaskData(data);                // Missing return type
+}
+
+// ✅ REQUIRED - Explicit types everywhere
+function createTask(data: CreateTaskRequest): Promise<TaskCreationResult> {
+  return processTaskData(data);
+}
+
+// For arrow functions
+const transformData = (input: RawData): ProcessedData => {
+  // implementation
+};
+
+// For async functions
+async function fetchUserData(id: string): Promise<User | null> {
+  // implementation
+}
+```
+
+#### Rule 4: Optional Chaining and Nullish Coalescing EVERYWHERE
+
+```typescript
+// ❌ FORBIDDEN - Direct property access
+const value = data.nested.property.deep.value;
+const firstItem = items[0].id;
+const result = config.settings.timeout;
+
+// ✅ REQUIRED - Safe property access
+const value = data?.nested?.property?.deep?.value ?? 'default';
+const firstItem = items?.[0]?.id ?? null;
+const result = config?.settings?.timeout ?? 5000;
+
+// For method calls
+const processResult = processor?.process?.(data) ?? null;
+```
+
+#### Rule 5: Type Assertion Functions for Complex Validation
+
+```typescript
+// For complex objects that need runtime validation
+function assertValidTaskResult(
+  result: unknown
+): asserts result is { success: true; task: { id: string; name: string } } {
+  if (!result || typeof result !== 'object') {
+    throw new Error('Invalid result: not an object');
+  }
+  
+  const typed = result as any;
+  
+  if (typed.success !== true) {
+    throw new Error('Task operation failed');
+  }
+  
+  if (!typed.task || typeof typed.task !== 'object') {
+    throw new Error('Invalid result: missing task data');
+  }
+  
+  if (typeof typed.task.id !== 'string' || typeof typed.task.name !== 'string') {
+    throw new Error('Invalid result: task missing required properties');
+  }
+}
+
+// Usage - eliminates type errors
+const result = await createTaskAPI(data);
+assertValidTaskResult(result);
+// TypeScript now knows result.task.id and result.task.name exist
+const taskId = result.task.id; // ✓ No type errors
+```
+
+### 🎯 AI Code Generation Workflow
+
+#### STEP 1: Type Definition FIRST (Always)
+```typescript
+// AI: "Defining types with Zod validation for [FEATURE]"
+
+// 1. Input validation schema
+const CreateTaskRequestSchema = z.object({
+  name: z.string().min(1, 'Task name is required'),
+  description: z.string().optional(),
+  assignees: z.array(z.string()).optional(),
+  priority: z.enum(['low', 'medium', 'high']).default('medium')
+});
+
+type CreateTaskRequest = z.infer<typeof CreateTaskRequestSchema>;
+
+// 2. Response type definition
+interface TaskCreationResponse {
+  success: boolean;
+  data?: {
+    task: {
+      id: string;
+      name: string;
+      status: string;
+      createdAt: string;
+    };
+  };
+  error?: {
+    message: string;
+    code: string;
+    details?: Record<string, unknown>;
+  };
+}
+```
+
+#### STEP 2: Type Guards and Validators
+```typescript
+// AI: "Creating type guards for safe property access"
+
+function isTaskCreationSuccess(
+  response: unknown
+): response is TaskCreationResponse & { success: true; data: NonNullable<TaskCreationResponse['data']> } {
+  return (
+    response !== null &&
+    typeof response === 'object' &&
+    'success' in response &&
+    (response as any).success === true &&
+    'data' in response &&
+    typeof (response as any).data === 'object' &&
+    (response as any).data !== null &&
+    'task' in (response as any).data &&
+    typeof (response as any).data.task === 'object' &&
+    'id' in (response as any).data.task &&
+    typeof (response as any).data.task.id === 'string'
+  );
+}
+
+function validateCreateTaskRequest(data: unknown): CreateTaskRequest {
+  try {
+    return CreateTaskRequestSchema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(`Invalid task data: ${error.errors.map(e => e.message).join(', ')}`);
+    }
+    throw error;
+  }
+}
+```
+
+#### STEP 3: Implementation with Full Type Safety
+```typescript
+// AI: "Implementing with complete type safety and error prevention"
+
+export class TaskService implements ITaskService {
+  constructor(
+    private readonly client: IClickUpClient,
+    private readonly logger: ILogger
+  ) {}
+
+  async createTask(rawRequest: unknown): Promise<string> {
+    // Step 1: Validate input with Zod
+    const validRequest = validateCreateTaskRequest(rawRequest);
+    
+    // Step 2: Make API call with proper error handling
+    let response: unknown;
+    try {
+      response = await this.client.post('/tasks', validRequest);
+    } catch (error) {
+      this.logger.error('API call failed', { error, request: validRequest });
+      throw new Error('Failed to create task: API error');
+    }
+    
+    // Step 3: Validate response structure
+    if (!isTaskCreationSuccess(response)) {
+      this.logger.error('Invalid API response', { response });
+      throw new Error('Failed to create task: Invalid response');
+    }
+    
+    // Step 4: Safe access (TypeScript knows the type)
+    const taskId = response.data.task.id; // ✓ No type errors!
+    
+    this.logger.info('Task created successfully', { taskId });
+    return taskId;
+  }
+}
+```
+
+### 🔍 AI Self-Verification Protocol
+
+Before EVERY code submission, AI MUST verify:
+
+```typescript
+interface PreSubmissionCheck {
+  // Type Safety Verification
+  noImplicitAny: boolean;              // ✓ No 'any' types used
+  noUnknownAccess: boolean;            // ✓ No direct property access on 'unknown'
+  allReturnsTyped: boolean;            // ✓ All functions have explicit return types
+  nullSafetyChecks: boolean;           // ✓ Null/undefined handled everywhere
+  
+  // Validation Verification
+  zodSchemasPresent: boolean;          // ✓ External data validated with Zod
+  typeGuardsImplemented: boolean;      // ✓ Type guards for complex objects
+  optionalChainingUsed: boolean;       // ✓ ?. operator used for nested access
+  assertionFunctionsCreated: boolean;  // ✓ Assertion functions for complex validation
+  
+  // Error Prevention
+  properErrorHandling: boolean;        // ✓ Try-catch blocks for external calls
+  meaningfulErrorMessages: boolean;    // ✓ Descriptive error messages
+  loggingImplemented: boolean;         // ✓ Proper logging for debugging
+  
+  // Architecture Compliance
+  solidPrinciplesFollowed: boolean;    // ✓ SOLID principles maintained
+  interfacesImplemented: boolean;      // ✓ Proper interface implementation
+  dependencyInjectionUsed: boolean;   // ✓ DI patterns correctly applied
+  fileSizeLimitsRespected: boolean;    // ✓ Files under 300 lines
+}
+```
+
+### 🚨 Common Error Patterns and Mandatory Fixes
+
+#### Pattern 1: Unknown Type Access (TS18046)
+```typescript
+// ❌ ERROR: 'data' is of type 'unknown'
+function processWebhook(data: unknown) {
+  return data.ticket.id; // TS18046: 'data' is of type 'unknown'
+}
+
+// ✅ FIX: Type guard + optional chaining
+function processWebhook(data: unknown): string | null {
+  if (!isWebhookData(data)) {
+    return null;
+  }
+  return data.ticket?.id ?? null;
+}
+
+function isWebhookData(data: unknown): data is { ticket?: { id: string } } {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    (!('ticket' in data) || 
+     (typeof (data as any).ticket === 'object' &&
+      'id' in (data as any).ticket &&
+      typeof (data as any).ticket.id === 'string'))
+  );
+}
+```
+
+#### Pattern 2: Possibly Undefined (TS2532)
+```typescript
+// ❌ ERROR: Object is possibly 'undefined'
+function getUserName(user?: User) {
+  return user.name; // TS2532: Object is possibly 'undefined'
+}
+
+// ✅ FIX: Optional chaining with fallback
+function getUserName(user?: User): string {
+  return user?.name ?? 'Anonymous';
+}
+```
+
+#### Pattern 3: Property Does Not Exist (TS2339)
+```typescript
+// ❌ ERROR: Property 'task' does not exist on type 'unknown'
+function getTaskId(response: unknown) {
+  return response.task.id; // TS2339: Property 'task' does not exist
+}
+
+// ✅ FIX: Proper typing with validation
+interface TaskResponse {
+  task?: { id: string };
+}
+
+function getTaskId(response: unknown): string | null {
+  const validated = response as TaskResponse;
+  return validated.task?.id ?? null;
+}
+```
+
+### 📋 AI Error Prevention Template
+
+When generating ANY code, AI MUST follow this template:
+
+```typescript
+/**
+ * STEP 1: Define all types with Zod schemas
+ */
+const InputSchema = z.object({
+  // Define input structure
+});
+type Input = z.infer<typeof InputSchema>;
+
+/**
+ * STEP 2: Create type guards for runtime validation
+ */
+function isValidInput(data: unknown): data is Input {
+  return InputSchema.safeParse(data).success;
+}
+
+function assertValidResponse(
+  response: unknown
+): asserts response is ExpectedResponse {
+  // Runtime validation logic
+}
+
+/**
+ * STEP 3: Implement with explicit types and comprehensive safety
+ */
+export async function processData(rawInput: unknown): Promise<ProcessedResult> {
+  // Validate input
+  if (!isValidInput(rawInput)) {
+    throw new Error('Invalid input data structure');
+  }
+  
+  // Process with type safety
+  let result: unknown;
+  try {
+    result = await externalOperation(rawInput);
+  } catch (error) {
+    logger.error('External operation failed', { error, input: rawInput });
+    throw new Error('Processing failed');
+  }
+  
+  // Validate output
+  assertValidResponse(result);
+  
+  // Return with confidence
+  return result;
+}
+```
+
 ---
 
 ## Framework & Dependencies
