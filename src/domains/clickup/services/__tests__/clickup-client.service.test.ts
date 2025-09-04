@@ -126,7 +126,7 @@ describe('ClickUpClient', () => {
         description: 'Test Description',
         assignees: [123],
         status: 'to do',
-        priority: 'normal',
+        priority: 3, // 3 = normal
         due_date: Date.now(),
         start_date: Date.now(),
         tags: ['test'],

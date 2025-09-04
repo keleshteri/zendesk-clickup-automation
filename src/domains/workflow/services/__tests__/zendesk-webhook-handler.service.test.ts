@@ -8,8 +8,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ZendeskWebhookHandler } from '../zendesk-webhook-handler.service';
 import type { WebhookEvent } from '../../types/webhook.types';
-import type { WorkflowResult } from '../../types/workflow.types';
 import type { IClickUpTaskService } from '../../../clickup/interfaces/clickup-task-service.interface';
+import type { IClickUpSpaceService } from '../../../clickup/interfaces/clickup-space-service.interface';
 
 describe('ZendeskWebhookHandler', () => {
   let handler: ZendeskWebhookHandler;
@@ -49,11 +49,68 @@ describe('ZendeskWebhookHandler', () => {
       getTaskCountByStatus: vi.fn()
     } as IClickUpTaskService;
 
-    // Create handler with mock dependencies
-    handler = new ZendeskWebhookHandler(mockClickUpTaskService, {
-      CLICKUP_API_KEY: 'test-api-key',
-      CLICKUP_DEFAULT_LIST_ID: 'test-list-id'
-    });
+    // Create mock ClickUp space service
+    const mockClickUpSpaceService: IClickUpSpaceService = {
+      // Space Operations
+      getSpaceById: vi.fn(),
+      getSpacesByTeam: vi.fn(),
+      createSpace: vi.fn(),
+      updateSpace: vi.fn(),
+      deleteSpace: vi.fn(),
+      archiveSpace: vi.fn(),
+      unarchiveSpace: vi.fn(),
+      
+      // Folder Operations
+      getFolderById: vi.fn(),
+      getFoldersBySpace: vi.fn(),
+      createFolder: vi.fn(),
+      updateFolder: vi.fn(),
+      deleteFolder: vi.fn(),
+      
+      // List Operations
+      getListById: vi.fn(),
+      getListsByFolder: vi.fn(),
+      getFolderlessLists: vi.fn(),
+      createList: vi.fn(),
+      createFolderlessList: vi.fn(),
+      updateList: vi.fn(),
+      deleteList: vi.fn(),
+      
+      // Workspace Structure Operations
+      getWorkspaceStructure: vi.fn(),
+      moveListToFolder: vi.fn(),
+      moveListToSpace: vi.fn(),
+      moveFolderToSpace: vi.fn(),
+      
+      // Search and Discovery
+      searchSpaces: vi.fn(),
+      searchFolders: vi.fn(),
+      searchLists: vi.fn(),
+      
+      // Validation
+      validateSpaceData: vi.fn(),
+      validateFolderData: vi.fn(),
+      validateListData: vi.fn(),
+      
+      // Permissions
+      canUserAccessSpace: vi.fn(),
+      canUserModifySpace: vi.fn(),
+      canUserCreateInSpace: vi.fn(),
+      
+      // Analytics
+      getSpaceStatistics: vi.fn(),
+      getTeamWorkspaceOverview: vi.fn()
+    };
+
+    // Create handler with mock dependencies and environment variables
+    handler = new ZendeskWebhookHandler(
+      mockClickUpTaskService, 
+      mockClickUpSpaceService, 
+      {
+        CLICKUP_SYSTEM_TOKEN: 'test-api-key',
+        CLICKUP_DEFAULT_LIST_ID: 'test-list-id'
+      }
+    );
   });
 
   describe('handleWebhook', () => {

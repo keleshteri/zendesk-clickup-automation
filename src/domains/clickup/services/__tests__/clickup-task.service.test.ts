@@ -79,7 +79,7 @@ describe('ClickUpTaskService', () => {
         description: 'Test Description',
         assignees: [123],
         status: 'to do',
-        priority: 'normal',
+        priority: 3, // 3 = normal
         due_date: Date.now(),
         tags: ['test'],
       };
@@ -336,7 +336,7 @@ describe('ClickUpTaskService', () => {
         name: 'Updated Task Name',
         description: 'Updated Description',
         status: 'in progress',
-        priority: 'high',
+        priority: 2, // 2 = high
       };
 
       const updatedTask: ClickUpTask = {

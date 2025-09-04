@@ -25,15 +25,12 @@ import type {
 import type { PaginatedResponse } from '../types/api.types';
 
 import {
-  ClickUpTaskSchema,
   CreateTaskRequestSchema,
   UpdateTaskRequestSchema,
   TaskQueryParamsSchema,
-  TaskStatusSchema,
   TaskPrioritySchema,
+  priorityToNumber,
 } from '../types/task.types';
-
-import { ValidationResult } from '../../../shared/types';
 
 /**
  * Task service configuration
@@ -211,7 +208,8 @@ export class ClickUpTaskService implements IClickUpTaskService {
   // Priority management
   async updateTaskPriority(taskId: string, priority: TaskPriority): Promise<ClickUpTask> {
     const validatedPriority = TaskPrioritySchema.parse(priority);
-    return await this.updateTask(taskId, { priority: validatedPriority });
+    const priorityNumber = priorityToNumber(validatedPriority);
+    return await this.updateTask(taskId, { priority: priorityNumber });
   }
   
   async getTasksByPriority(listId: string, priority: TaskPriority): Promise<readonly ClickUpTask[]> {

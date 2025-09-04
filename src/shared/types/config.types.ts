@@ -130,7 +130,7 @@ export const EnvSchema = z.object({
   PORT: z.string().transform(Number).pipe(z.number().min(1).max(65535)).default('8787'),
   
   // ClickUp
-  CLICKUP_API_KEY: z.string().min(1),
+  CLICKUP_SYSTEM_TOKEN: z.string().min(1),
   CLICKUP_WEBHOOK_SECRET: z.string().optional(),
   CLICKUP_DEFAULT_TEAM_ID: z.string().optional(),
   CLICKUP_DEFAULT_SPACE_ID: z.string().optional(),

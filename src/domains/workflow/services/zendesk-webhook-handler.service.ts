@@ -65,7 +65,7 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
     }
 
     const requiredEnvVars = {
-      CLICKUP_API_KEY: env.CLICKUP_API_KEY,
+      CLICKUP_SYSTEM_TOKEN: env.CLICKUP_SYSTEM_TOKEN,
       CLICKUP_DEFAULT_LIST_ID: env.CLICKUP_DEFAULT_LIST_ID,
     };
 
@@ -83,7 +83,7 @@ export class ZendeskWebhookHandler implements IZendeskWebhookHandler {
 
     // Log current configuration (without sensitive data)
     console.log('ClickUp workspace configuration:', {
-      hasApiKey: !!env.CLICKUP_API_KEY,
+      hasApiKey: !!env.CLICKUP_SYSTEM_TOKEN,
       hasDefaultListId: !!env.CLICKUP_DEFAULT_LIST_ID,
       hasDefaultSpaceId: !!env.CLICKUP_DEFAULT_SPACE_ID,
       hasDefaultTeamId: !!env.CLICKUP_DEFAULT_TEAM_ID,

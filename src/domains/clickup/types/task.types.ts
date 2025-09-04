@@ -11,6 +11,31 @@ import { z } from 'zod';
 export const TaskPrioritySchema = z.enum(['urgent', 'high', 'normal', 'low']);
 export type TaskPriority = z.infer<typeof TaskPrioritySchema>;
 
+// Priority mapping between string values and numeric values
+export const PRIORITY_MAP: Record<TaskPriority, number> = {
+  urgent: 1,
+  high: 2,
+  normal: 3,
+  low: 4
+};
+
+export const PRIORITY_MAP_REVERSE: Record<number, TaskPriority> = {
+  1: 'urgent',
+  2: 'high',
+  3: 'normal',
+  4: 'low'
+};
+
+// Helper function to convert string priority to number
+export function priorityToNumber(priority: TaskPriority): number {
+  return PRIORITY_MAP[priority];
+}
+
+// Helper function to convert number to string priority
+export function numberToPriority(priority: number): TaskPriority {
+  return PRIORITY_MAP_REVERSE[priority] as TaskPriority;
+}
+
 // Task Status (simple enum for use in interfaces)
 export const TaskStatusEnumSchema = z.enum(['open', 'in_progress', 'review', 'closed', 'cancelled']);
 export type TaskStatusEnum = z.infer<typeof TaskStatusEnumSchema>;
