@@ -1302,7 +1302,7 @@ export interface Dependencies {
 }
 
 export function createDependencies(env: Env): Dependencies {
-  const clickUpClient = new ClickUpClient(env.CLICKUP_API_KEY);
+  const clickUpClient = new ClickUpClient(env.CLICKUP_SYSTEM_TOKEN);
   const zendeskClient = new ZendeskClient(env.ZENDESK_API_KEY);
   const taskService = new TaskService(clickUpClient, zendeskClient);
   
