@@ -1,4 +1,4 @@
-# AI Coding Rules - Enforceable Version
+# AI Coding Rules - Simplified & Enforceable
 
 ## 🔴 CRITICAL: Task Size Limits
 
@@ -25,9 +25,12 @@ Which task should I do first?"
 ```typescript
 /**
  * @ai-metadata
+ * @description: description of the file
  * @edit-permission: "full" | "read-only" | "add-only"
  * @approved-by: "user@email.com" | null
  * @breaking-risk: "high" | "medium" | "low"
+ * @dependencies: ["file1.ts", "file2.ts"]
+ * @review-required: "yes" | "no"
  */
 ```
 
@@ -41,47 +44,6 @@ Which task should I do first?"
 
 3. CHECK size → If >250 lines → WARN
    AI: "⚠️ File approaching limit. Should I split it first?"
-```
-
----
-
-## 📍 CODE MAPPING SYSTEM (MANDATORY)
-
-### Map Structure:
-```
-project/
-├── map.md                    # Main index
-├── src/
-│   ├── domains/
-│   │   ├── clickup/
-│   │   │   └── map.md       # Domain map
-│   │   └── zendesk/
-│   │       └── map.md       # Domain map
-│   └── shared/
-│       └── map.md           # Shared utilities map
-```
-
-### Map Format (Interface → Class → Methods):
-```markdown
-# Domain Map
-Updated: 2024-01-15 | Coverage: 12/15 methods (80%)
-
-## IClickUpTaskService
-└── ClickUpTaskService [3/5 methods]
-    ✅ createTask(data: CreateTaskDto): Promise<Task>
-    ✅ updateTask(id: string, data: UpdateTaskDto): Promise<Task>
-    ✅ getTask(id: string): Promise<Task | null>
-    ❌ deleteTask(id: string): Promise<void>
-    ❌ searchTasks(query: SearchQuery): Promise<Task[]>
-```
-
-### ENFORCEMENT:
-```
-After EVERY file change:
-AI: "📍 Updating map.md with new changes..."
-- ADD new methods with ❌ not implemented
-- MARK completed methods with ✅ implemented
-- UPDATE method signatures if changed
 ```
 
 ---
@@ -140,13 +102,7 @@ src/
 
 ## 🛠️ Development Workflow (STRICT SEQUENCE)
 
-### Step 1: Check Map
-```
-// AI: "📍 Checking map.md for existing methods..."
-// AI: "Found: createTask ✅, updateTask ❌. Ready to implement updateTask."
-```
-
-### Step 2: Define Contract
+### Step 1: Define Contract
 ```typescript
 // AI: "Creating interface first. Approve?"
 interface ITaskService {
@@ -155,7 +111,7 @@ interface ITaskService {
 // WAIT for: "approved" or changes
 ```
 
-### Step 3: Define Types
+### Step 2: Define Types
 ```typescript
 // AI: "Creating types with Zod. Approve?"
 const CreateTaskDto = z.object({
@@ -166,7 +122,7 @@ type CreateTaskDto = z.infer<typeof CreateTaskDto>;
 // WAIT for: "approved"
 ```
 
-### Step 4: Implement (MAX 100 lines)
+### Step 3: Implement (MAX 100 lines)
 ```typescript
 // AI: "Implementing service (est. 80 lines). Proceed?"
 export class TaskService implements ITaskService {
@@ -175,13 +131,6 @@ export class TaskService implements ITaskService {
   }
 }
 // If >100 lines: MUST split into sub-services
-```
-
-### Step 5: Update Map
-```markdown
-// AI: "📍 Updating map.md..."
-// BEFORE: `createTask(...): Promise<Task>` ❌ not implemented
-// AFTER:  `createTask(...): Promise<Task>` ✅ implemented
 ```
 
 ---
@@ -225,7 +174,6 @@ interface TaskMetrics {
 2. **Permission denied** → Request approval
 3. **Structure wrong** → Fix first
 4. **Type unsafe** → Add guards
-5. **Map outdated** → Update first
 
 ---
 
@@ -236,27 +184,22 @@ interface TaskMetrics {
 - `"grant edit to [file]"` → Override read-only
 - `"split this task"` → Break into subtasks
 - `"skip approval"` → Bypass approval (use carefully)
-- `"update map"` → Force map.md update
-- `"check map"` → Show current map status
 
 ### AI Responses:
 - `"❌ Cannot proceed: [reason]"`
 - `"⚠️ Warning: [issue]. Continue?"`
 - `"✅ Ready to implement. Approve?"`
 - `"📋 Task too large. Split into: [list]"`
-- `"📍 Map updated: [changes]"`
 
 ---
 
 ## 🔥 Priority Enforcement Order
 
-1. **Check Map** - See what exists first
-2. **File Permissions** - Check access rights
-3. **Task Size** - Never exceed 100 lines
-4. **Code Organization** - Types → Interfaces → Implementation
-5. **Type Safety** - No unsafe operations
-6. **Update Map** - Document changes
-7. **Approval Flow** - Wait for user confirmation
+1. **File Permissions** - Check first, always
+2. **Task Size** - Never exceed 100 lines
+3. **Code Organization** - Types → Interfaces → Implementation
+4. **Type Safety** - No unsafe operations
+5. **Approval Flow** - Wait for user confirmation
 
 ---
 
@@ -264,32 +207,14 @@ interface TaskMetrics {
 
 Before EVERY code generation:
 ```
-□ Map checked for duplicates?
 □ Permission checked?
 □ Under 100 lines?
 □ Types defined first?
 □ Zod validation added?
 □ No 'any' types?
 □ Approval received?
-□ Map.md update prepared?
 
 If ANY unchecked → STOP and fix
-```
-
-### AI Map Usage Flow:
-```
-1. BEFORE coding:
-   AI: "📍 Checking map.md for existing methods..."
-   AI: "Found 3 similar methods. None match exactly."
-   
-2. DURING coding:
-   AI: "Creating new method 'processTask'"
-   AI: "This will be line 4 in TaskService"
-   
-3. AFTER coding:
-   AI: "📍 Updating map.md:"
-   - Added: `processTask(data: TaskData): Promise<Result>` ✅
-   - Coverage: 4/5 methods (80%)
 ```
 
 ---
@@ -319,23 +244,6 @@ FIX: AI: "Moving types to proper location:
 - UserDto → types/user.types.ts"
 ```
 
-### Violation: "Map not updated"
-```
-FIX: AI: "📍 Updating map.md with:
-- Added method: createTask ✅
-- Coverage: 5/6 methods (83%)"
-```
-
-### Violation: "Duplicate functionality"
-```
-FIX: AI: "📍 Map shows similar method exists:
-- Found: TaskService.createTask()
-- Options:
-  1. Use existing method
-  2. Extend with parameters
-  3. Create variant (justify why)"
-```
-
 ---
 
 ## ⚡ Quick Decision Tree
@@ -343,8 +251,6 @@ FIX: AI: "📍 Map shows similar method exists:
 ```
 Start Task
     ↓
-Check Map → Duplicate? → ASK USER
-    ↓ OK
 Check Permission → Denied? → ASK USER
     ↓ OK
 Check Size → >100 lines? → SPLIT TASK
@@ -352,18 +258,15 @@ Check Size → >100 lines? → SPLIT TASK
 Check Structure → Wrong? → FIX FIRST
     ↓ OK
 Implement → Wait for approval
-    ↓ OK
-Update Map → Document changes
 ```
 
 ---
 
 ## 🎮 Example Enforcement
 
-### Good AI Behavior (With Mapping):
+### Good AI Behavior:
 ```typescript
 // AI: "Task: Create user service"
-// AI: "📍 Checking map.md... No UserService found"
 // AI: "Step 1: Checking permissions... ✅"
 // AI: "Step 2: Creating interface (20 lines)... Need approval"
 // User: "approved"
@@ -371,44 +274,12 @@ Update Map → Document changes
 // User: "approved"
 // AI: "Step 4: Implementing service (45 lines)... Need approval"
 // User: "approved"
-// AI: "📍 Updating map.md: Added UserService with 3 methods ✅"
-// AI: "✅ Task complete: 80 lines across 3 files, map updated"
+// AI: "✅ Task complete: 80 lines across 3 files"
 ```
 
 ### Bad AI Behavior (AUTO-BLOCKED):
 ```typescript
 // AI: "Here's the complete implementation:" [500 lines]
 // SYSTEM: "❌ BLOCKED: Exceeded 100-line limit"
-// SYSTEM: "❌ BLOCKED: Map.md not checked for duplicates"
-// AI: "Sorry, let me check the map first and split into tasks..."
+// AI: "Sorry, splitting into smaller tasks..."
 ```
-
-### Map Prevents Dead Code:
-```
-// AI: "📍 Checking map.md before creating 'fetchUser' method..."
-// AI: "⚠️ Found similar methods:
-//   - UserService.getUser() ✅ implemented
-//   - UserQuery.findUser() ✅ implemented
-// 
-// Should I:
-// 1. Use existing UserService.getUser()?
-// 2. Add parameters to existing method?
-// 3. Create new fetchUser() (please explain need)?"
-// 
-// User: "Use existing getUser()"
-// AI: "✅ Reusing existing method, no dead code created"
-```
-
----
-
-## 🔑 SUMMARY: 7 GOLDEN RULES
-
-1. **Check map.md FIRST** - No duplicates
-2. **100 lines MAX per task** - Split if larger
-3. **Types before code** - Always define first
-4. **No 'any' types** - Use unknown + guards
-5. **Wait for approval** - Every step
-6. **Update map.md** - After every change
-7. **Stop on violations** - Fix before continuing
-
----
