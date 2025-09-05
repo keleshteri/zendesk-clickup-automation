@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ChatMessageRole } from '../../../enums/chat';
+import { ChatMessageRole } from '../../enums';
 
 /**
  * @ai-metadata

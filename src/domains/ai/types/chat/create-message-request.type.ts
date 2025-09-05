@@ -1,5 +1,5 @@
-import { CreateMessageSchema } from "./schema/create-message.schema";
 import { z } from 'zod';
+import { CreateMessageSchema } from '../../schemas';
 
 /**
  * @ai-metadata

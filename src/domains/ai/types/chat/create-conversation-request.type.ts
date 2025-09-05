@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CreateConversationSchema } from "./schema/create-conversation.schema";
+import { CreateConversationSchema } from "../../schemas";
 
 /**
  * @ai-metadata
