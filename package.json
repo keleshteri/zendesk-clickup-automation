@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "wrangler dev --config wrangler.dev.jsonc",
     "dev:prod": "wrangler dev",
+    "build": "tsc --noEmit",
     "deploy": "wrangler deploy --minify",
     "deploy:dev": "wrangler deploy --config wrangler.dev.jsonc --minify",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
@@ -17,6 +18,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@slack/bolt": "^4.4.0",
+    "@slack/web-api": "^7.10.0",
     "@types/uuid": "^10.0.0",
     "hono": "^4.9.5",
     "uuid": "^11.1.0",

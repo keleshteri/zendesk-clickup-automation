@@ -16,6 +16,7 @@ import { getEnvironmentConfig } from './infrastructure/di/dependencies';
 import { clickupRoutes } from './infrastructure/routes/clickup.routes';
 import { zendeskRoutes } from './infrastructure/routes/zendesk.routes';
 import { webhookRoutes } from './infrastructure/routes/webhook.routes';
+import { slackRoutes } from './infrastructure/routes/slack.routes';
 
 // Create Hono app with proper typing
 const app = new Hono<{ Bindings: Env }>();
@@ -84,6 +85,9 @@ app.route('/api/zendesk', zendeskRoutes);
 
 // Mount Webhook API routes
 app.route('/api/webhooks', webhookRoutes);
+
+// Mount Slack API routes
+app.route('/api/slack', slackRoutes);
 
 // API routes overview
 app.get('/api', (c: DIContext) => {

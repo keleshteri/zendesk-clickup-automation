@@ -38,6 +38,13 @@ import type {
   IPromptManager,
 } from '../../domains/ai/interfaces';
 
+// Slack imports
+import type {
+  ISlackBot,
+  ISlackMessaging,
+  IMessageTemplateManager
+} from '../../domains/slack/interfaces';
+
 // Service implementations
 import { ClickUpOAuthService } from '../../domains/clickup/services/clickup-oauth.service';
 import { ClickUpAuthClient } from '../../domains/clickup/services/clickup-auth-client.service';
@@ -61,6 +68,11 @@ import { GeminiClient } from '../../domains/ai/services/gemini-client.service';
 import { PomlPromptManager } from '../../domains/ai/services/prompt-manager.service';
 import { GeminiModel } from '../../domains/ai/enums';
 
+// Slack service implementations
+
+import { SlackMessagingService } from '../../domains/slack/services/slack-messaging.service';
+import { MessageTemplateManager } from '../../domains/slack/services/message-template-manager.service';
+
 /**
  * Environment variables interface for Cloudflare Workers
  */
@@ -83,6 +95,13 @@ export interface Env {
   
   // AI Configuration
   GEMINI_API_KEY?: string;
+  
+  // Slack Configuration
+  SLACK_BOT_TOKEN?: string;
+  SLACK_SIGNING_SECRET?: string;
+  SLACK_APP_TOKEN?: string;
+  SLACK_BOT_USER_ID?: string;
+  SLACK_PORT?: string;
   
   // Application Configuration
   APP_BASE_URL: string;
@@ -127,6 +146,11 @@ export interface Dependencies {
   readonly workflowOrchestrator: IWorkflowOrchestrator;
   readonly zendeskWebhookHandler: IZendeskWebhookHandler;
   readonly clickUpWebhookHandler: IClickUpWebhookHandler;
+  
+  // Slack services
+  readonly slackBotService?: ISlackBot;
+  readonly slackMessagingService?: ISlackMessaging;
+  readonly messageTemplateManager?: IMessageTemplateManager;
   
   // Configuration
   readonly oauthConfig: OAuthConfig;
@@ -230,6 +254,13 @@ export function createDependencies(env: Env): Dependencies {
   //Create prompt manager
   const promptManager = new PomlPromptManager(promptManagerConfig);
   
+  // Slack services (optional)
+  // Legacy Socket Mode service is no longer used
+  // Use the new HTTP webhook-based SlackService in routes instead
+  let slackBotService: ISlackBot | undefined;
+  let slackMessagingService: ISlackMessaging | undefined;
+  let messageTemplateManager: IMessageTemplateManager | undefined;
+  
   return {
     // OAuth services
     clickUpOAuthService,
@@ -255,6 +286,11 @@ export function createDependencies(env: Env): Dependencies {
     workflowOrchestrator,
     zendeskWebhookHandler,
     clickUpWebhookHandler,
+    
+    // Slack services
+    slackBotService,
+    slackMessagingService,
+    messageTemplateManager,
     
     // Configuration
     oauthConfig,
