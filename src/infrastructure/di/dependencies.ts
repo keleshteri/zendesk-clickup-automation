@@ -31,6 +31,13 @@ import type {
   IClickUpWebhookHandler,
 } from '../../domains/workflow/interfaces';
 
+// AI imports
+import type {
+  IAIClient,
+  IGeminiClient,
+  IPromptManager,
+} from '../../domains/ai/interfaces';
+
 // Service implementations
 import { ClickUpOAuthService } from '../../domains/clickup/services/clickup-oauth.service';
 import { ClickUpAuthClient } from '../../domains/clickup/services/clickup-auth-client.service';
@@ -48,6 +55,11 @@ import { ZendeskTicketService } from '../../domains/zendesk/services/zendesk-tic
 import { WorkflowOrchestrator } from '../../domains/workflow/services/workflow-orchestrator.service';
 import { ZendeskWebhookHandler } from '../../domains/workflow/services/zendesk-webhook-handler.service';
 import { ClickUpWebhookHandler } from '../../domains/workflow/services/clickup-webhook-handler.service';
+
+// AI service implementations
+import { GeminiClient } from '../../domains/ai/services/gemini-client.service';
+import { PomlPromptManager } from '../../domains/ai/services/prompt-manager.service';
+import { GeminiModel } from '../../domains/ai/enums';
 
 /**
  * Environment variables interface for Cloudflare Workers
@@ -68,6 +80,9 @@ export interface Env {
   ZENDESK_SUBDOMAIN: string;
   ZENDESK_EMAIL: string;
   ZENDESK_API_TOKEN: string;
+  
+  // AI Configuration
+  GEMINI_API_KEY?: string;
   
   // Application Configuration
   APP_BASE_URL: string;
@@ -97,6 +112,11 @@ export interface Dependencies {
   readonly clickUpClient: IClickUpClient;
   readonly clickUpTaskService: IClickUpTaskService;
   readonly clickUpSpaceService: IClickUpSpaceService;
+  
+  // AI services
+  readonly aiClient: IAIClient;
+  readonly geminiClient: IGeminiClient;
+  readonly promptManager: IPromptManager;
   
   // Zendesk API services
   readonly zendeskHttpClient: IZendeskHttpClient;
@@ -191,6 +211,25 @@ export function createDependencies(env: Env): Dependencies {
     clickUpWebhookHandler
   );
   
+  // Create AI services
+  const geminiConfig = {
+    apiKey: env.GEMINI_API_KEY || '',
+    model: GeminiModel.GEMINI_PRO,
+  };
+  // Create AI services
+  const geminiClient = new GeminiClient(geminiConfig);
+  //ai services 
+  const aiClient = geminiClient; // Use Gemini as the default AI client
+  // prompt manager info
+  const promptManagerConfig = {
+    templateDir: 'prompts',
+    defaultVariables: {
+      systemName: 'Zendesk-ClickUp Automation',
+    },
+  };
+  //Create prompt manager
+  const promptManager = new PomlPromptManager(promptManagerConfig);
+  
   return {
     // OAuth services
     clickUpOAuthService,
@@ -201,6 +240,11 @@ export function createDependencies(env: Env): Dependencies {
     clickUpClient,
     clickUpTaskService,
     clickUpSpaceService,
+    
+    // AI services
+    aiClient,
+    geminiClient,
+    promptManager,
     
     // Zendesk API services
     zendeskHttpClient,
@@ -261,6 +305,7 @@ export function validateEnvironment(env: Env): void {
     'ZENDESK_SUBDOMAIN',
     'ZENDESK_EMAIL',
     'ZENDESK_API_TOKEN',
+    // GEMINI_API_KEY is optional and only required when using AI features
   ] as const;
   
   const missing = required.filter(key => !env[key]);

@@ -20,6 +20,7 @@ A Cloudflare Workers application that automates task creation and synchronizatio
 - **Validation**: Zod (runtime type validation)
 - **Testing**: Vitest (with Node.js environment)
 - **Authentication**: OAuth 2.0 with PKCE
+- **AI Integration**: Google Gemini API for chat and utility functions
 
 ## Project Structure
 
@@ -32,6 +33,11 @@ src/
 │   │   ├── services/           # ClickUp service implementations
 │   │   └── __tests__/          # Unit tests
 │   ├── zendesk/               # Zendesk integration (future)
+│   ├── ai/                    # AI integration with Gemini
+│   │   ├── interfaces/        # AI service contracts
+│   │   ├── types/             # AI data types and schemas
+│   │   ├── services/          # AI service implementations
+│   │   └── __tests__/         # Unit tests
 │   └── automation/            # Automation workflows (future)
 ├── shared/
 │   ├── interfaces/            # Shared contracts
@@ -41,6 +47,16 @@ src/
 │   └── di/                   # Dependency injection setup
 └── index.ts                  # Main application entry point
 ```
+
+## AI Integration
+
+This project integrates with Google's Gemini API to provide AI-powered features:
+
+- **Chat Conversations**: Interactive AI chat for user assistance
+- **Ticket Summaries**: Automated summarization of Zendesk tickets
+- **Error Analysis**: AI-powered analysis of error logs
+
+For more information about token limits and configuration, see [AI Token Limits Guide](./docs/ai-token-limits.md).
 
 ## Prerequisites
 
@@ -95,7 +111,8 @@ wrangler secret put ENCRYPTION_KEY
     "ENVIRONMENT": "development",
     "LOG_LEVEL": "info",
     "CLICKUP_API_BASE_URL": "https://api.clickup.com/api/v2",
-    "ZENDESK_API_BASE_URL": "https://your-domain.zendesk.com/api/v2"
+    "ZENDESK_API_BASE_URL": "https://your-domain.zendesk.com/api/v2",
+    "GEMINI_API_KEY": "your-gemini-api-key" // Required for AI features
   }
 }
 ```
