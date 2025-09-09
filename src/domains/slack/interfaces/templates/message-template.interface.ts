@@ -2,6 +2,10 @@
 type Block = any;
 type KnownBlock = any;
 
+// Import and re-export TemplateContext from separate file
+import type { TemplateContext } from './template-context.interface.js';
+export type { TemplateContext };
+
 /**
  * Template variable definition
  */
@@ -61,3 +65,7 @@ export interface MessageTemplate {
     tags?: string[];
   };
 }
+
+// TemplateContext is imported from template-context.interface.ts
+
+// RenderedMessage is exported from rendered-message.interface.ts

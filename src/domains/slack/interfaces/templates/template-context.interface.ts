@@ -2,6 +2,8 @@
  * Context for template rendering
  */
 export interface TemplateContext {
+  /** Variables to substitute in template */
+  variables: Record<string, any>;
   /** User context */
   user?: {
     /** User ID */

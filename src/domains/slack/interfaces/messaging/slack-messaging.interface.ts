@@ -4,7 +4,8 @@ import type {
 } from "@slack/web-api";
  
 import { RenderedMessage } from "../templates/rendered-message.interface.js";
-import { DirectMessageOptions, EphemeralMessageOptions, MessageDeleteOptions, MessageOptions, MessageReactionOptions, MessageUpdateOptions } from "./message-options.interface.js";
+import { DirectMessageOptions, EphemeralMessageOptions, MessageDeleteOptions, MessageOptions, MessageReactionOptions, MessageUpdateOptions } from "./message-options/index.js";
+ 
 
 /**
  * Slack messaging service interface

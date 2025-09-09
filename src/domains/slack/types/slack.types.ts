@@ -83,11 +83,30 @@ export const SlackUserSchema = z.object({
 export const MessageTemplateSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
+  version: z.string().min(1),
   description: z.string().optional(),
-  text: z.string().min(1),
-  blocks: z.array(z.any()).optional(),
-  defaultVariables: z.record(z.any()).optional(),
-  category: z.nativeEnum(TemplateCategory).optional()
+  category: z.string().optional(),
+  variables: z.array(z.object({
+    name: z.string(),
+    type: z.enum(['string', 'number', 'boolean', 'object', 'array']),
+    required: z.boolean(),
+    defaultValue: z.any().optional(),
+    description: z.string().optional(),
+    pattern: z.string().optional(),
+    min: z.number().optional(),
+    max: z.number().optional()
+  })),
+  content: z.object({
+    text: z.string().optional(),
+    blocks: z.array(z.any()).optional(),
+    attachments: z.array(z.any()).optional()
+  }),
+  metadata: z.object({
+    createdAt: z.date(),
+    updatedAt: z.date(),
+    author: z.string().optional(),
+    tags: z.array(z.string()).optional()
+  }).optional()
 });
 
 // Template Context Schema

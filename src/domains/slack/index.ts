@@ -19,16 +19,16 @@ export type {
   SlackUser,
   BotMentionEvent,
   WelcomeMessageContext
-} from './interfaces/slack-bot.interface.js';
+} from './interfaces';
 
 export type {
-  IMessageTemplateManager,
   MessageTemplate,
   TemplateVariable,
-  RenderedMessage,
-  TemplateContext,
-  ITemplateLoader
-} from './interfaces/message-template.interface.js';
+  TemplateContext
+} from './interfaces/templates/message-template.interface.js';
+export type { IMessageTemplateManager } from './interfaces/templates/message-template-manager.interface.js';
+export type { RenderedMessage } from './interfaces/templates/rendered-message.interface.js';
+export type { ITemplateLoader } from './interfaces/templates/template-loader.interface.js';
 
 export type {
   ISlackMessaging,
@@ -38,7 +38,7 @@ export type {
   MessageDeleteOptions,
   EphemeralMessageOptions,
   MessageReactionOptions
-} from './interfaces/slack-messaging.interface.js';
+} from './interfaces';
 
 // Types and schemas
 export {
@@ -87,7 +87,7 @@ export {
   isSlackRateLimitError,
   isSlackTemplateError,
   isSlackMessageError
-} from './errors/slack.errors.js';
+} from './errors/index.js';
 
 // Template functions
 export {
