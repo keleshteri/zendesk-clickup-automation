@@ -6,10 +6,10 @@
  */
 
 import { WebClient } from '@slack/web-api';
-import type { ChatPostMessageResponse, WebAPICallResult } from '@slack/web-api';
+import type { ChatPostMessageResponse } from '@slack/web-api';
 import type { SlackBotConfig } from '../interfaces/slack-bot.interface.js';
 import type { SlackEvent, SlackInteraction, SlackCommand } from '../types/slack.types.js';
-import { SlackBotError, SlackConfigError } from '../errors/slack.errors.js';
+import { SlackBotError, SlackConfigError } from '../errors';
 
 /**
  * Cloudflare Workers compatible Slack service
@@ -37,9 +37,6 @@ export class SlackService {
     
     if (!config.signingSecret) {
       throw new SlackConfigError('Signing secret is required');
-    }
-    if (config.socketMode) {
-      throw new SlackConfigError('Socket Mode is not supported in Cloudflare Workers. Use HTTP webhooks instead.');
     }
   }
 
