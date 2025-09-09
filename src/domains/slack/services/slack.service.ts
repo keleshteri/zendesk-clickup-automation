@@ -7,7 +7,7 @@
 
 import { WebClient } from '@slack/web-api';
 import type { ChatPostMessageResponse } from '@slack/web-api';
-import type { SlackBotConfig } from '../interfaces/slack-bot.interface.js';
+import type { SlackBotConfig } from '../interfaces/bot/slack-bot.interface.js';
 import type { SlackEvent, SlackInteraction, SlackCommand } from '../types/slack.types.js';
 import { SlackBotError, SlackConfigError } from '../errors';
 

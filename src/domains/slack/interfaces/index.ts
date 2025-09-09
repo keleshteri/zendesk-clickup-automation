@@ -1,7 +1,30 @@
-/**
- * @fileoverview Slack domain interfaces barrel export
- */
+// Bot interfaces
+export type {
+  SlackBotConfig,
+  SlackChannel,
+  SlackUser,
+  BotMentionEvent,
+  WelcomeMessageContext,
+  ISlackBot
+} from './bot/index.js';
 
-export type { ISlackBot } from './slack-bot.interface';
-export type { ISlackMessaging } from './slack-messaging.interface';
-export type { IMessageTemplateManager } from './message-template.interface';
+// Messaging interfaces
+export type {
+  ISlackMessaging,
+  MessageOptions,
+  DirectMessageOptions,
+  MessageUpdateOptions,
+  MessageDeleteOptions,
+  EphemeralMessageOptions,
+  MessageReactionOptions
+} from './messaging/index.js';
+
+// Template interfaces
+export type {
+  TemplateVariable,
+  MessageTemplate,
+  RenderedMessage,
+  TemplateContext,
+  IMessageTemplateManager,
+  ITemplateLoader
+} from './templates/index.js';
