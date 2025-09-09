@@ -58,9 +58,7 @@ export enum BotResponseType {
 export const SlackBotConfigSchema = z.object({
   botToken: z.string().min(1, 'Bot token is required'),
   botUserId: z.string().optional(),
-  appToken: z.string().optional(),
   signingSecret: z.string().optional(),
-  socketMode: z.boolean().default(true),
   port: z.number().int().positive().optional()
 });
 

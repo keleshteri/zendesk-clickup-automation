@@ -1,11 +1,9 @@
 import type {
   ISlackBot,
-  SlackBotConfig
 } from './interfaces/slack-bot.interface.js';
 import type { IMessageTemplateManager } from './interfaces/message-template.interface.js';
 import type { ISlackMessaging } from './interfaces/slack-messaging.interface.js';
 import type { SlackModuleConfig, WelcomeConfig, MentionConfig } from './types/slack.types.js';
-import { SlackLegacyService } from './services/slack-legacy.service.js';
 import { MessageTemplateManager } from './services/message-template-manager.service.js';
 import { SlackMessagingService } from './services/slack-messaging.service.js';
 import { MentionHandlerService } from './services/mention-handler.service.js';
@@ -27,7 +25,8 @@ export class SlackModule {
     this.config = config;
 
     // Initialize services
-    this.bot = new SlackLegacyService(config.bot);
+    // Note: SlackLegacyService removed - use SlackService in routes for Cloudflare Workers
+    throw new SlackConfigError('SlackModule with SlackLegacyService is deprecated. Use SlackService directly in routes for Cloudflare Workers compatibility.');
     this.templateManager = new MessageTemplateManager();
     this.messagingService = new SlackMessagingService(this.bot.client);
     this.mentionHandler = new MentionHandlerService(
@@ -210,20 +209,17 @@ export function createSlackModule(config: SlackModuleConfig): SlackModule {
 export function createBasicSlackConfig({
   botToken,
   signingSecret,
-  appToken,
   port = 3000
 }: {
   botToken: string;
   signingSecret?: string;
-  appToken?: string;
   port?: number;
 }): SlackModuleConfig {
   return {
     bot: {
       botToken,
-      appToken,
       signingSecret,
-      socketMode: true,
+      // appToken and socketMode removed - not compatible with Cloudflare Workers
       port
     },
     welcome: {
@@ -279,11 +275,11 @@ export type {
 
 // Export services for advanced usage
 export {
-  SlackLegacyService,
   MessageTemplateManager,
   SlackMessagingService,
   MentionHandlerService
 };
+
 
 // Export errors
 export {

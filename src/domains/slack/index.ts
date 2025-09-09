@@ -7,7 +7,6 @@
  */
 
 // Core services
-export { SlackLegacyService } from './services/slack-legacy.service.js';
 export { MessageTemplateManager } from './services/message-template-manager.service.js';
 export { SlackMessagingService } from './services/slack-messaging.service.js';
 export { MentionHandlerService } from './services/mention-handler.service.js';
@@ -166,7 +165,7 @@ export function createDevSlackConfig(config: {
   botToken?: string;
   signingSecret?: string;
   botUserId?: string;
-  appToken?: string;
+  // appToken removed - not supported in Cloudflare Workers
   botName?: string;
   port?: number;
 }): any {
@@ -174,10 +173,10 @@ export function createDevSlackConfig(config: {
     botToken: config.botToken || process.env.SLACK_BOT_TOKEN || '',
     signingSecret: config.signingSecret || process.env.SLACK_SIGNING_SECRET || '',
     botUserId: config.botUserId || process.env.SLACK_BOT_USER_ID || '',
-    appToken: config.appToken || process.env.SLACK_APP_TOKEN,
+    // appToken removed - not supported in Cloudflare Workers
     botName: config.botName || process.env.SLACK_BOT_NAME || 'DevBot',
     port: config.port || parseInt(process.env.PORT || '3000'),
-    socketMode: !!config.appToken || !!process.env.SLACK_APP_TOKEN,
+    // socketMode removed - not supported in Cloudflare Workers
     enableWelcomeMessages: true,
     enableMentionHandling: true,
     welcomeConfig: {

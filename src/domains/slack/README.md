@@ -72,8 +72,7 @@ const slackModule = new SlackModule({
   botName: 'AdvancedBot',
   port: 3000,
   logLevel: LogLevel.DEBUG,
-  socketMode: true,
-  appToken: 'xapp-your-app-token',
+  // HTTP webhook mode (Cloudflare Workers compatible)
   
   // Welcome message configuration
   enableWelcomeMessages: true,
@@ -106,8 +105,7 @@ The main module that orchestrates all Slack functionality.
 
 #### Service Architecture
 
-- **SlackLegacyService**: Legacy bot service handling Socket Mode connections (deprecated)
-- **SlackService**: New Cloudflare Workers-compatible service using HTTP webhooks
+- **SlackService**: Cloudflare Workers-compatible service using HTTP webhooks
 
 ```typescript
 // Get individual services
@@ -355,8 +353,7 @@ interface SlackModuleConfig {
   
   // Optional
   botName?: string;             // Bot display name
-  appToken?: string;            // App-Level Token (for Socket Mode)
-  socketMode?: boolean;         // Enable Socket Mode
+  // Note: Socket Mode not supported in Cloudflare Workers
   port?: number;                // Server port (default: 3000)
   logLevel?: LogLevel;          // Logging level
   receiver?: ExpressReceiver;   // Custom receiver
@@ -398,8 +395,7 @@ interface MentionConfig {
 1. **Environment Variables**: Store sensitive tokens in environment variables
 2. **Error Handling**: Always wrap Slack operations in try-catch blocks
 3. **Rate Limiting**: Be mindful of Slack's rate limits
-4. **Socket Mode**: Use Socket Mode for development, HTTP for production
-5. **Templates**: Use templates for consistent messaging
+4.5. **HTTP Webhooks**: Use HTTP webhooks for Cloudflare Workers compatibility **Templates**: Use templates for consistent messaging
 6. **Logging**: Enable appropriate logging levels for debugging
 
 ## Example: Complete Bot Setup

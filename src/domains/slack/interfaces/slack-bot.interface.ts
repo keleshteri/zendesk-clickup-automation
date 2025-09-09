@@ -12,11 +12,11 @@ export interface SlackBotConfig {
   /** Bot user ID for mentions */
   botUserId?: string;
   /** App token for socket mode (optional) */
-  appToken?: string;
+  // appToken removed - not supported in Cloudflare Workers
   /** Signing secret for request verification */
   signingSecret?: string;
   /** Enable socket mode for real-time events */
-  socketMode?: boolean;
+  // socketMode removed - not supported in Cloudflare Workers
   /** Custom port for HTTP mode */
   port?: number;
 }

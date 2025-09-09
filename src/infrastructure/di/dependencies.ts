@@ -255,8 +255,6 @@ export function createDependencies(env: Env): Dependencies {
   const promptManager = new PomlPromptManager(promptManagerConfig);
   
   // Slack services (optional)
-  // Legacy Socket Mode service is no longer used
-  // Use the new HTTP webhook-based SlackService in routes instead
   let slackBotService: ISlackBot | undefined;
   let slackMessagingService: ISlackMessaging | undefined;
   let messageTemplateManager: IMessageTemplateManager | undefined;
@@ -287,7 +285,7 @@ export function createDependencies(env: Env): Dependencies {
     zendeskWebhookHandler,
     clickUpWebhookHandler,
     
-    // Slack services
+    // Slack services (deprecated - use SlackService in routes)
     slackBotService,
     slackMessagingService,
     messageTemplateManager,
